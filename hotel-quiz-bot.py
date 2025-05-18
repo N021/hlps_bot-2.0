@@ -1171,20 +1171,19 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     
     application.add_handler(conv_handler)
     
-    # Визначаємо режим запуску: webhook або polling
+      # Визначаємо режим запуску: webhook або polling
     if webhook_url and webhook_port and webhook_path:
         # Налаштування webhook
         webhook_info = f"{webhook_url}{webhook_path}"
         
         # Запуск бота в режимі webhook
         logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-           application.run_webhook(
-        listen="0.0.0.0",
-        port=10000,  # Render використовує цей порт
-        url_path=webhook_path,
-        webhook_url=webhook_info
-    )
-
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=10000,  # Render використовує цей порт
+            url_path=webhook_path,
+            webhook_url=webhook_info
+        )
     else:
         # Запуск бота в режимі polling (стандартний режим)
         logger.info("Запуск бота в режимі polling...")
