@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: telegram-loyalty-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python your_script_name.py  # заміни на реальну назву
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: WEBHOOK_HOST
+        value: your-service-name.onrender.com
+      - key: WEBHOOK_PATH
+        value: /webhook/your_bot_token
