@@ -6,8 +6,10 @@ services:
     startCommand: python telegram_bot.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        fromEnvVar: TELEGRAM_TOKEN
+      - key: CSV_PATH
+        fromEnvVar: CSV_PATH
       - key: WEBHOOK_HOST
-        value: your-service-name.onrender.com
+        fromEnvVar: WEBHOOK_HOST
       - key: WEBHOOK_PATH
-        value: /webhook/your_bot_token
+        value: /webhook/$(TELEGRAM_TOKEN)
