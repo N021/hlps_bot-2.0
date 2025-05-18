@@ -3,7 +3,7 @@ services:
     name: telegram-loyalty-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python telegram_bot.py
+    startCommand: python hotel-quiz-bot.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         fromEnvVar: TELEGRAM_TOKEN
