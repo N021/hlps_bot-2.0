@@ -3,7 +3,7 @@ services:
     name: telegram-loyalty-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python your_script_name.py  # заміни на реальну назву
+    startCommand: python telegram_bot.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
