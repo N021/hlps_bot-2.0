@@ -1194,7 +1194,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
 if __name__ == "__main__":
     # Використовуємо змінні середовища або значення за замовчуванням
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-    CSV_PATH = os.environ.get("CSV_PATH", "hotel_loyalty_programs.csv")
+    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
     
     # Параметри для webhook (опціонально)
     WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", None)  # Домен або IP-адреса вашого сервера
