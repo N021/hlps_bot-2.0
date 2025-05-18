@@ -1,15 +1,11 @@
 services:
   - type: web
-    name: telegram-loyalty-bot
+    name: hlp-loyalty-bot
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python hotel-quiz-bot.py
     envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        fromEnvVar: TELEGRAM_TOKEN
       - key: CSV_PATH
-        fromEnvVar: CSV_PATH
-      - key: WEBHOOK_HOST
-        fromEnvVar: WEBHOOK_HOST
-      - key: WEBHOOK_PATH
-        value: /webhook/$(TELEGRAM_TOKEN)
+        value: hotel_data.csv
+      - key: TELEGRAM_BOT_TOKEN
+        value: 123456789:ABCdefGHIjkLmNoPQRstuVWxyZ
