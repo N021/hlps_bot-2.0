@@ -1138,7 +1138,7 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
     
     return ConversationHandler.END
 
-def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None,
+def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None),
     """Головна функція запуску бота з підтримкою webhook"""
     # Завантаження даних
     global hotel_data
