@@ -2,8 +2,7 @@ import logging
 import pandas as pd
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
-import os  # Додано для кращої роботи з шляхами до файлів
-# Після існуючих імпортів
+import os  # Для кращої роботи з шляхами до файлів
 from telegram.ext import ApplicationBuilder
 import ssl
 from aiohttp import web
@@ -16,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Етапи розмови
-LANGUAGE, REGION, COUNTRY, CATEGORY, STYLE, PURPOSE = range(6)  # Додано COUNTRY як окремий стан
+LANGUAGE, REGION, COUNTRY, CATEGORY, STYLE, PURPOSE = range(6)
 
 # Дані користувачів
 user_data_global = {}
@@ -41,7 +40,6 @@ def analyze_csv_structure(df):
     
     if 'segment' in df.columns:
         logger.info(f"Сегменти: {df['segment'].unique()}")
-    # Видаляємо перевірку на category, оскільки повинен бути segment
     
     # Перевірка пропущених значень
     null_counts = df.isnull().sum()
@@ -51,7 +49,6 @@ def analyze_csv_structure(df):
     # Перевірка типів даних
     logger.info(f"Типи даних: {df.dtypes}")
 
-# Функція для завантаження CSV
 def load_hotel_data(csv_path):
     """Завантаження даних про програми лояльності з CSV файлу"""
     try:
@@ -82,7 +79,6 @@ def load_hotel_data(csv_path):
         if 'category' in df.columns and 'segment' not in df.columns:
             rename_mapping['category'] = 'segment'
             logger.info("Перейменовано колонку 'category' в 'segment'")
-        # Видаляємо створення колонки 'category' як копії 'segment'
         
         # Якщо є колонка з коротшою назвою для регіонів
         if 'region_hotels' in df.columns and 'Total hotels of Corporation / Loyalty Program in this region' not in df.columns:
@@ -300,7 +296,7 @@ async def country_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     return await ask_category(update, context)
 
-# Функції для категорії та стилю готелів
+# Функції для категорії готелів
 async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про категорію готелів"""
     user_id = update.effective_user.id
@@ -312,7 +308,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         keyboard = [
             ["Luxury (преміум-клас)"],
             ["Comfort (середній клас)"],
-            ["Standard (економ-клас)"]  # Виправлено Standart на Standard
+            ["Standard (економ-клас)"]
         ]
         
         await update.message.reply_text(
@@ -323,7 +319,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         keyboard = [
             ["Luxury (premium class)"],
             ["Comfort (middle class)"],
-            ["Standard (economy class)"]  # Виправлено Standart на Standard
+            ["Standard (economy class)"]
         ]
         
         await update.message.reply_text(
@@ -364,71 +360,63 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     return await ask_style(update, context)
 
+# Оновлена функція для вибору стилю готелю
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю"""
     user_id = update.effective_user.id
     lang = user_data_global[user_id]['language']
-    category = user_data_global[user_id]['category']
     
-    keyboard = []
-    
-    # Визначаємо варіанти стилів відповідно до обраної категорії
-    if category == "Luxury":
-        if lang == 'uk':
-            keyboard = [
-                ["Розкішний та вишуканий (преміум-матеріали, елегантний дизайн, високий рівень сервісу)"],
-                ["Бутік та унікальний (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)"],
-                ["Класичний та традиційний (перевірений часом стиль, консервативність, історичність)"],
-                ["Сучасний та дизайнерський (модні інтер'єри, мінімалізм, технологічність)"]
-            ]
-        else:
-            keyboard = [
-                ["Luxurious and refined (premium materials, elegant design, high level of service)"],
-                ["Boutique and unique (original interior, creative atmosphere, sense of exclusivity)"],
-                ["Classic and traditional (time-tested style, conservatism, historical ambiance)"],
-                ["Modern and designer (fashionable interiors, minimalism, technological features)"]
-            ]
-    elif category == "Comfort":
-        if lang == 'uk':
-            keyboard = [
-                ["Затишний та сімейний (тепла атмосфера, комфорт, дружній до дітей)"],
-                ["Класичний та традиційний (перевірений часом стиль, консервативність, історичність)"],
-                ["Сучасний та дизайнерський (модні інтер'єри, мінімалізм, технологічність)"]
-            ]
-        else:
-            keyboard = [
-                ["Cozy and family-friendly (warm atmosphere, comfort, child-friendly)"],
-                ["Classic and traditional (time-tested style, conservatism, historical ambiance)"],
-                ["Modern and designer (fashionable interiors, minimalism, technological features)"]
-            ]
-    else:  # Standard
-        if lang == 'uk':
-            keyboard = [
-                ["Практичний та економічний (без зайвих деталей, функціональний, доступний)"],
-                ["Затишний та сімейний (тепла атмосфера, комфорт, дружній до дітей)"]
-            ]
-        else:
-            keyboard = [
-                ["Practical and economical (no unnecessary details, functional, affordable)"],
-                ["Cozy and family-friendly (warm atmosphere, comfort, child-friendly)"]
-            ]
-    
-    # Додаємо чітку інструкцію про вибір кількох варіантів
     if lang == 'uk':
-        await update.message.reply_text(
-            "Питання 3/4:\nЯкий стиль готелю ви зазвичай обираєте?\n"
-            "(Виберіть до трьох варіантів. Для вибору кількох варіантів, надішліть їх через кому.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        message = (
+            "Питання 3/4:\n"
+            "**Який стиль готелю ви зазвичай обираєте?**\n"
+            "*(Оберіть до трьох варіантів.)*\n\n"
+            "1. **Розкішний і вишуканий** (преміум-матеріали, елегантний дизайн, високий рівень сервісу)\n"
+            "2. **Бутік і унікальний** (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)\n"
+            "3. **Класичний і традиційний** (перевірений часом стиль, консервативність, історичність)\n"
+            "4. **Сучасний і дизайнерський** (модні інтер'єри, мінімалізм, технологічність)\n"
+            "5. **Затишний і сімейний** (тепла атмосфера, комфорт, дружній до дітей)\n"
+            "6. **Практичний і економічний** (без зайвих деталей, функціональний, доступний)"
         )
+        
+        keyboard = [
+            ["1. Розкішний і вишуканий"],
+            ["2. Бутік і унікальний"],
+            ["3. Класичний і традиційний"],
+            ["4. Сучасний і дизайнерський"],
+            ["5. Затишний і сімейний"],
+            ["6. Практичний і економічний"]
+        ]
     else:
-        await update.message.reply_text(
-            "Question 3/4:\nWhat hotel style do you usually choose?\n"
-            "(Choose up to three options. For multiple choices, send them separated by commas.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        message = (
+            "Question 3/4:\n"
+            "**What hotel style do you usually choose?**\n"
+            "*(Choose up to three options.)*\n\n"
+            "1. **Luxurious and refined** (premium materials, elegant design, high level of service)\n"
+            "2. **Boutique and unique** (original interior, creative atmosphere, sense of exclusivity)\n"
+            "3. **Classic and traditional** (time-tested style, conservatism, historical ambiance)\n"
+            "4. **Modern and designer** (fashionable interiors, minimalism, technological features)\n"
+            "5. **Cozy and family-friendly** (warm atmosphere, comfort, child-friendly)\n"
+            "6. **Practical and economical** (no unnecessary details, functional, affordable)"
         )
+        
+        keyboard = [
+            ["1. Luxurious and refined"],
+            ["2. Boutique and unique"],
+            ["3. Classic and traditional"],
+            ["4. Modern and designer"],
+            ["5. Cozy and family-friendly"],
+            ["6. Practical and economical"]
+        ]
+    
+    await update.message.reply_text(
+        message,
+        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    )
     
     return STYLE
 
+# Оновлена функція обробки вибору стилю готелю
 async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє вибір стилю готелю"""
     user_id = update.effective_user.id
@@ -440,9 +428,48 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     
     # Перевіряємо на множинний вибір (якщо текст містить кому)
     if "," in text:
-        styles = [style.strip() for style in text.split(",")]
+        style_texts = [style.strip() for style in text.split(",")]
     else:
-        styles = [text.strip()]  # Один стиль
+        style_texts = [text.strip()]  # Один стиль
+    
+    # Мапінг номерів до стилів
+    style_mapping_uk = {
+        "1": "Розкішний і вишуканий",
+        "2": "Бутік і унікальний",
+        "3": "Класичний і традиційний",
+        "4": "Сучасний і дизайнерський",
+        "5": "Затишний і сімейний",
+        "6": "Практичний і економічний"
+    }
+    
+    style_mapping_en = {
+        "1": "Luxurious and refined",
+        "2": "Boutique and unique",
+        "3": "Classic and traditional",
+        "4": "Modern and designer",
+        "5": "Cozy and family-friendly",
+        "6": "Practical and economical"
+    }
+    
+    # Визначаємо обрані стилі, обробляючи номери або повні назви
+    for style_text in style_texts:
+        # Видаляємо крапку після числа, якщо вона є
+        if ". " in style_text:
+            style_text = style_text.replace(". ", ".")
+        
+        # Якщо текст починається з цифри (1-6), використовуємо мапінг
+        if style_text.startswith(("1", "2", "3", "4", "5", "6")):
+            num = style_text[0]  # Перший символ (цифра)
+            if lang == 'uk':
+                styles.append(style_mapping_uk[num])
+            else:
+                styles.append(style_mapping_en[num])
+        else:
+            # Інакше шукаємо відповідність у назвах стилів
+            for key, value in (style_mapping_uk.items() if lang == 'uk' else style_mapping_en.items()):
+                if value.lower() in style_text.lower():
+                    styles.append(value)
+                    break
     
     # Обмеження до трьох варіантів з повідомленням
     original_count = len(styles)
@@ -464,116 +491,20 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # Зберігаємо вибрані стилі
     user_data_global[user_id]['styles'] = styles
     
-    # Створюємо спрощений список стилів для відображення (без описів у дужках)
-    display_styles = []
-    for style in styles:
-        # Виділяємо основну частину стилю без описів у дужках
-        if "(" in style:
-            display_style = style.split("(")[0].strip()
-            display_styles.append(display_style)
-        else:
-            display_styles.append(style)
-    
     if lang == 'uk':
         await update.message.reply_text(
-            f"Дякую! Ви обрали наступні стилі: {', '.join(display_styles)}.\n"
+            f"Дякую! Ви обрали наступні стилі: {', '.join(styles)}.\n"
             "Переходимо до наступного питання."
         )
     else:
         await update.message.reply_text(
-            f"Thank you! You have chosen the following styles: {', '.join(display_styles)}.\n"
+            f"Thank you! You have chosen the following styles: {', '.join(styles)}.\n"
             "Moving on to the next question."
         )
     
     return await ask_purpose(update, context)
 
-# Функції для мети подорожі та фільтрації даних
-async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про мету подорожі"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
-    
-    keyboard = []
-    
-    if lang == 'uk':
-        keyboard = [
-            ["Бізнес-подорожі / відрядження"],
-            ["Відпустка / релакс"],
-            ["Сімейний відпочинок"],
-            ["Довготривале проживання"]
-        ]
-        
-        await update.message.reply_text(
-            "Питання 4/4:\nЗ якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "(Оберіть до двох варіантів. Для вибору кількох варіантів, надішліть їх через кому, наприклад: \"Бізнес-подорожі / відрядження, Сімейний відпочинок\")",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    else:
-        keyboard = [
-            ["Business travel"],
-            ["Vacation / relaxation"],
-            ["Family vacation"],
-            ["Long-term stay"]
-        ]
-        
-        await update.message.reply_text(
-            "Question 4/4:\nFor what purpose do you usually stay at a hotel?\n"
-            "(Choose up to two options. For multiple choices, send them separated by commas, for example: \"Business travel, Family vacation\")",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    
-    return PURPOSE
-
-async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір мети подорожі"""
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
-    
-    # Обробка вибору мети
-    purposes = []
-    
-    # Перевіряємо на множинний вибір (якщо текст містить кому)
-    if "," in text:
-        purposes = [purpose.strip() for purpose in text.split(",")]
-    else:
-        purposes = [text.strip()]  # Один варіант
-    
-    # Обмеження до двох варіантів з повідомленням
-    original_count = len(purposes)
-    if len(purposes) > 2:
-        purposes = purposes[:2]
-        
-        # Повідомляємо користувача про обмеження
-        if lang == 'uk':
-            await update.message.reply_text(
-                f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-                f"Я врахую тільки перші дві: {', '.join(purposes)}."
-            )
-        else:
-            await update.message.reply_text(
-                f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-                f"I will only consider the first two: {', '.join(purposes)}."
-            )
-    
-    # Зберігаємо вибрані мети
-    user_data_global[user_id]['purposes'] = purposes
-    
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали наступні мети: {', '.join(purposes)}.\n"
-            "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the following purposes: {', '.join(purposes)}.\n"
-            "Please wait while I analyze your answers and select the best loyalty programs for you."
-        )
-    
-    # Обчислюємо та відображаємо результати
-    return await calculate_and_show_results(update, context)
-
-# Виправлені функції для роботи з даними
+# Функції фільтрації готелів
 def filter_hotels_by_region(df, regions, countries=None):
     """
     Фільтрує готелі за регіоном або країною
@@ -652,138 +583,7 @@ def filter_hotels_by_adjacent_category(df, category):
     
     return df
 
-def map_hotel_style(hotel_brand):
-    """
-    Зіставляє бренд готелю зі стилями
-    
-    Args:
-        hotel_brand: бренд готелю (один рядок, не список)
-    
-    Returns:
-        Словник стилів з відповідними значеннями True/False
-    """
-    # Переконуємося, що hotel_brand є рядком
-    if not isinstance(hotel_brand, str):
-        hotel_brand = str(hotel_brand)
-    
-    style_mapping = {
-        "Розкішний та вишуканий (преміум-матеріали, елегантний дизайн, високий рівень сервісу)": ["JW Marriott", "The Ritz-Carlton", "Conrad Hotels & Resorts", 
-                                 "Waldorf Astoria Hotels & Resorts", "InterContinental Hotels & Resorts", 
-                                 "Fairmont Hotels", "Park Hyatt Hotels"],
-        
-        "Бутік та унікальний (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)": ["Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
-                              "Ascend Hotel Collection", "Alila Hotels"],
-        
-        "Класичний та традиційний (перевірений часом стиль, консервативність, історичність)": ["The Ritz-Carlton", "Marriott Hotels", "Sheraton", 
-                                  "Waldorf Astoria Hotels & Resorts", "Fairmont"],
-        
-        "Сучасний та дизайнерський (модні інтер'єри, мінімалізм, технологічність)": ["Conrad Hotels & Resorts", "Kimpton Hotels & Restaurants", 
-                                   "Wyndham Grand", "Novotel Hotels", "Cambria Hotels"],
-        
-        "Затишний та сімейний (тепла атмосфера, комфорт, дружній до дітей)": ["DoubleTree by Hilton", "Holiday Inn Hotels & Resorts", 
-                              "Mercure Hotels", "Novotel Hotels", "Comfort Inn Hotels", "Hyatt House"],
-        
-        "Практичний та економічний (без зайвих деталей, функціональний, доступний)": ["Fairfield Inn & Suites", "Courtyard by Marriott", 
-                                 "Hampton by Hilton", "Holiday Inn Express", "Ibis Hotels", 
-                                 "Super 8 by Wyndham", "Days Inn by Wyndham"]
-    }
-    
-    # Додаємо альтернативні ключі без описів для сумісності зі старими записами
-    simplified_mapping = {
-        "Розкішний та вишуканий": style_mapping["Розкішний та вишуканий (преміум-матеріали, елегантний дизайн, високий рівень сервісу)"],
-        "Бутік та унікальний": style_mapping["Бутік та унікальний (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)"],
-        "Класичний та традиційний": style_mapping["Класичний та традиційний (перевірений часом стиль, консервативність, історичність)"],
-        "Сучасний та дизайнерський": style_mapping["Сучасний та дизайнерський (модні інтер'єри, мінімалізм, технологічність)"],
-        "Затишний та сімейний": style_mapping["Затишний та сімейний (тепла атмосфера, комфорт, дружній до дітей)"],
-        "Практичний та економний": style_mapping["Практичний та економічний (без зайвих деталей, функціональний, доступний)"]
-    }
-    
-    # Об'єднуємо обидва словники для обробки як повних, так і скорочених варіантів
-    style_mapping.update(simplified_mapping)
-    
-    # Переклад для англійської мови
-    style_mapping_en = {
-        "Luxurious and refined (premium materials, elegant design, high level of service)": style_mapping["Розкішний та вишуканий (преміум-матеріали, елегантний дизайн, високий рівень сервісу)"],
-        "Boutique and unique (original interior, creative atmosphere, sense of exclusivity)": style_mapping["Бутік та унікальний (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)"],
-        "Classic and traditional (time-tested style, conservatism, historical ambiance)": style_mapping["Класичний та традиційний (перевірений часом стиль, консервативність, історичність)"],
-        "Modern and designer (fashionable interiors, minimalism, technological features)": style_mapping["Сучасний та дизайнерський (модні інтер'єри, мінімалізм, технологічність)"],
-        "Cozy and family-friendly (warm atmosphere, comfort, child-friendly)": style_mapping["Затишний та сімейний (тепла атмосфера, комфорт, дружній до дітей)"],
-        "Practical and economical (no unnecessary details, functional, affordable)": style_mapping["Практичний та економічний (без зайвих деталей, функціональний, доступний)"]
-    }
-    
-    # Додаємо короткі англійські варіанти для сумісності
-    en_simplified_mapping = {
-        "Luxurious and refined": style_mapping_en["Luxurious and refined (premium materials, elegant design, high level of service)"],
-        "Boutique and unique": style_mapping_en["Boutique and unique (original interior, creative atmosphere, sense of exclusivity)"],
-        "Classic and traditional": style_mapping_en["Classic and traditional (time-tested style, conservatism, historical ambiance)"],
-        "Modern and designer": style_mapping_en["Modern and designer (fashionable interiors, minimalism, technological features)"],
-        "Cozy and family-friendly": style_mapping_en["Cozy and family-friendly (warm atmosphere, comfort, child-friendly)"],
-        "Practical and economical": style_mapping_en["Practical and economical (no unnecessary details, functional, affordable)"]
-    }
-    
-    # Об'єднуємо всі словники
-    combined_mapping = {**style_mapping, **style_mapping_en, **en_simplified_mapping}
-    
-    result = {}
-    for style, brands in combined_mapping.items():
-        # Перевіряємо, чи бренд відповідає одному зі списку
-        result[style] = any(b.lower() in hotel_brand.lower() for b in brands)
-    
-    return result
-
-def map_hotel_purpose(hotel_brand):
-    """
-    Зіставляє бренд готелю з метою подорожі
-    
-    Args:
-        hotel_brand: бренд готелю (один рядок, не список)
-    
-    Returns:
-        Словник цілей з відповідними значеннями True/False
-    """
-    # Переконуємося, що hotel_brand є рядком
-    if not isinstance(hotel_brand, str):
-        hotel_brand = str(hotel_brand)
-    
-    purpose_mapping = {
-        "Бізнес-подорожі / відрядження": ["Marriott Hotels", "InterContinental Hotels & Resorts", "Crowne Plaza", 
-                                      "Hyatt Regency", "Grand Hyatt", "Courtyard by Marriott", "Hilton Garden Inn", 
-                                      "Sheraton", "DoubleTree by Hilton", "Novotel Hotels", "Cambria Hotels", 
-                                      "Fairfield Inn & Suites", "Holiday Inn Express", "Wingate by Wyndham", 
-                                      "Quality Inn Hotels", "ibis Hotels"],
-        
-        "Відпустка / релакс": ["The Ritz-Carlton", "JW Marriott", "Waldorf Astoria Hotels & Resorts", 
-                             "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
-                             "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
-                             "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
-                             "Ascend Hotel Collection"],
-        
-        "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
-                              "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
-                              "Comfort Inn Hotels", "Hampton by Hilton", "Holiday Inn Express", 
-                              "Days Inn by Wyndham", "Super 8 by Wyndham"],
-        
-        "Довготривале проживання": ["Hyatt House", "Candlewood Suites", "ibis Styles"]
-    }
-    
-    # Переклад для англійської мови
-    purpose_mapping_en = {
-        "Business travel": purpose_mapping["Бізнес-подорожі / відрядження"],
-        "Vacation / relaxation": purpose_mapping["Відпустка / релакс"],
-        "Family vacation": purpose_mapping["Сімейний відпочинок"],
-        "Long-term stay": purpose_mapping["Довготривале проживання"]
-    }
-    
-    # Об'єднуємо обидва словники
-    combined_mapping = {**purpose_mapping, **purpose_mapping_en}
-    
-    result = {}
-    for purpose, brands in combined_mapping.items():
-        # Перевіряємо, чи бренд відповідає одному зі списку
-        result[purpose] = any(b.lower() in hotel_brand.lower() for b in brands)
-    
-    return result
-
+# Оновлена функція фільтрації за стилем
 def filter_hotels_by_style(df, styles):
     """
     Фільтрує готелі за стилем
@@ -798,19 +598,53 @@ def filter_hotels_by_style(df, styles):
     if not styles or len(styles) == 0:
         return df
     
+    # Логування для відладки
+    logger.info(f"Фільтрація за стилями: {styles}")
+    logger.info(f"Колонки DataFrame: {df.columns}")
+    if 'Hotel Brand' in df.columns:
+        logger.info(f"Кількість унікальних брендів: {df['Hotel Brand'].nunique()}")
+        logger.info(f"Приклади брендів: {df['Hotel Brand'].unique()[:5]}")
+    
+    # Спрощуємо стилі для кращого порівняння
+    simplified_styles = [style.strip().lower() for style in styles]
+    logger.info(f"Спрощені стилі для пошуку: {simplified_styles}")
+    
     # Створюємо маску для фільтрації
     style_mask = pd.Series(False, index=df.index)
     
-    for idx, row in df.iterrows():
-        # Використовуємо колонку 'Hotel Brand'
-        if 'Hotel Brand' in row:
-            hotel_styles = map_hotel_style(row['Hotel Brand'])
-            # Перевіряємо, чи готель відповідає хоча б одному з обраних стилів
-            if any(hotel_styles.get(style, False) for style in styles):
-                style_mask.loc[idx] = True
+    # Кількість знайдених готелів по стилях для логування
+    style_counts = {style: 0 for style in styles}
     
-    return df[style_mask]
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            
+            # Отримуємо відповідність бренду до стилів
+            hotel_styles = map_hotel_style(hotel_brand)
+            
+            # Перевіряємо, чи готель відповідає хоча б одному з обраних стилів
+            for style in styles:
+                # Перевіряємо як точну відповідність, так і ключові частини
+                style_lower = style.lower()
+                
+                for hotel_style, matches in hotel_styles.items():
+                    if matches and (hotel_style.lower() == style_lower or 
+                                    style_lower in hotel_style.lower() or
+                                    hotel_style.lower() in style_lower):
+                        style_mask.loc[idx] = True
+                        style_counts[style] += 1
+                        break
+    
+    # Логуємо кількість знайдених готелів для кожного стилю
+    for style, count in style_counts.items():
+        logger.info(f"Знайдено {count} готелів для стилю '{style}'")
+    
+    filtered_df = df[style_mask]
+    logger.info(f"Загальна кількість готелів після фільтрації: {len(filtered_df)}")
+    
+    return filtered_df
 
+# Оновлена функція фільтрації за метою
 def filter_hotels_by_purpose(df, purposes):
     """
     Фільтрує готелі за метою подорожі
@@ -825,18 +659,43 @@ def filter_hotels_by_purpose(df, purposes):
     if not purposes or len(purposes) == 0:
         return df
     
+    # Логування для відладки
+    logger.info(f"Фільтрація за метою: {purposes}")
+    
     # Створюємо маску для фільтрації
     purpose_mask = pd.Series(False, index=df.index)
     
-    for idx, row in df.iterrows():
-        # Використовуємо колонку 'Hotel Brand'
-        if 'Hotel Brand' in row:
-            hotel_purposes = map_hotel_purpose(row['Hotel Brand'])
-            # Перевіряємо, чи готель відповідає хоча б одній з обраних цілей
-            if any(hotel_purposes.get(purpose, False) for purpose in purposes):
-                purpose_mask.loc[idx] = True
+    # Кількість знайдених готелів по метах для логування
+    purpose_counts = {purpose: 0 for purpose in purposes}
     
-    return df[purpose_mask]
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            
+            # Отримуємо відповідність бренду до цілей
+            hotel_purposes = map_hotel_purpose(hotel_brand)
+            
+            # Перевіряємо, чи готель відповідає хоча б одній з обраних цілей
+            for purpose in purposes:
+                # Перевіряємо як точну відповідність, так і ключові частини
+                purpose_lower = purpose.lower()
+                
+                for hotel_purpose, matches in hotel_purposes.items():
+                    if matches and (hotel_purpose.lower() == purpose_lower or 
+                                    purpose_lower in hotel_purpose.lower() or
+                                    hotel_purpose.lower() in purpose_lower):
+                        purpose_mask.loc[idx] = True
+                        purpose_counts[purpose] += 1
+                        break
+    
+    # Логуємо кількість знайдених готелів для кожної мети
+    for purpose, count in purpose_counts.items():
+        logger.info(f"Знайдено {count} готелів для мети '{purpose}'")
+    
+    filtered_df = df[purpose_mask]
+    logger.info(f"Загальна кількість готелів після фільтрації: {len(filtered_df)}")
+    
+    return filtered_df
 
 def get_region_score(df, regions=None, countries=None):
     """
@@ -1125,6 +984,22 @@ def calculate_scores(user_data, hotel_data):
             if program in purpose_scores:
                 scores_df.at[index, 'purpose_score'] = purpose_scores[program]
     
+    # Додаткове логування для стилів
+    if styles and len(styles) > 0:
+        logger.info(f"Фільтрація за стилями: {styles}")
+        # Вивести кількість готелів для кожного стилю
+        for style in styles:
+            style_hotels_count = 0
+            for program in loyalty_programs:
+                program_data = style_filtered[style_filtered['loyalty_program'] == program]
+                style_hotels_count += len(program_data)
+            logger.info(f"Загальна кількість готелів для стилю '{style}': {style_hotels_count}")
+            
+            # Перевірити, чи є готелі цього стилю для кожної програми лояльності
+            for program in loyalty_programs:
+                program_data = style_filtered[style_filtered['loyalty_program'] == program]
+                logger.info(f"Програма '{program}' - {len(program_data)} готелів для стилю '{style}'")
+    
     # Обчислюємо загальний рейтинг
     scores_df['total_score'] = (
         scores_df['region_score'] + 
@@ -1406,7 +1281,6 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
         CommandHandler("cancel", cancel),
         CommandHandler("start", start)  # Додаємо /start як fallback
         ]
-        
     )
     
     application.add_handler(conv_handler)
