@@ -1407,16 +1407,15 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     
     application.add_handler(conv_handler)
     
-...
-
-
-    # ✅ Використання PORT всередині main
+    # Використання PORT для webhook
+    port = int(os.environ.get("PORT", "10000"))
+    
     if webhook_url and webhook_path:
         webhook_info = f"{webhook_url}{webhook_path}"
         logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
         application.run_webhook(
             listen="0.0.0.0",
-            port=PORT,
+            port=port,
             url_path=webhook_path,
             webhook_url=webhook_info,
             allowed_updates=Update.ALL_TYPES
@@ -1424,7 +1423,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     else:
         logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
         application.run_polling(allowed_updates=Update.ALL_TYPES)
-
+    
     logger.info("Бот запущено")
 
 if __name__ == "__main__":
@@ -1437,16 +1436,16 @@ if __name__ == "__main__":
         exit(1)
     logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
     
-   # Параметри для webhook (опціонально)
-WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
-WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-
-# Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
-
-# Перевіряємо наявність токена
-if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-    logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
+    # Параметри для webhook (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Перевіряємо наявність токена
+    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
     
     # Запускаємо бота з підтримкою webhook або polling
     main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
