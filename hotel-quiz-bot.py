@@ -1436,13 +1436,12 @@ if __name__ == "__main__":
         exit(1)
     logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
     
-    # Параметри для webhook (опціонально)
    # Параметри для webhook (опціонально)
-    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", None)  # Домен або IP-адреса вашого сервера
-    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-    
-    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+
+# Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
     
     # Перевіряємо наявність токена
     if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
