@@ -1,1425 +1,1161 @@
-import logging
-import pandas as pd
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
-import os
-from telegram.ext import ApplicationBuilder
-import ssl
-from aiohttp import web
-from difflib import get_close_matches
-import Levenshtein  # Потрібно встановити: pip install python-Levenshtein
-PORT = int(os.environ.get("PORT", "10000"))
-
-# Налаштування логування
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Оновлені стани розмови
-LANGUAGE, REGION, COUNTRY, REGION_SELECTION, CATEGORY, STYLE, PURPOSE = range(7)
-
-# Дані користувачів
-user_data_global = {}
-
-def analyze_csv_structure(df):
+# Оновлена функція зіставлення бренду готелю зі стилями
+def map_hotel_style(hotel_brand):
     """
-    Аналізує структуру CSV-файлу та логує інформацію
+    Зіставляє бренд готелю зі стилями
+    
+    Args:
+        hotel_brand: бренд готелю (один рядок, не список)
+    
+    Returns:
+        Словник стилів з відповідними значеннями True/False
+    """
+    # Переконуємося, що hotel_brand є рядком
+    if not isinstance(hotel_brand, str):
+        hotel_brand = str(hotel_brand)
+    
+    hotel_brand = hotel_brand.lower()
+    
+    # Оновлений повний словник стилів та брендів
+    style_mapping = {
+        "Розкішний і вишуканий": [
+            "JW Marriott", "The Ritz-Carlton", "Conrad Hotels & Resorts", 
+            "Waldorf Astoria Hotels & Resorts", "InterContinental Hotels & Resorts", 
+            "Wyndham Grand", "Registry Collection Hotels", "Fairmont Hotels", 
+            "Raffles Hotels & Resorts", "Park Hyatt Hotels", "Alila Hotels", 
+            "Hyatt Regency", "Grand Hyatt", "Ascend Hotel Collection"
+        ],
+        
+        "Бутік і унікальний": [
+            "Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
+            "Mercure Hotels", "ibis Styles", "Park Hyatt Hotels", 
+            "Alila Hotels", "Ascend Hotel Collection"
+        ],
+        
+        "Класичний і традиційний": [
+            "The Ritz-Carlton", "Marriott Hotels", "Sheraton", 
+            "Waldorf Astoria Hotels & Resorts", "Hilton Hotels & Resorts", 
+            "InterContinental Hotels & Resorts", "Holiday Inn Hotels & Resorts", 
+            "Wyndham", "Fairmont Hotels", "Raffles Hotels & Resorts", 
+            "Ascend Hotel Collection"
+        ],
+        
+        "Сучасний і дизайнерський": [
+            "Conrad Hotels & Resorts", "Kimpton Hotels & Restaurants", 
+            "Crowne Plaza", "Wyndham Grand", "Novotel Hotels", 
+            "Ibis Hotels", "ibis Styles", "Cambria Hotels", 
+            "Park Hyatt Hotels", "Grand Hyatt", "Hyatt Place"
+        ],
+        
+        "Затишний і сімейний": [
+            "Fairfield Inn & Suites", "DoubleTree by Hilton", 
+            "Hampton by Hilton", "Holiday Inn Hotels & Resorts", 
+            "Candlewood Suites", "Wyndham", "Days Inn by Wyndham", 
+            "Mercure Hotels", "Novotel Hotels", "Quality Inn Hotels", 
+            "Comfort Inn Hotels", "Hyatt House"
+        ],
+        
+        "Практичний і економічний": [
+            "Fairfield Inn & Suites", "Courtyard by Marriott", 
+            "Hampton by Hilton", "Hilton Garden Inn", 
+            "Holiday Inn Hotels & Resorts", "Holiday Inn Express", 
+            "Candlewood Suites", "Wingate by Wyndham", 
+            "Super 8 by Wyndham", "Days Inn by Wyndham", 
+            "Ibis Hotels", "ibis Styles", "Quality Inn Hotels", 
+            "Comfort Inn Hotels", "Econo Lodge Hotels", 
+            "Rodeway Inn Hotels", "Hyatt Place", "Hyatt House"
+        ]
+    }
+    
+    # Додаємо англійські ключі для стилів
+    style_mapping_en = {
+        "Luxurious and refined": style_mapping["Розкішний і вишуканий"],
+        "Boutique and unique": style_mapping["Бутік і унікальний"],
+        "Classic and traditional": style_mapping["Класичний і традиційний"],
+        "Modern and designer": style_mapping["Сучасний і дизайнерський"],
+        "Cozy and family-friendly": style_mapping["Затишний і сімейний"],
+        "Practical and economical": style_mapping["Практичний і економічний"]
+    }
+    
+    # Об'єднуємо словники
+    combined_mapping = {**style_mapping, **style_mapping_en}
+    
+    result = {}
+    for style, brands in combined_mapping.items():
+        # Більш гнучке порівняння назв брендів
+        is_match = False
+        for brand in brands:
+            brand_lower = brand.lower()
+            # Перевіряємо, чи бренд готелю містить назву бренду зі списку
+            if brand_lower in hotel_brand:
+                is_match = True
+                break
+        result[style] = is_match
+    
+    return result
+
+# Оновлена функція зіставлення бренду готелю з метою подорожі
+def map_hotel_purpose(hotel_brand):
+    """
+    Зіставляє бренд готелю з метою подорожі
+    
+    Args:
+        hotel_brand: бренд готелю (один рядок, не список)
+    
+    Returns:
+        Словник цілей з відповідними значеннями True/False
+    """
+    # Переконуємося, що hotel_brand є рядком
+    if not isinstance(hotel_brand, str):
+        hotel_brand = str(hotel_brand)
+    
+    hotel_brand = hotel_brand.lower()
+    
+    purpose_mapping = {
+        "Бізнес-подорожі / відрядження": ["Marriott Hotels", "InterContinental Hotels & Resorts", "Crowne Plaza", 
+                                      "Hyatt Regency", "Grand Hyatt", "Courtyard by Marriott", "Hilton Garden Inn", 
+                                      "Sheraton", "DoubleTree by Hilton", "Novotel Hotels", "Cambria Hotels", 
+                                      "Fairfield Inn & Suites", "Holiday Inn Express", "Wingate by Wyndham", 
+                                      "Quality Inn Hotels", "ibis Hotels"],
+        
+        "Відпустка / релакс": ["The Ritz-Carlton", "JW Marriott", "Waldorf Astoria Hotels & Resorts", 
+                             "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
+                             "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
+                             "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
+                             "Ascend Hotel Collection"],
+        
+        "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
+                              "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
+                              "Comfort Inn Hotels", "Hampton by Hilton", "Holiday Inn Express", 
+                              "Days Inn by Wyndham", "Super 8 by Wyndham"],
+        
+        "Довготривале проживання": ["Hyatt House", "Candlewood Suites", "ibis Styles"]
+    }
+    
+    # Переклад для англійської мови
+    purpose_mapping_en = {
+        "Business travel": purpose_mapping["Бізнес-подорожі / відрядження"],
+        "Vacation / relaxation": purpose_mapping["Відпустка / релакс"],
+        "Family vacation": purpose_mapping["Сімейний відпочинок"],
+        "Long-term stay": purpose_mapping["Довготривале проживання"]
+    }
+    
+    # Об'єднуємо обидва словники
+    combined_mapping = {**purpose_mapping, **purpose_mapping_en}
+    
+    result = {}
+    for purpose, brands in combined_mapping.items():
+        # Більш гнучке порівняння назв брендів
+        is_match = False
+        for brand in brands:
+            brand_lower = brand.lower()
+            # Перевіряємо, чи бренд готелю містить назву бренду зі списку
+            if brand_lower in hotel_brand:
+                is_match = True
+                break
+        result[purpose] = is_match
+    
+    return result
+
+# Функції фільтрації готелів
+def filter_hotels_by_category(df, category):
+    """
+    Фільтрує готелі за категорією
     
     Args:
         df: DataFrame з даними готелів
-    """
-    logger.info("Аналіз структури CSV-файлу:")
-    logger.info(f"Кількість рядків: {len(df)}")
-    logger.info(f"Колонки: {list(df.columns)}")
-    
-    # Перевірка унікальних значень
-    if 'loyalty_program' in df.columns:
-        logger.info(f"Програми лояльності: {df['loyalty_program'].unique()}")
-    
-    if 'region' in df.columns:
-        logger.info(f"Регіони: {df['region'].unique()}")
-    
-    if 'segment' in df.columns:
-        logger.info(f"Сегменти: {df['segment'].unique()}")
-    
-    # Перевірка пропущених значень
-    null_counts = df.isnull().sum()
-    if null_counts.sum() > 0:
-        logger.warning(f"Пропущені значення: {null_counts[null_counts > 0]}")
-    
-    # Перевірка типів даних
-    logger.info(f"Типи даних: {df.dtypes}")
-
-def load_hotel_data(csv_path):
-    """Завантаження даних про програми лояльності з CSV файлу"""
-    try:
-        # Перевіряємо, чи існує файл
-        if not os.path.exists(csv_path):
-            logger.error(f"Файл не знайдено: {csv_path}")
-            return None
-            
-        df = pd.read_csv(csv_path)
-        
-        # Аналізуємо структуру CSV
-        analyze_csv_structure(df)
-        
-        # Базова валідація даних - оновлено згідно з очікуваними назвами колонок
-        expected_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand', 'segment',
-                            'Total hotels of Corporation / Loyalty Program in this region',
-                            'Total hotels of Corporation / Loyalty Program in this country']
-        
-        # Перевіряємо наявність колонок і створюємо відображення для перейменування
-        rename_mapping = {}
-        
-        # Перевіряємо наявність колонки 'Hotel Brand' або 'brand'
-        if 'brand' in df.columns and 'Hotel Brand' not in df.columns:
-            rename_mapping['brand'] = 'Hotel Brand'
-            logger.info("Перейменовано колонку 'brand' в 'Hotel Brand'")
-        
-        # Перевіряємо наявність колонки 'segment' або 'category'
-        if 'category' in df.columns and 'segment' not in df.columns:
-            rename_mapping['category'] = 'segment'
-            logger.info("Перейменовано колонку 'category' в 'segment'")
-        
-        # Якщо є колонка з коротшою назвою для регіонів
-        if 'region_hotels' in df.columns and 'Total hotels of Corporation / Loyalty Program in this region' not in df.columns:
-            rename_mapping['region_hotels'] = 'Total hotels of Corporation / Loyalty Program in this region'
-            logger.info("Перейменовано колонку 'region_hotels'")
-        
-        # Якщо є колонка з коротшою назвою для країн
-        if 'country_hotels' in df.columns and 'Total hotels of Corporation / Loyalty Program in this country' not in df.columns:
-            rename_mapping['country_hotels'] = 'Total hotels of Corporation / Loyalty Program in this country'
-            logger.info("Перейменовано колонку 'country_hotels'")
-        
-        # Застосовуємо перейменування, якщо потрібно
-        if rename_mapping:
-            df = df.rename(columns=rename_mapping)
-            logger.info(f"Перейменовано колонки: {rename_mapping}")
-        
-        # Перевіряємо, чи існують обов'язкові колонки після перейменування
-        missing_columns = [col for col in expected_columns if col not in df.columns]
-        if missing_columns:
-            logger.warning(f"Після перейменування все ще відсутні колонки: {missing_columns}")
-            
-            # Створюємо відсутні колонки з порожніми значеннями
-            for col in missing_columns:
-                df[col] = ''
-                logger.warning(f"Створено порожню колонку: {col}")
-        
-        return df
-    except Exception as e:
-        logger.error(f"Помилка завантаження CSV: {e}")
-        return None
-
-# Словники для перекладу регіонів та країн
-region_translation = {
-    "Європа": "Europe",
-    "Північна Америка": "North America", 
-    "Азія": "Asia",
-    "Близький Схід": "Middle East",
-    "Африка": "Africa",
-    "Південна Америка": "South America",
-    "Карибський басейн": "Caribbean",
-    "Океанія": "Oceania"
-}
-
-# Словник для перетворення назв країн (укр -> англ)
-country_translation = {
-    # Країни з кількома варіантами
-    "США": "United States",
-    "Сполучені Штати": "United States",
-    "Сполучені Штати Америки": "United States",
-    "Америка": "United States",
-    "USA": "United States",
-    
-    "Великобританія": "United Kingdom",
-    "Сполучене Королівство": "United Kingdom",
-    "Англія": "United Kingdom",
-    "Британія": "United Kingdom",
-    "UK": "United Kingdom",
-    
-    "Нідерланди": "Netherlands",
-    "Голландія": "Netherlands",
-    
-    "ОАЕ": "United Arab Emirates",
-    "Об'єднані Арабські Емірати": "United Arab Emirates",
-    "Емірати": "United Arab Emirates",
-    
-    "Китай": "China",
-    "КНР": "China",
-    
-    "Чехія": "Czech Republic",
-    "Чеська Республіка": "Czech Republic",
-    
-    "Корея": "South Korea",
-    "Південна Корея": "South Korea",
-    
-    "Домінікана": "Dominican Republic",
-    
-    # Стандартні переклади
-    "Албанія": "Albania",
-    "Алжир": "Algeria",
-    "Андорра": "Andorra",
-    "Ангола": "Angola",
-    "Аргентина": "Argentina",
-    "Вірменія": "Armenia",
-    "Аруба": "Aruba",
-    "Австралія": "Australia",
-    "Австрія": "Austria",
-    "Азербайджан": "Azerbaijan",
-    "Багамські острови": "Bahamas",
-    "Багами": "Bahamas",
-    "Бахрейн": "Bahrain",
-    "Бангладеш": "Bangladesh",
-    "Барбадос": "Barbados",
-    "Білорусь": "Belarus",
-    "Бельгія": "Belgium",
-    "Бенін": "Benin",
-    "Бермуди": "Bermuda",
-    "Богота": "Bogota",
-    "Болівія": "Bolivia",
-    "Боснія і Герцеговина": "Bosnia Herzegovina",
-    "Боснія": "Bosnia Herzegovina",
-    "Ботсвана": "Botswana",
-    "Бразилія": "Brazil",
-    "Британські Віргінські острови": "British Virgin Islands",
-    "Болгарія": "Bulgaria",
-    "Камбоджа": "Cambodia",
-    "Камерун": "Cameroon",
-    "Канада": "Canada",
-    "Кабо-Верде": "Cape Verde",
-    "Кайманові острови": "Cayman Islands",
-    "Чилі": "Chile",
-    "Колумбія": "Colombia",
-    "Конго - Браззавіль": "Congo - Brazzaville",
-    "Конго - Кіншаса": "Congo - Kinshasa",
-    "Коста-Ріка": "Costa Rica",
-    "Кот-д'Івуар": "Côte d'Ivoire",
-    "Хорватія": "Croatia",
-    "Кюрасао": "Curacao",
-    "Кіпр": "Cyprus",
-    "Чеська Республіка": "Czech Republic",
-    "Данія": "Denmark",
-    "Джибуті": "Djibouti",
-    "Домініка": "Dominica",
-    "Домініканська Республіка": "Dominican Republic",
-    "Еквадор": "Ecuador",
-    "Єгипет": "Egypt",
-    "Сальвадор": "El Salvador",
-    "Екваторіальна Гвінея": "Equatorial Guinea",
-    "Естонія": "Estonia",
-    "Есватіні": "Eswatini",
-    "Ефіопія": "Ethiopia",
-    "Фарерські острови": "Faroe Islands",
-    "Фіджі": "Fiji",
-    "Фінляндія": "Finland",
-    "Франція": "France",
-    "Французька Гвіана": "French Guiana",
-    "Французька Полінезія": "French Polynesia",
-    "Грузія": "Georgia",
-    "Німеччина": "Germany",
-    "Гана": "Ghana",
-    "Гібралтар": "Gibraltar",
-    "Греція": "Greece",
-    "Гуам": "Guam",
-    "Гватемала": "Guatemala",
-    "Гаяна": "Guyana",
-    "Гаїті": "Haiti",
-    "Гондурас": "Honduras",
-    "Угорщина": "Hungary",
-    "Ісландія": "Iceland",
-    "Індія": "India",
-    "Індонезія": "Indonesia",
-    "Ірландія": "Ireland",
-    "Ізраїль": "Israel",
-    "Італія": "Italy",
-    "Ямайка": "Jamaica",
-    "Японія": "Japan",
-    "Йорданія": "Jordan",
-    "Казахстан": "Kazakhstan",
-    "Кенія": "Kenya",
-    "Кувейт": "Kuwait",
-    "Киргизстан": "Kyrgyzstan",
-    "Лаос": "Laos",
-    "Латвія": "Latvia",
-    "Ліван": "Lebanon",
-    "Литва": "Lithuania",
-    "Люксембург": "Luxembourg",
-    "Макао": "Macao",
-    "Македонія": "Macedonia",
-    "Мадагаскар": "Madagascar",
-    "Малайзія": "Malaysia",
-    "Мальдіви": "Maldives",
-    "Мальта": "Malta",
-    "Маврикій": "Mauritius",
-    "Майотта": "Mayotte",
-    "Мексика": "Mexico",
-    "Молдова": "Moldova",
-    "Монако": "Monaco",
-    "Монголія": "Mongolia",
-    "Чорногорія": "Montenegro",
-    "Марокко": "Morocco",
-    "М'янма": "Myanmar",
-    "Намібія": "Namibia",
-    "Непал": "Nepal",
-    "Нова Каледонія": "New Caledonia",
-    "Нова Зеландія": "New Zealand",
-    "Нікарагуа": "Nicaragua",
-    "Нігерія": "Nigeria",
-    "Північна Македонія": "North Macedonia",
-    "Північні Маріанські острови": "Northern Mariana Islands",
-    "Норвегія": "Norway",
-    "Оман": "Oman",
-    "Пакистан": "Pakistan",
-    "Панама": "Panama",
-    "Папуа-Нова Гвінея": "Papua New Guinea",
-    "Парагвай": "Paraguay",
-    "Перу": "Peru",
-    "Філіппіни": "Philippines",
-    "Польща": "Poland",
-    "Португалія": "Portugal",
-    "Пуерто-Ріко": "Puerto Rico",
-    "Катар": "Qatar",
-    "Румунія": "Romania",
-    "Руанда": "Rwanda",
-    "Сент-Кітс і Невіс": "Saint Kitts and Nevis",
-    "Самоа": "Samoa",
-    "Санта-Марта": "Santa Marta",
-    "Саудівська Аравія": "Saudi Arabia",
-    "Сенегал": "Senegal",
-    "Сербія": "Serbia",
-    "Сейшельські острови": "Seychelles",
-    "Сейшели": "Seychelles",
-    "Сінгапур": "Singapore",
-    "Сінт-Мартен": "Sint Maarten",
-    "Словаччина": "Slovakia",
-    "Словенія": "Slovenia",
-    "ПАР": "South Africa",
-    "Південно-Африканська Республіка": "South Africa",
-    "Іспанія": "Spain",
-    "Шрі-Ланка": "Sri Lanka",
-    "Суринам": "Suriname",
-    "Швеція": "Sweden",
-    "Швейцарія": "Switzerland",
-    "Тайвань": "Taiwan",
-    "Таджикистан": "Tajikistan",
-    "Танзанія": "Tanzania",
-    "Таїланд": "Thailand",
-    "Тринідад і Тобаго": "Trinidad and Tobago",
-    "Туніс": "Tunisia",
-    "Туреччина": "Turkey",
-    "Теркс і Кайкос": "Turks and Caicos Islands",
-    "Уганда": "Uganda",
-    "Україна": "Ukraine",
-    "Уругвай": "Uruguay",
-    "Узбекистан": "Uzbekistan",
-    "Венесуела": "Venezuela",
-    "В'єтнам": "Vietnam",
-    "Замбія": "Zambia",
-    "Зімбабве": "Zimbabwe",
-}
-
-# Перевірка на згадування країни-терориста
-def is_russia_mentioned(text):
-    """
-    Перевіряє, чи згадується країна-терорист в тексті
-    
-    Args:
-        text: текст для перевірки
-        
-    Returns:
-        bool: True, якщо згадується, False - інакше
-    """
-    russia_keywords = ["росія", "россия", "russia"]  # Тільки 3 основні варіанти
-    
-    # Перетворюємо текст до нижнього регістру для порівняння
-    text_lower = text.lower()
-    
-    # Перевіряємо, чи міститься якесь із ключових слів у тексті
-    return any(keyword.lower() in text_lower for keyword in russia_keywords)
-
-# Повідомлення про країну-терориста
-def get_russia_message(lang='uk'):
-    """
-    Повертає повідомлення щодо країни-терориста відповідною мовою
-    
-    Args:
-        lang: мова ('uk' або 'en')
-        
-    Returns:
-        str: форматоване повідомлення
-    """
-    if lang == 'uk':
-        return (
-            "Ми не рекомендуємо відвідувати країну-терориста. "
-            "В нашій базі даних принципово немає жодного готелю з цієї території.\n\n"
-            "Будь ласка, оберіть будь-яку іншу країну для ваших подорожей. "
-            "Є так багато чудових місць у світі, які варто відвідати!\n\n"
-            "Слава Україні! Героям Слава! 🇺🇦"
-        )
-    else:
-        return (
-            "We strongly advise against visiting this terrorist state. "
-            "Our database does not include any hotels from this territory.\n\n"
-            "Please choose any other country for your journeys. "
-            "There are so many wonderful places in the world worth visiting!\n\n"
-            "Glory to Ukraine! Glory to the Heroes! 🇺🇦"
-        )
-
-# Функції для нечіткого пошуку країн
-def find_closest_country(input_name, country_list, cutoff=0.75):
-    """
-    Знаходить найближчу за написанням країну у словнику.
-    
-    Args:
-        input_name: введена назва країни
-        country_list: список правильних назв країн
-        cutoff: мінімальна схожість (від 0 до 1)
-        
-    Returns:
-        Найближча правильна назва або None, якщо нічого не знайдено
-    """
-    matches = get_close_matches(input_name.lower(), [c.lower() for c in country_list], n=1, cutoff=cutoff)
-    if matches:
-        # Знаходимо оригінальну назву з правильним регістром
-        for country in country_list:
-            if country.lower() == matches[0]:
-                return country
-    return None
-
-def find_by_levenshtein(input_name, country_dict, threshold=2):
-    """
-    Знаходить країну за відстанню Левенштейна.
-    
-    Args:
-        input_name: введена назва країни
-        country_dict: словник країн {укр_назва: англ_назва}
-        threshold: максимальна допустима відстань
-        
-    Returns:
-        Кортеж (правильна_укр_назва, англ_назва) або (None, None)
-    """
-    input_lower = input_name.lower()
-    min_distance = float('inf')
-    closest_match = None
-    
-    for ukr_name in country_dict.keys():
-        distance = Levenshtein.distance(input_lower, ukr_name.lower())
-        if distance < min_distance and distance <= threshold:
-            min_distance = distance
-            closest_match = ukr_name
-    
-    if closest_match:
-        return (closest_match, country_dict[closest_match])
-    return (None, None)
-
-def find_closest_country_name(input_name, lang='uk'):
-    """
-    Знаходить найближчу назву країни з урахуванням можливих помилок написання.
-    
-    Args:
-        input_name: введена назва країни
-        lang: мова ('uk' або 'en')
-        
-    Returns:
-        Нормалізована англійська назва країни або None
-    """
-    if not input_name or len(input_name) < 3:
-        return None
-        
-    input_lower = input_name.lower()
-    
-    # 1. Спочатку шукаємо точні збіги
-    for ukr_name, eng_name in country_translation.items():
-        if input_lower == ukr_name.lower():
-            return eng_name
-    
-    # 2. Шукаємо часткові збіги
-    for ukr_name, eng_name in country_translation.items():
-        if input_lower in ukr_name.lower() or ukr_name.lower() in input_lower:
-            return eng_name
-    
-    # 3. Використовуємо нечітке порівняння
-    ukr_country_names = list(country_translation.keys())
-    closest = find_closest_country(input_name, ukr_country_names, cutoff=0.75)
-    if closest:
-        return country_translation[closest]
-    
-    # 4. Використовуємо відстань Левенштейна для близьких за написанням слів
-    ukr_name, eng_name = find_by_levenshtein(input_name, country_translation, threshold=2)
-    if ukr_name:
-        logger.info(f"Знайдено країну за відстанню Левенштейна: '{input_name}' -> '{ukr_name}'")
-        return eng_name
-    
-    # 5. Пошук за ключовими словами (окремими частинами назви)
-    for word in input_lower.split():
-        if len(word) > 3:
-            for ukr_name, eng_name in country_translation.items():
-                ukr_lower = ukr_name.lower()
-                # Обчислюємо відстань Левенштейна для кожного слова
-                distance = Levenshtein.distance(word, ukr_lower)
-                if distance <= 1:  # Допускаємо одну помилку
-                    logger.info(f"Знайдено країну за словом з відстанню Левенштейна: '{word}' -> '{ukr_name}'")
-                    return eng_name
-    
-    # Не знайдено відповідності
-    logger.warning(f"Не вдалося знайти відповідність для: '{input_name}'")
-    return input_name
-
-# Оновлений фільтр готелів за регіоном
-def filter_hotels_by_region(df, regions, countries=None):
-    """
-    Фільтрує готелі за регіоном або країною
-    
-    Args:
-        df: DataFrame з даними готелів
-        regions: список обраних регіонів
-        countries: список обраних країн (якщо вказано)
+        category: обрана категорія (Luxury, Comfort, Standard)
     
     Returns:
         Відфільтрований DataFrame
     """
-    if not regions and not countries:
+    category_mapping = {
+        "Luxury": ["Luxury"],
+        "Comfort": ["Comfort"],
+        "Standard": ["Standard", "Standart"],  # Обробка обох варіантів написання
+    }
+    
+    if category in category_mapping:
+        if 'segment' in df.columns:
+            mask = df['segment'].apply(lambda x: any(cat.lower() in str(x).lower() for cat in category_mapping[category]))
+            return df[mask]
+    
+    return df
+
+def filter_hotels_by_adjacent_category(df, category):
+    """
+    Фільтрує готелі за суміжною категорією
+    
+    Args:
+        df: DataFrame з даними готелів
+        category: обрана категорія (Luxury, Comfort, Standard)
+    
+    Returns:
+        Відфільтрований DataFrame
+    """
+    adjacent_mapping = {
+        "Luxury": ["Comfort"],
+        "Comfort": ["Luxury", "Standard", "Standart"],  # Обробка обох варіантів
+        "Standard": ["Comfort"],  # Змінено на Standard для узгодженості
+    }
+    
+    if category in adjacent_mapping:
+        if 'segment' in df.columns:
+            mask = df['segment'].apply(lambda x: any(cat.lower() in str(x).lower() for cat in adjacent_mapping[category]))
+            return df[mask]
+    
+    return df
+
+# Оновлена функція фільтрації за стилем
+def filter_hotels_by_style(df, styles):
+    """
+    Фільтрує готелі за стилем
+    
+    Args:
+        df: DataFrame з даними готелів
+        styles: список обраних стилів
+    
+    Returns:
+        Відфільтрований DataFrame
+    """
+    if not styles or len(styles) == 0:
         return df
     
-    # Створюємо копію для уникнення попереджень
-    filtered_df = df.copy()
+    # Логування для відладки
+    logger.info(f"Фільтрація за стилями: {styles}")
+    logger.info(f"Колонки DataFrame: {df.columns}")
+    if 'Hotel Brand' in df.columns:
+        logger.info(f"Кількість унікальних брендів: {df['Hotel Brand'].nunique()}")
+        logger.info(f"Приклади брендів: {df['Hotel Brand'].unique()[:5]}")
     
-    # Фільтрація за регіонами
-    if regions and len(regions) > 0:
-        # Перетворюємо українські назви на англійські для пошуку
-        search_regions = []
-        for region in regions:
-            if region in region_translation:
-                search_regions.append(region_translation[region])
-            else:
-                search_regions.append(region)
-        
-        logger.info(f"Оригінальні регіони: {regions}")
-        logger.info(f"Регіони для пошуку: {search_regions}")
-        
-        region_mask = filtered_df['region'].apply(
-            lambda x: any(region.lower() in str(x).lower() for region in search_regions)
-        )
-        filtered_df = filtered_df[region_mask]
+    # Спрощуємо стилі для кращого порівняння
+    simplified_styles = [style.strip().lower() for style in styles]
+    logger.info(f"Спрощені стилі для пошуку: {simplified_styles}")
     
-    # Фільтрація за країнами
-    if countries and len(countries) > 0:
-        logger.info(f"Країни для пошуку: {countries}")
-        
-        country_mask = filtered_df['country'].apply(
-            lambda x: any(country.lower() in str(x).lower() for country in countries)
-        )
-        filtered_df = filtered_df[country_mask]
+    # Створюємо маску для фільтрації
+    style_mask = pd.Series(False, index=df.index)
+    
+    # Кількість знайдених готелів по стилях для логування
+    style_counts = {style: 0 for style in styles}
+    
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            
+            # Отримуємо відповідність бренду до стилів
+            hotel_styles = map_hotel_style(hotel_brand)
+            
+            # Перевіряємо, чи готель відповідає хоча б одному з обраних стилів
+            for style in styles:
+                # Перевіряємо як точну відповідність, так і ключові частини
+                style_lower = style.lower()
+                
+                for hotel_style, matches in hotel_styles.items():
+                    if matches and (hotel_style.lower() == style_lower or 
+                                    style_lower in hotel_style.lower() or
+                                    hotel_style.lower() in style_lower):
+                        style_mask.loc[idx] = True
+                        style_counts[style] += 1
+                        break
+    
+    # Логуємо кількість знайдених готелів для кожного стилю
+    for style, count in style_counts.items():
+        logger.info(f"Знайдено {count} готелів для стилю '{style}'")
+    
+    filtered_df = df[style_mask]
+    logger.info(f"Загальна кількість готелів після фільтрації: {len(filtered_df)}")
     
     return filtered_df
 
-# Отримання списку країн за регіоном
-def get_countries_in_region(region_name):
+# Оновлена функція фільтрації за метою
+def filter_hotels_by_purpose(df, purposes):
     """
-    Отримує список країн для вказаного регіону з бази даних
+    Фільтрує готелі за метою подорожі
     
     Args:
-        region_name: назва регіону
-        
+        df: DataFrame з даними готелів
+        purposes: список обраних цілей
+    
     Returns:
-        list: список назв країн у цьому регіоні
+        Відфільтрований DataFrame
     """
-    # Перетворюємо назву регіону в англійську для пошуку в CSV
-    region_eng = region_name
-    if region_name in region_translation.values():
-        region_eng = region_name
-    else:
-        for ukr, eng in region_translation.items():
-            if ukr == region_name:
-                region_eng = eng
-                break
+    if not purposes or len(purposes) == 0:
+        return df
     
-    # Шукаємо країни в обраному регіоні
-    countries = []
+    # Логування для відладки
+    logger.info(f"Фільтрація за метою: {purposes}")
     
-    # Фільтруємо DataFrame за регіоном
-    region_filter = hotel_data['region'].apply(
-        lambda x: region_eng.lower() in str(x).lower()
-    )
-    filtered_df = hotel_data[region_filter]
+    # Створюємо маску для фільтрації
+    purpose_mask = pd.Series(False, index=df.index)
     
-    # Отримуємо унікальні країни
-    if 'country' in filtered_df.columns:
-        unique_countries = filtered_df['country'].dropna().unique()
-        
-        # Перетворюємо назви країн в українську/англійську залежно від мови інтерфейсу
-        for country_eng in unique_countries:
-            country_display = country_eng  # За замовчуванням показуємо англійську назву
+    # Кількість знайдених готелів по метах для логування
+    purpose_counts = {purpose: 0 for purpose in purposes}
+    
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
             
-            # Шукаємо українську назву
-            for ukr, eng in country_translation.items():
-                if eng == country_eng:
-                    country_display = ukr
-                    break
+            # Отримуємо відповідність бренду до цілей
+            hotel_purposes = map_hotel_purpose(hotel_brand)
             
-            countries.append(country_display)
+            # Перевіряємо, чи готель відповідає хоча б одній з обраних цілей
+            for purpose in purposes:
+                # Перевіряємо як точну відповідність, так і ключові частини
+                purpose_lower = purpose.lower()
+                
+                for hotel_purpose, matches in hotel_purposes.items():
+                    if matches and (hotel_purpose.lower() == purpose_lower or 
+                                    purpose_lower in hotel_purpose.lower() or
+                                    hotel_purpose.lower() in purpose_lower):
+                        purpose_mask.loc[idx] = True
+                        purpose_counts[purpose] += 1
+                        break
     
-    return sorted(countries)  # Сортуємо за алфавітом
+    # Логуємо кількість знайдених готелів для кожної мети
+    for purpose, count in purpose_counts.items():
+        logger.info(f"Знайдено {count} готелів для мети '{purpose}'")
+    
+    filtered_df = df[purpose_mask]
+    logger.info(f"Загальна кількість готелів після фільтрації: {len(filtered_df)}")
+    
+    return filtered_df
 
-# Функції для регіону та країни
-async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про регіони подорожей"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
+def get_region_score(df, regions=None, countries=None):
+    """
+    Обчислює бали для програм лояльності за регіонами/країнами
     
-    keyboard = []
+    Args:
+        df: DataFrame з даними готелів
+        regions: список обраних регіонів
+        countries: список обраних країн
     
-    if lang == 'uk':
-        keyboard = [
-            ["Європа", "Північна Америка", "Азія"],
-            ["Близький Схід", "Африка", "Південна Америка"],
-            ["Карибський басейн", "Океанія"],
-            ["Мене цікавлять лише конкретні країни"]
-        ]
+    Returns:
+        Dict з програмами лояльності та їх балами
+    """
+    region_scores = {}
+    
+    try:
+        if regions and len(regions) > 0:
+            # Використовуємо колонку для кількості готелів у регіоні
+            if 'Total hotels of Corporation / Loyalty Program in this region' in df.columns:
+                # Беремо унікальні значення для кожної програми лояльності
+                region_data = df.drop_duplicates('loyalty_program')[['loyalty_program', 'Total hotels of Corporation / Loyalty Program in this region']]
+                region_counts = region_data.set_index('loyalty_program')['Total hotels of Corporation / Loyalty Program in this region']
+            else:
+                # Якщо колонка відсутня, просто рахуємо кількість готелів
+                region_counts = df.groupby('loyalty_program').size()
+                logger.warning("Колонка 'Total hotels of Corporation / Loyalty Program in this region' відсутня. Використовуємо кількість рядків.")
         
-        await update.message.reply_text(
-            "Питання 1/4:\nУ яких регіонах світу ви плануєте подорожувати?\n"
-            "(Оберіть один або кілька варіантів, для вибору кількох варіантів, надішліть їх через кому.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
+        elif countries and len(countries) > 0:
+            # Використовуємо колонку для кількості готелів у країні
+            if 'Total hotels of Corporation / Loyalty Program in this country' in df.columns:
+                # Беремо унікальні значення для кожної програми лояльності
+                country_data = df.drop_duplicates('loyalty_program')[['loyalty_program', 'Total hotels of Corporation / Loyalty Program in this country']]
+                region_counts = country_data.set_index('loyalty_program')['Total hotels of Corporation / Loyalty Program in this country']
+            else:
+                # Якщо колонка відсутня, просто рахуємо кількість готелів
+                region_counts = df.groupby('loyalty_program').size()
+                logger.warning("Колонка 'Total hotels of Corporation / Loyalty Program in this country' відсутня. Використовуємо кількість рядків.")
+        
+        else:
+            # Якщо не вибрано ні регіонів, ні країн, повертаємо порожній словник
+            return {}
+        
+        # Переконуємося, що region_counts не містить NaN або None
+        region_counts = region_counts.fillna(0).astype(float)
+        
+        # Розподіляємо бали за рейтингом (21, 18, 15, 12, 9, 6, 3)
+        score_values = [21, 18, 15, 12, 9, 6, 3]
+        
+        # Сортуємо програми за кількістю готелів
+        ranked_programs = region_counts.sort_values(ascending=False)
+        
+        # Нормалізуємо, якщо обрано кілька регіонів/країн
+        normalization_factor = 1.0
+        if regions and len(regions) > 0:
+            normalization_factor = float(len(regions))
+        elif countries and len(countries) > 0:
+            normalization_factor = float(len(countries))
+        
+        # Призначаємо бали за рейтингом
+        for i, (program, _) in enumerate(ranked_programs.items()):
+            if i < len(score_values):
+                region_scores[program] = score_values[i] / normalization_factor
+            else:
+                region_scores[program] = 0.0
+                
+    except Exception as e:
+        logger.error(f"Помилка обчислення балів за регіоном: {e}")
+    
+    return region_scores
+
+def calculate_scores(user_data, hotel_data):
+    """
+    Розраховує загальний рейтинг для кожної програми лояльності на основі відповідей користувача
+    
+    Args:
+        user_data: словник з відповідями користувача
+        hotel_data: DataFrame з даними готелів
+    
+    Returns:
+        DataFrame з програмами лояльності та їх балами
+    """
+    # Отримуємо відповіді користувача
+    regions = user_data.get('regions', [])
+    countries = user_data.get('countries', [])
+    category = user_data.get('category')
+    styles = user_data.get('styles', [])
+    purposes = user_data.get('purposes', [])
+    
+    # Перевірка на None та перетворення на порожні списки для уникнення помилок
+    if regions is None:
+        regions = []
+    if countries is None:
+        countries = []
+    if styles is None:
+        styles = []
+    if purposes is None:
+        purposes = []
+    
+    # Ініціалізуємо DataFrame для зберігання результатів
+    loyalty_programs = hotel_data['loyalty_program'].unique()
+    scores_df = pd.DataFrame({
+        'loyalty_program': loyalty_programs,
+        'region_score': 0.0,  # Явно вказуємо тип float для точності
+        'category_score': 0.0,
+        'style_score': 0.0,
+        'purpose_score': 0.0,
+        'total_score': 0.0,
+        'region_hotels': 0,
+        'category_hotels': 0,
+        'style_hotels': 0,
+        'purpose_hotels': 0
+    })
+    
+    # Крок 1: Фільтруємо готелі за регіоном
+    filtered_by_region = filter_hotels_by_region(hotel_data, regions, countries)
+    
+    # Використовуємо готові значення з колонок для регіонів та країн
+    if regions and len(regions) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this region"
+        if 'Total hotels of Corporation / Loyalty Program in this region' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне значення з колонки
+                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = region_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо кількість готелів
+            region_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in region_counts:
+                    scores_df.at[index, 'region_hotels'] = region_counts[program]
+    
+    elif countries and len(countries) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
+        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне значення з колонки
+                    country_hotels = program_data['Total hotels of Corporation / Loyalty Program in this country'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = country_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо кількість готелів
+            country_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in country_counts:
+                    scores_df.at[index, 'region_hotels'] = country_counts[program]
+    
+    # Розподіляємо бали за регіонами/країнами
+    region_scores = get_region_score(filtered_by_region, regions, countries)
+    for index, row in scores_df.iterrows():
+        program = row['loyalty_program']
+        if program in region_scores:
+            scores_df.at[index, 'region_score'] = region_scores[program]
+
+# Крок 2: Фільтруємо готелі за категорією в обраному регіоні
+    if category:
+        filtered_by_category = filter_hotels_by_category(filtered_by_region, category)
+        
+        category_counts = filtered_by_category.groupby('loyalty_program').size()
+        
+        # Розподіляємо бали за категорією (21, 18, 15, 12, 9, 6, 3)
+        if not category_counts.empty:
+            category_scores = {}
+            ranked_programs = category_counts.sort_values(ascending=False)
+            
+            # Бали за рейтингом
+            score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+            for i, (program, _) in enumerate(ranked_programs.items()):
+                if i < len(score_values):
+                    category_scores[program] = score_values[i]
+                else:
+                    category_scores[program] = 0.0
+            
+            # Додаємо бали за суміжні категорії
+            adjacent_filtered = filter_hotels_by_adjacent_category(filtered_by_region, category)
+            adjacent_counts = adjacent_filtered.groupby('loyalty_program').size()
+            
+            # Бали за суміжною категорією (7, 6, 5, 4, 3, 2, 1)
+            adjacent_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+            adjacent_scores = {}
+            
+            if not adjacent_counts.empty:
+                ranked_adjacent = adjacent_counts.sort_values(ascending=False)
+                for i, (program, _) in enumerate(ranked_adjacent.items()):
+                    if i < len(adjacent_score_values):
+                        adjacent_scores[program] = adjacent_score_values[i]
+                    else:
+                        adjacent_scores[program] = 0.0
+            
+            # Оновлюємо DataFrame з балами
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                
+                # Бали за повну відповідність
+                if program in category_scores:
+                    scores_df.at[index, 'category_score'] = category_scores[program]
+                
+                # Додаємо бали за суміжну категорію
+                if program in adjacent_scores:
+                    scores_df.at[index, 'category_score'] += adjacent_scores[program]
+                
+                # Записуємо кількість готелів у категорії
+                category_mask = filtered_by_category['loyalty_program'] == program
+                scores_df.at[index, 'category_hotels'] = category_mask.sum()
+        else:
+            # Якщо категорія не обрана, використовуємо all hotels
+            filtered_by_category = filtered_by_region
     else:
-        keyboard = [
-            ["Europe", "North America", "Asia"],
-            ["Middle East", "Africa", "South America"],
-            ["Caribbean", "Oceania"],
-            ["I'm only interested in specific countries"]
-        ]
-        
-        await update.message.reply_text(
-            "Question 1/4:\nIn which regions of the world are you planning to travel?\n"
-            "(Select one or multiple options. For multiple options, send them separated by commas.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    
-    return REGION
+        filtered_by_category = filtered_by_region
 
-# Функція для початку бота
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Початкова функція при команді /start"""
-    user_id = update.effective_user.id
-    user_data_global[user_id] = {}
+    # Крок 3: Фільтруємо готелі за стилем у обраній категорії та регіоні
+    if styles and len(styles) > 0:
+        style_filtered = filter_hotels_by_style(filtered_by_category, styles)
+        style_counts_dict = {}
+        
+        for program in loyalty_programs:
+            style_mask = style_filtered['loyalty_program'] == program
+            style_counts_dict[program] = style_mask.sum()
+            
+            # Записуємо кількість готелів за стилем
+            scores_df.loc[scores_df['loyalty_program'] == program, 'style_hotels'] = style_mask.sum()
+        
+        # Розподіляємо бали за стилями (21, 18, 15, 12, 9, 6, 3)
+        style_scores = {}
+        ranked_programs = sorted(style_counts_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        # Бали за рейтингом
+        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+        for i, (program, _) in enumerate(ranked_programs):
+            if i < len(score_values):
+                style_scores[program] = score_values[i]
+            else:
+                style_scores[program] = 0.0
+        
+        # Нормалізуємо бали, якщо обрано кілька стилів
+        if len(styles) > 1:
+            for program in style_scores:
+                style_scores[program] /= len(styles)
+        
+        # Оновлюємо DataFrame з балами
+        for index, row in scores_df.iterrows():
+            program = row['loyalty_program']
+            if program in style_scores:
+                scores_df.at[index, 'style_score'] = style_scores[program]
+
+# Крок 4: Фільтруємо готелі за метою у обраних стилі, категорії та регіоні
+    if purposes and len(purposes) > 0:
+        purpose_filtered = filter_hotels_by_purpose(filtered_by_category, purposes)
+        purpose_counts_dict = {}
+        
+        for program in loyalty_programs:
+            purpose_mask = purpose_filtered['loyalty_program'] == program
+            purpose_counts_dict[program] = purpose_mask.sum()
+            
+            # Записуємо кількість готелів за метою
+            scores_df.loc[scores_df['loyalty_program'] == program, 'purpose_hotels'] = purpose_mask.sum()
+        
+        # Розподіляємо бали за метою (21, 18, 15, 12, 9, 6, 3)
+        purpose_scores = {}
+        ranked_programs = sorted(purpose_counts_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        # Бали за рейтингом
+        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+        for i, (program, _) in enumerate(ranked_programs):
+            if i < len(score_values):
+                purpose_scores[program] = score_values[i]
+            else:
+                purpose_scores[program] = 0.0
+        
+        # Нормалізуємо бали, якщо обрано кілька цілей
+        if len(purposes) > 1:
+            for program in purpose_scores:
+                purpose_scores[program] /= len(purposes)
+        
+        # Оновлюємо DataFrame з балами
+        for index, row in scores_df.iterrows():
+            program = row['loyalty_program']
+            if program in purpose_scores:
+                scores_df.at[index, 'purpose_score'] = purpose_scores[program]
     
-    # Клавіатура для вибору мови
-    keyboard = [
-        ["Українська (Ukrainian)"],
-        ["English (Англійська)"],
-        ["Other (Інша)"]
-    ]
+    # Додаткове логування для стилів
+    if styles and len(styles) > 0:
+        logger.info(f"Фільтрація за стилями: {styles}")
+        # Вивести кількість готелів для кожного стилю
+        for style in styles:
+            style_hotels_count = 0
+            for program in loyalty_programs:
+                program_data = style_filtered[style_filtered['loyalty_program'] == program]
+                style_hotels_count += len(program_data)
+            logger.info(f"Загальна кількість готелів для стилю '{style}': {style_hotels_count}")
+            
+            # Перевірити, чи є готелі цього стилю для кожної програми лояльності
+            for program in loyalty_programs:
+                program_data = style_filtered[style_filtered['loyalty_program'] == program]
+                logger.info(f"Програма '{program}' - {len(program_data)} готелів для стилю '{style}'")
     
-    await update.message.reply_text(
-        "Please select your preferred language for our conversation "
-        "(будь ласка, оберіть мову, якою вам зручніше спілкуватися):",
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    # Обчислюємо загальний рейтинг
+    scores_df['total_score'] = (
+        scores_df['region_score'] + 
+        scores_df['category_score'] + 
+        scores_df['style_score'] + 
+        scores_df['purpose_score']
     )
     
-    return LANGUAGE
+    # Сортуємо за загальним рейтингом
+    scores_df = scores_df.sort_values('total_score', ascending=False)
+    
+    return scores_df
 
-# Функція обробки вибору мови
-async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір мови користувачем"""
+def get_detailed_analysis(user_data, hotel_data, scores_df):
+    """
+    Генерує детальний аналіз підрахунку балів
+    
+    Args:
+        user_data: словник з відповідями користувача
+        hotel_data: DataFrame з даними готелів
+        scores_df: DataFrame з підрахованими балами
+    
+    Returns:
+        str: детальний аналіз у текстовому форматі
+    """
+    analysis = "<detailed_analysis>\n"
+    
+    # Додаємо узагальнення відповідей користувача
+    analysis += "User responses summary:\n"
+    if user_data.get('regions'):
+        analysis += f"- Selected regions: {', '.join(user_data['regions'])}\n"
+    if user_data.get('countries'):
+        analysis += f"- Selected countries: {', '.join(user_data['countries'])}\n"
+    if user_data.get('category'):
+        analysis += f"- Selected hotel category: {user_data['category']}\n"
+    if user_data.get('styles'):
+        analysis += f"- Selected hotel styles: {', '.join(user_data['styles'])}\n"
+    if user_data.get('purposes'):
+        analysis += f"- Selected travel purposes: {', '.join(user_data['purposes'])}\n"
+    
+    analysis += "\nLoyalty program scores calculation:\n"
+    
+    # Для кожної програми показуємо детальний розрахунок
+    for index, row in scores_df.head(5).iterrows():
+        program = row['loyalty_program']
+        analysis += f"\n{program}:\n"
+        analysis += f"- Region score: {row['region_score']:.2f} (hotels in region: {row['region_hotels']})\n"
+        analysis += f"- Category score: {row['category_score']:.2f} (hotels in selected category: {row['category_hotels']})\n"
+        analysis += f"- Style score: {row['style_score']:.2f} (hotels in selected style(s): {row['style_hotels']})\n"
+        analysis += f"- Purpose score: {row['purpose_score']:.2f} (hotels for selected purpose(s): {row['purpose_hotels']})\n"
+        analysis += f"- Total score: {row['total_score']:.2f}\n"
+    
+    analysis += "\nRanking of loyalty programs by total score:\n"
+    for i, (index, row) in enumerate(scores_df.head(5).iterrows()):
+        analysis += f"{i+1}. {row['loyalty_program']} - {row['total_score']:.2f} points\n"
+    
+    analysis += "</detailed_analysis>"
+    
+    return analysis
+
+def format_results(user_data, scores_df, lang='en'):
+    """
+    Форматує результати для відображення користувачу
+    
+    Args:
+        user_data: словник з відповідями користувача
+        scores_df: DataFrame з підрахованими балами
+        lang: мова відображення (uk або en)
+    
+    Returns:
+        str: форматовані результати для відображення
+    """
+    results = ""
+    
+    # Беремо топ-5 програм або менше, якщо програм менше 5
+    max_programs = min(5, len(scores_df))
+    top_programs = scores_df.head(max_programs)
+    
+    for i, (index, row) in enumerate(top_programs.iterrows()):
+        program = row['loyalty_program']
+        
+        results += "<result>\n"
+        
+        if lang == 'uk':
+            results += f"{program} - посіла {i+1} місце з рейтингом {row['total_score']:.2f}\n"
+            
+            # Інформація про регіони/країни
+            if user_data.get('regions'):
+                region_str = ', '.join(user_data['regions'])
+                results += f"1) у {region_str} - ({row['region_hotels']} готелів)\n"
+            elif user_data.get('countries'):
+                country_str = ', '.join(user_data['countries'])
+                results += f"1) у {country_str} - ({row['region_hotels']} готелів)\n"
+            
+            # Інформація про категорію
+            if user_data.get('category'):
+                results += f"2) у сегменті {user_data['category']} ({row['category_hotels']} готелів)\n"
+            
+            # Інформація про стиль
+            if user_data.get('styles'):
+                style_str = ', '.join(user_data['styles'])
+                results += f"3) у стилі {style_str} ({row['style_hotels']} готелів у цьому стилі/стилях та у суміжних)\n"
+            
+            # Інформація про мету
+            if user_data.get('purposes'):
+                purpose_str = ', '.join(user_data['purposes'])
+                results += f"4) для {purpose_str} ({row['purpose_hotels']} готелів)\n"
+        else:
+            results += f"{program} - ranked {i+1} with a score of {row['total_score']:.2f}\n"
+            
+            # Інформація про регіони/країни
+            if user_data.get('regions'):
+                region_str = ', '.join(user_data['regions'])
+                results += f"1) in {region_str} - ({row['region_hotels']} hotels)\n"
+            elif user_data.get('countries'):
+                country_str = ', '.join(user_data['countries'])
+                results += f"1) in {country_str} - ({row['region_hotels']} hotels)\n"
+            
+            # Інформація про категорію
+            if user_data.get('category'):
+                results += f"2) in the {user_data['category']} segment ({row['category_hotels']} hotels)\n"
+            
+            # Інформація про стиль
+            if user_data.get('styles'):
+                style_str = ', '.join(user_data['styles'])
+                results += f"3) in the {style_str} style ({row['style_hotels']} hotels in this style(s) and adjacent ones)\n"
+            
+            # Інформація про мету
+            if user_data.get('purposes'):
+                purpose_str = ', '.join(user_data['purposes'])
+                results += f"4) for {purpose_str} ({row['purpose_hotels']} hotels)\n"
+        
+        results += "</result>\n\n"
+    
+    return results
+
+async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Обчислює результати та відображає їх користувачеві
+    
+    Args:
+        update: об'єкт Update від Telegram
+        context: контекст бота
+    
+    Returns:
+        int: ідентифікатор кінцевого стану розмови
+    """
     user_id = update.effective_user.id
-    text = update.message.text
+    user_data = user_data_global[user_id]
+    lang = user_data['language']
     
-    if "Українська" in text:
-        user_data_global[user_id]['language'] = 'uk'
-        await update.message.reply_text(
-            "Дякую! Я продовжу спілкування українською мовою.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return await ask_region(update, context)
-    
-    elif "English" in text:
-        user_data_global[user_id]['language'] = 'en'
-        await update.message.reply_text(
-            "Thank you! I will continue our conversation in English.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return await ask_region(update, context)
-    
-    else:
-        user_data_global[user_id]['language'] = 'en'  # За замовчуванням - англійська
-        await update.message.reply_text(
-            "I'll continue in English. If you need another language, please let me know.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return await ask_region(update, context)
+    # Виконуємо аналіз та підрахунок балів
+    try:
+        # Логуємо інформацію для відладки
+        logger.info(f"Розрахунок балів для користувача {user_id}")
+        logger.info(f"Дані користувача: {user_data}")
+        
+        # Перевіряємо, чи є дані готелів
+        if hotel_data is None or hotel_data.empty:
+            logger.error("Дані готелів відсутні або порожні!")
+            if lang == 'uk':
+                await update.message.reply_text(
+                    "На жаль, виникла проблема з даними готелів. Спробуйте пізніше.",
+                    reply_markup=ReplyKeyboardRemove()
+                )
+            else:
+                await update.message.reply_text(
+                    "Unfortunately, there is a problem with the hotel data. Please try again later.",
+                    reply_markup=ReplyKeyboardRemove()
+                )
+            return ConversationHandler.END
 
-# Функція завершення розмови
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Скасовує розмову за командою /cancel"""
-    user = update.message.from_user
-    logger.info(f"Користувач {user.id} скасував розмову.")
+# Підраховуємо бали для кожної програми лояльності
+        scores_df = calculate_scores(user_data, hotel_data)
+        
+        # Перевіряємо, чи є результати
+        if scores_df.empty:
+            if lang == 'uk':
+                await update.message.reply_text(
+                    "На жаль, не вдалося знайти програми лояльності, які відповідають вашим уподобанням. "
+                    "Спробуйте змінити параметри пошуку, надіславши команду /start знову.",
+                    reply_markup=ReplyKeyboardRemove()
+                )
+            else:
+                await update.message.reply_text(
+                    "Unfortunately, I couldn't find any loyalty programs that match your preferences. "
+                    "Try changing your search parameters by sending the /start command again.",
+                    reply_markup=ReplyKeyboardRemove()
+                )
+            
+            return ConversationHandler.END
+        
+        # Генеруємо детальний аналіз (не відображається користувачеві)
+        detailed_analysis = get_detailed_analysis(user_data, hotel_data, scores_df)
+        
+        # Логування детального аналізу для розробників
+        logger.info(f"Detailed analysis for user {user_id}: {detailed_analysis}")
+        
+        # Форматуємо результати для відображення
+        results = format_results(user_data, scores_df, lang)
+        
+        # Відправляємо результати користувачеві
+        if lang == 'uk':
+            await update.message.reply_text(
+                "Аналіз завершено! Ось топ-5 програм лояльності готелів, які найкраще відповідають вашим уподобанням:\n\n" + 
+                results + 
+                "\nЩоб почати нове опитування, надішліть команду /start.",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        else:
+            await update.message.reply_text(
+                "Analysis completed! Here are the top 5 hotel loyalty programs that best match your preferences:\n\n" + 
+                results + 
+                "\nTo start a new survey, send the /start command.",
+                reply_markup=ReplyKeyboardRemove()
+            )
     
-    lang = user_data_global.get(user.id, {}).get('language', 'en')
+    except Exception as e:
+        logger.error(f"Помилка при обчисленні результатів: {e}")
+        
+        if lang == 'uk':
+            await update.message.reply_text(
+                "Виникла помилка при аналізі ваших відповідей. Будь ласка, спробуйте знову, надіславши команду /start.",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        else:
+            await update.message.reply_text(
+                "An error occurred while analyzing your answers. Please try again by sending the /start command.",
+                reply_markup=ReplyKeyboardRemove()
+            )
     
-    if lang == 'uk':
-        await update.message.reply_text(
-            "Розмову завершено. Щоб почати знову, надішліть команду /start.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-    else:
-        await update.message.reply_text(
-            "Conversation ended. To start again, send the /start command.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-    
-    if user.id in user_data_global:
-        del user_data_global[user.id]
+    # Видаляємо дані користувача
+    if user_id in user_data_global:
+        del user_data_global[user_id]
     
     return ConversationHandler.END
 
-# Функції для регіону та країни
-async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про регіони подорожей"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
-    
-    keyboard = []
-    
-    if lang == 'uk':
-        keyboard = [
-            ["Європа", "Північна Америка", "Азія"],
-            ["Близький Схід", "Африка", "Південна Америка"],
-            ["Карибський басейн", "Океанія"],
-            ["Мене цікавлять лише конкретні країни"]
-        ]
-        
-        await update.message.reply_text(
-            "Питання 1/4:\nУ яких регіонах світу ви плануєте подорожувати?\n"
-            "(Оберіть один або кілька варіантів, для вибору кількох варіантів, надішліть їх через кому.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    else:
-        keyboard = [
-            ["Europe", "North America", "Asia"],
-            ["Middle East", "Africa", "South America"],
-            ["Caribbean", "Oceania"],
-            ["I'm only interested in specific countries"]
-        ]
-        
-        await update.message.reply_text(
-            "Question 1/4:\nIn which regions of the world are you planning to travel?\n"
-            "(Select one or multiple options. For multiple options, send them separated by commas.)",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    
-    return REGION
+# Додаємо функції для оновлення коду після всіх інших функцій
 
-async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє відповідь про регіони"""
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
-    
-    # Перевіряємо, чи користувач хоче вказати конкретні країни
-    if ("конкретні країни" in text.lower()) or ("specific countries" in text.lower()):
-        if lang == 'uk':
-            await update.message.reply_text(
-                "Будь ласка, введіть назви країн, які вас цікавлять (через кому):",
-                reply_markup=ReplyKeyboardRemove()
-            )
-        else:
-            await update.message.reply_text(
-                "Please enter the names of the countries you are interested in (separated by commas):",
-                reply_markup=ReplyKeyboardRemove()
-            )
-        
-        # Переходимо до стану COUNTRY замість встановлення флагу
-        return COUNTRY
-    
-    # Обробка звичайного вибору регіонів
-    regions = []
-    
-    # Перевіряємо на множинний вибір (якщо текст містить кому)
-    if "," in text:
-        regions = [region.strip() for region in text.split(",")]
-    else:
-        regions = [text.strip()]  # Додаємо один регіон, видаляючи зайві пробіли
-    
-    # Зберігаємо вибрані регіони
-    user_data_global[user_id]['regions'] = regions
-    user_data_global[user_id]['countries'] = None
-    
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали наступні регіони: {', '.join(regions)}.\n"
-            "Переходимо до наступного питання."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the following regions: {', '.join(regions)}.\n"
-            "Moving on to the next question."
-        )
-    
-    return await ask_category(update, context)
-
-# Обробка відсутності країни
-async def handle_missing_country(update: Update, context: ContextTypes.DEFAULT_TYPE, country_name: str) -> int:
+# Функція зіставлення стилю з категорією
+def style_matches_category(style, category):
     """
-    Обробляє випадок, коли країни немає в базі даних
+    Перевіряє, чи стиль відповідає категорії
     
     Args:
-        update: об'єкт Update від Telegram
-        context: контекст бота
-        country_name: назва країни, якої немає в базі
-        
+        style: назва стилю
+        category: категорія (Luxury, Comfort, Standard)
+    
     Returns:
-        int: Новий стан розмови (REGION_SELECTION)
+        bool: True, якщо стиль підходить для категорії
     """
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
-    
-    # Зберігаємо оригінальний запит користувача
-    context.user_data['original_country_query'] = country_name
-    
-    # Формуємо повідомлення залежно від мови
-    if lang == 'uk':
-        message = (
-            f"На жаль, країна \"{country_name}\" не знайдена в нашій базі даних. "
-            f"Можливо, вона записана дещо інакше або входить до складу іншої країни.\n\n"
-            f"Для зручності пошуку оберіть один із регіонів світу, і я покажу всі країни "
-            f"цього регіону, які представлені в нашій базі:\n\n"
-            f"1. Європа\n"
-            f"2. Північна Америка\n"
-            f"3. Азія\n"
-            f"4. Близький Схід\n"
-            f"5. Африка\n"
-            f"6. Південна Америка\n"
-            f"7. Карибський басейн\n"
-            f"8. Океанія\n\n"
-            f"Будь ласка, надішліть номер регіону, який вас цікавить."
-        )
-    else:
-        message = (
-            f"Unfortunately, the country \"{country_name}\" was not found in our database. "
-            f"It might be listed under a different name or as part of another country.\n\n"
-            f"For easier search, please select one of the world regions, and I will show "
-            f"all countries from that region that are represented in our database:\n\n"
-            f"1. Europe\n"
-            f"2. North America\n"
-            f"3. Asia\n"
-            f"4. Middle East\n"
-            f"5. Africa\n"
-            f"6. South America\n"
-            f"7. Caribbean\n"
-            f"8. Oceania\n\n"
-            f"Please send the number of the region you are interested in."
-        )
-    
-    # Створюємо клавіатуру з регіонами
-    keyboard = [
-        ["1. Європа" if lang == 'uk' else "1. Europe"],
-        ["2. Північна Америка" if lang == 'uk' else "2. North America"],
-        ["3. Азія" if lang == 'uk' else "3. Asia"],
-        ["4. Близький Схід" if lang == 'uk' else "4. Middle East"],
-        ["5. Африка" if lang == 'uk' else "5. Africa"],
-        ["6. Південна Америка" if lang == 'uk' else "6. South America"],
-        ["7. Карибський басейн" if lang == 'uk' else "7. Caribbean"],
-        ["8. Океанія" if lang == 'uk' else "8. Oceania"]
-    ]
-    
-    await update.message.reply_text(
-        message,
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-    )
-    
-    # Повертаємо новий стан для обробки вибору регіону
-    return REGION_SELECTION
-
-# Оновлена функція вибору регіону
-async def region_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Обробляє вибір регіону для перегляду доступних країн
-    
-    Args:
-        update: об'єкт Update від Telegram
-        context: контекст бота
+    category_style_mapping = {
+        "Luxury": ["Розкішний і вишуканий", "Бутік і унікальний", 
+                  "Luxurious and refined", "Boutique and unique"],
         
-    Returns:
-        int: Наступний стан розмови (COUNTRY)
-    """
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
-    
-    # Визначаємо обраний регіон за номером або назвою
-    selected_region = None
-    
-    # Словник регіонів
-    region_dict = {
-        "1": "Europe" if lang == 'en' else "Європа",
-        "2": "North America" if lang == 'en' else "Північна Америка",
-        "3": "Asia" if lang == 'en' else "Азія",
-        "4": "Middle East" if lang == 'en' else "Близький Схід",
-        "5": "Africa" if lang == 'en' else "Африка",
-        "6": "South America" if lang == 'en' else "Південна Америка",
-        "7": "Caribbean" if lang == 'en' else "Карибський басейн",
-        "8": "Oceania" if lang == 'en' else "Океанія"
+        "Comfort": ["Класичний і традиційний", "Сучасний і дизайнерський", "Затишний і сімейний",
+                   "Classic and traditional", "Modern and designer", "Cozy and family-friendly"],
+        
+        "Standard": ["Практичний і економічний", "Practical and economical"]
     }
     
-    # Витягуємо номер регіону з тексту
-    if text.startswith(("1", "2", "3", "4", "5", "6", "7", "8")):
-        region_num = text[0]  # Перший символ (цифра)
-        selected_region = region_dict[region_num]
-    else:
-        # Пошук за назвою регіону
-        for num, name in region_dict.items():
-            if name.lower() in text.lower():
-                selected_region = name
-                break
+    if category in category_style_mapping:
+        return style in category_style_mapping[category]
     
-    if not selected_region:
-        # Якщо регіон не розпізнано, повідомляємо і даємо спробувати ще раз
-        if lang == 'uk':
-            await update.message.reply_text(
-                "Вибачте, я не розпізнав обраний регіон. Будь ласка, виберіть один із запропонованих варіантів.",
-                reply_markup=ReplyKeyboardMarkup([list(region_dict.values())], one_time_keyboard=True)
-            )
-        else:
-            await update.message.reply_text(
-                "Sorry, I couldn't recognize the selected region. Please choose one of the suggested options.",
-                reply_markup=ReplyKeyboardMarkup([list(region_dict.values())], one_time_keyboard=True)
-            )
-        return REGION_SELECTION
-    
-    # Отримуємо список країн для вибраного регіону
-    countries_in_region = get_countries_in_region(selected_region)
-    
-    if not countries_in_region:
-        # Якщо немає країн у цьому регіоні
-        if lang == 'uk':
-            await update.message.reply_text(
-                f"На жаль, у нашій базі даних немає країн для регіону {selected_region}. "
-                "Будь ласка, виберіть інший регіон.",
-                reply_markup=ReplyKeyboardMarkup([list(region_dict.values())], one_time_keyboard=True)
-            )
-        else:
-            await update.message.reply_text(
-                f"Unfortunately, there are no countries in our database for the {selected_region} region. "
-                "Please select another region.",
-                reply_markup=ReplyKeyboardMarkup([list(region_dict.values())], one_time_keyboard=True)
-            )
-        return REGION_SELECTION
-    
-    # Формуємо повідомлення зі списком країн
-    if lang == 'uk':
-        message = f"Ось всі країни з регіону {selected_region} в нашій базі даних:\n\n"
-        message += "\n".join([f"• {country}" for country in countries_in_region])
-        message += "\n\nБудь ласка, введіть назву країни з цього списку (або кілька через кому):"
-    else:
-        message = f"Here are all countries from the {selected_region} region in our database:\n\n"
-        message += "\n".join([f"• {country}" for country in countries_in_region])
-        message += "\n\nPlease enter a country name from this list (or several countries separated by commas):"
-    
-    await update.message.reply_text(message, reply_markup=ReplyKeyboardRemove())
-    
-    # Повертаємося до стану введення країни
-    return COUNTRY
+    return False
 
-# Оновлена функція country_choice
-async def country_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє введення конкретних країн"""
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
+# Функція для виведення категорій для кожної програми лояльності
+def get_segment_distribution(df):
+    """
+    Отримує розподіл категорій для програм лояльності
     
-    # Перевірка на згадування країни-терориста
-    if is_russia_mentioned(text):
-        await update.message.reply_text(get_russia_message(lang))
-        return COUNTRY
+    Args:
+        df: DataFrame з даними готелів
     
-    # Розбиваємо введений текст на окремі країни
-    country_names = [name.strip() for name in text.split(",")]
+    Returns:
+        Словник {програма: {категорія: кількість}}
+    """
+    result = {}
     
-    # Нормалізуємо назви країн і конвертуємо в англійську
-    normalized_countries = []
-    display_results = []  # Результати для відображення користувачеві
-    unknown_countries = []  # Країни, яких немає в базі даних
-    
-    for country in country_names:
-        # Спочатку перевіряємо, чи є точне співпадіння
-        exact_match = None
-        for ukr_name, eng_name in country_translation.items():
-            if country.lower() == ukr_name.lower():
-                exact_match = (ukr_name, eng_name)
-                break
-        
-        # Якщо є точне співпадіння
-        if exact_match:
-            normalized_countries.append(exact_match[1])
-            # Показуємо правильну форму (з великої літери)
-            display_results.append(exact_match[0])
-            logger.info(f"Точне співпадіння для країни: '{country}' -> '{exact_match[0]}'")
-        else:
-            # Якщо немає точного співпадіння, використовуємо нечітке порівняння
-            corrected_name = find_closest_country_name(country, lang)
+    if 'loyalty_program' in df.columns and 'segment' in df.columns:
+        # Для кожної програми лояльності
+        for program in df['loyalty_program'].unique():
+            program_data = df[df['loyalty_program'] == program]
             
-            # Перевіряємо, чи знайдено відповідність
-            if corrected_name and corrected_name in country_translation.values():
-                # Знаходимо оригінальну українську назву для відображення
-                ukr_original = None
-                for ukr_name, eng_name in country_translation.items():
-                    if eng_name == corrected_name:
-                        ukr_original = ukr_name
-                        break
-                
-                normalized_countries.append(corrected_name)
-                
-                # Якщо знайдено відповідність і вона відрізняється від оригіналу
-                if ukr_original and country.lower() != ukr_original.lower():
-                    display_results.append(f"{country} → {ukr_original}")
-                    logger.info(f"Виправлено назву країни: '{country}' -> '{ukr_original}'")
+            # Підрахунок категорій
+            segment_counts = program_data['segment'].value_counts()
+            
+            result[program] = {}
+            for segment in ["Luxury", "Comfort", "Standard"]:
+                if segment in segment_counts:
+                    result[program][segment] = segment_counts[segment]
                 else:
-                    display_results.append(country)
-                    logger.info(f"Використано оригінальну назву країни: '{country}'")
-            else:
-                # Країну не знайдено
-                unknown_countries.append(country)
-                logger.warning(f"Не знайдено країну: '{country}'")
+                    result[program][segment] = 0
     
-    # Якщо всі країни невідомі, викликаємо обробник невідомих країн
-    if not normalized_countries and unknown_countries:
-        # Викликаємо обробник для першої невідомої країни
-        return await handle_missing_country(update, context, unknown_countries[0])
-    
-    # Якщо є і відомі, і невідомі країни
-    if normalized_countries and unknown_countries:
-        # Зберігаємо вибрані країни (нормалізовані)
-        user_data_global[user_id]['regions'] = None
-        user_data_global[user_id]['countries'] = normalized_countries
-        
-        # Формуємо повідомлення з попередженням про невідомі країни
-        if lang == 'uk':
-            message = f"Дякую! Ви обрали наступні країни: {', '.join(display_results)}."
-            
-            if unknown_countries:
-                message += f"\n\nУвага: наступні країни не знайдено в нашій базі: {', '.join(unknown_countries)}."
-                message += f"\nМи будемо враховувати тільки знайдені країни."
-            
-            message += "\nПереходимо до наступного питання."
-        else:
-            message = f"Thank you! You have chosen the following countries: {', '.join(display_results)}."
-            
-            if unknown_countries:
-                message += f"\n\nNote: the following countries were not found in our database: {', '.join(unknown_countries)}."
-                message += f"\nWe will only consider the countries that were found."
-            
-            message += "\nMoving on to the next question."
-        
-        await update.message.reply_text(message)
-        return await ask_category(update, context)
-    
-    # Зберігаємо вибрані країни (нормалізовані)
-    user_data_global[user_id]['regions'] = None
-    user_data_global[user_id]['countries'] = normalized_countries
-    
-    # Відображаємо результат користувачеві
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали наступні країни: {', '.join(display_results)}.\n"
-            "Переходимо до наступного питання."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the following countries: {', '.join(display_results)}.\n"
-            "Moving on to the next question."
-        )
-    
-    return await ask_category(update, context)
+    return result
 
-# Функції для категорії готелів
-async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про категорію готелів"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
+# Функція для генерації рекомендацій щодо програм лояльності
+def generate_recommendations(scores_df, top_n=3):
+    """
+    Генерує текстові рекомендації щодо програм лояльності
     
-    keyboard = []
+    Args:
+        scores_df: DataFrame з підрахованими балами
+        top_n: кількість програм для рекомендацій
     
-    if lang == 'uk':
-        keyboard = [
-            ["Luxury (преміум-клас)"],
-            ["Comfort (середній клас)"],
-            ["Standard (економ-клас)"]
-        ]
+    Returns:
+        str: текст з рекомендаціями
+    """
+    recommendations = []
+    
+    top_programs = scores_df.head(top_n)
+    
+    for i, (index, row) in enumerate(top_programs.iterrows()):
+        program = row['loyalty_program']
+        score = row['total_score']
         
-        await update.message.reply_text(
-            "Питання 2/4:\nЯку категорію готелів ви зазвичай обираєте?",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    else:
-        keyboard = [
-            ["Luxury (premium class)"],
-            ["Comfort (middle class)"],
-            ["Standard (economy class)"]
-        ]
+        # Базова рекомендація
+        recommendation = f"{i+1}. {program} (загальний бал: {score:.2f})"
         
-        await update.message.reply_text(
-            "Question 2/4:\nWhich hotel category do you usually choose?",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
+        # Додаємо примітки щодо сильних сторін
+        strengths = []
+        if row['region_score'] > 15.0:
+            strengths.append("велика кількість готелів у вибраному регіоні")
+        if row['category_score'] > 15.0:
+            strengths.append("відмінна відповідність вибраній категорії")
+        if row['style_score'] > 15.0:
+            strengths.append("ідеальний стиль для ваших уподобань")
+        if row['purpose_score'] > 15.0:
+            strengths.append("оптимальний вибір для вашої мети подорожі")
+        
+        if strengths:
+            recommendation += f" - сильні сторони: {', '.join(strengths)}"
+        
+        recommendations.append(recommendation)
     
-    return CATEGORY
+    return "\n".join(recommendations)
 
-async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір категорії готелю"""
-    user_id = update.effective_user.id
-    text = update.message.text.strip()
-    lang = user_data_global[user_id]['language']
-    
-    # Визначення обраної категорії
-    category = None
-    if "Luxury" in text:
-        category = "Luxury"
-    elif "Comfort" in text:
-        category = "Comfort"
-    elif "Standard" in text or "Standart" in text:  # Обробляємо обидва варіанти
-        category = "Standard"  # Але зберігаємо уніфіковано як "Standard"
-    
-    # Зберігаємо вибрану категорію
-    user_data_global[user_id]['category'] = category
-    
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали категорію: {category}.\n"
-            "Переходимо до наступного питання."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the category: {category}.\n"
-            "Moving on to the next question."
-        )
-    
-    return await ask_style(update, context)
+# Додаткові функції для розширеного аналізу та відображення
 
-# Оновлена функція для вибору стилю готелю
-async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про стиль готелю"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
+# Функція для порівняння програм лояльності
+def compare_loyalty_programs(df, selected_programs, user_preferences=None):
+    """
+    Порівнює обрані програми лояльності за різними критеріями
     
-    if lang == 'uk':
-        message = (
-            "Питання 3/4:\n"
-            "**Який стиль готелю ви зазвичай обираєте?**\n"
-            "*(Оберіть до трьох варіантів.)*\n\n"
-            "1. **Розкішний і вишуканий** (преміум-матеріали, елегантний дизайн, високий рівень сервісу)\n"
-            "2. **Бутік і унікальний** (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)\n"
-            "3. **Класичний і традиційний** (перевірений часом стиль, консервативність, історичність)\n"
-            "4. **Сучасний і дизайнерський** (модні інтер'єри, мінімалізм, технологічність)\n"
-            "5. **Затишний і сімейний** (тепла атмосфера, комфорт, дружній до дітей)\n"
-            "6. **Практичний і економічний** (без зайвих деталей, функціональний, доступний)"
-        )
+    Args:
+        df: DataFrame з даними готелів
+        selected_programs: список програм для порівняння
+        user_preferences: словник із перевагами користувача (опціонально)
+    
+    Returns:
+        DataFrame з порівнянням
+    """
+    comparison = {}
+    
+    # Рахуємо загальну кількість готелів
+    for program in selected_programs:
+        program_data = df[df['loyalty_program'] == program]
+        comparison[program] = {
+            'total_hotels': len(program_data),
+        }
         
-        keyboard = [
-            ["1. Розкішний і вишуканий"],
-            ["2. Бутік і унікальний"],
-            ["3. Класичний і традиційний"],
-            ["4. Сучасний і дизайнерський"],
-            ["5. Затишний і сімейний"],
-            ["6. Практичний і економічний"]
-        ]
-    else:
-        message = (
-            "Question 3/4:\n"
-            "**What hotel style do you usually choose?**\n"
-            "*(Choose up to three options.)*\n\n"
-            "1. **Luxurious and refined** (premium materials, elegant design, high level of service)\n"
-            "2. **Boutique and unique** (original interior, creative atmosphere, sense of exclusivity)\n"
-            "3. **Classic and traditional** (time-tested style, conservatism, historical ambiance)\n"
-            "4. **Modern and designer** (fashionable interiors, minimalism, technological features)\n"
-            "5. **Cozy and family-friendly** (warm atmosphere, comfort, child-friendly)\n"
-            "6. **Practical and economical** (no unnecessary details, functional, affordable)"
-        )
+        # Розподіл за категоріями
+        for category in ['Luxury', 'Comfort', 'Standard']:
+            category_data = program_data[program_data['segment'] == category]
+            comparison[program][f'{category}_hotels'] = len(category_data)
         
-        keyboard = [
-            ["1. Luxurious and refined"],
-            ["2. Boutique and unique"],
-            ["3. Classic and traditional"],
-            ["4. Modern and designer"],
-            ["5. Cozy and family-friendly"],
-            ["6. Practical and economical"]
-        ]
+        # Середній рейтинг (якщо є)
+        if 'rating' in program_data.columns:
+            comparison[program]['avg_rating'] = program_data['rating'].mean()
+        
+        # Розподіл по регіонах
+        regions = program_data['region'].value_counts()
+        for region, count in regions.items():
+            comparison[program][f'region_{region}'] = count
     
-    await update.message.reply_text(
-        message,
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-    )
+    # Перетворюємо на DataFrame
+    comparison_df = pd.DataFrame.from_dict(comparison, orient='index')
     
-    return STYLE
+    # Додаємо метрику відповідності перевагам користувача
+    if user_preferences:
+        comparison_df['preference_match'] = 0.0
+        
+        for program in selected_programs:
+            match_score = 0.0
+            
+            # Враховуємо категорію
+            if 'category' in user_preferences and user_preferences['category']:
+                category = user_preferences['category']
+                match_score += comparison_df.loc[program, f'{category}_hotels'] / comparison_df.loc[program, 'total_hotels'] * 100
+            
+            # Враховуємо регіон
+            if 'regions' in user_preferences and user_preferences['regions']:
+                for region in user_preferences['regions']:
+                    if f'region_{region}' in comparison_df.columns:
+                        match_score += comparison_df.loc[program, f'region_{region}'] / comparison_df.loc[program, 'total_hotels'] * 100
+            
+            comparison_df.loc[program, 'preference_match'] = match_score
+    
+    return comparison_df
 
-# Оновлена функція обробки вибору стилю готелю
-async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір стилю готелю"""
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
+# Функція для визначення найкращої категорії для наявної кількості поїнтів
+def recommend_category_for_points(program, points, hotel_data):
+    """
+    Рекомендує найкращу категорію готелю для наявної кількості поїнтів
     
-    # Обробка вибору стилів
-    styles = []
+    Args:
+        program: назва програми лояльності
+        points: кількість поїнтів
+        hotel_data: DataFrame з даними готелів
     
-    # Перевіряємо на множинний вибір (якщо текст містить кому)
-    if "," in text:
-        style_texts = [style.strip() for style in text.split(",")]
-    else:
-        style_texts = [text.strip()]  # Один стиль
-    
-    # Мапінг номерів до стилів
-    style_mapping_uk = {
-        "1": "Розкішний і вишуканий",
-        "2": "Бутік і унікальний",
-        "3": "Класичний і традиційний",
-        "4": "Сучасний і дизайнерський",
-        "5": "Затишний і сімейний",
-        "6": "Практичний і економічний"
+    Returns:
+        dict: рекомендації для кожної категорії
+    """
+    # Орієнтовні значення поїнтів для ночі в різних категоріях
+    points_per_night = {
+        "Luxury": 50000,
+        "Comfort": 25000,
+        "Standard": 15000
     }
     
-    style_mapping_en = {
-        "1": "Luxurious and refined",
-        "2": "Boutique and unique",
-        "3": "Classic and traditional",
-        "4": "Modern and designer",
-        "5": "Cozy and family-friendly",
-        "6": "Practical and economical"
+    # Результати для кожної категорії
+    results = {}
+    
+    # Для кожної категорії
+    for category, avg_points in points_per_night.items():
+        # Кількість ночей, яку можна забронювати
+        nights = points // avg_points
+        
+        # Залишок поїнтів
+        remaining = points % avg_points
+        
+        # Рекомендація
+        recommendation = {
+            "nights": nights,
+            "points_per_night": avg_points,
+            "remaining_points": remaining,
+            "percentage_used": (points - remaining) / points * 100 if points > 0 else 0
+        }
+        
+        results[category] = recommendation
+    
+    return results
+
+# Функція для аналізу географічного розподілу готелів програми лояльності
+def analyze_geographic_distribution(program, hotel_data):
+    """
+    Аналізує географічний розподіл готелів програми лояльності
+    
+    Args:
+        program: назва програми лояльності
+        hotel_data: DataFrame з даними готелів
+    
+    Returns:
+        dict: розподіл готелів по регіонах та країнах
+    """
+    program_data = hotel_data[hotel_data['loyalty_program'] == program].copy()
+    
+    # Розподіл по регіонах
+    region_distribution = program_data['region'].value_counts()
+    
+    # Розподіл по країнах
+    country_distribution = program_data['country'].value_counts()
+    
+    # Топ-5 країн
+    top_countries = dict(country_distribution.head(5))
+    
+    # Додаємо відсотки
+    total_hotels = len(program_data)
+    region_percentages = {region: count / total_hotels * 100 for region, count in region_distribution.items()}
+    country_percentages = {country: count / total_hotels * 100 for country, count in top_countries.items()}
+    
+    result = {
+        "total_hotels": total_hotels,
+        "region_distribution": {
+            "counts": dict(region_distribution),
+            "percentages": region_percentages
+        },
+        "top_countries": {
+            "counts": top_countries,
+            "percentages": country_percentages
+        }
     }
     
-    # Визначаємо обрані стилі, обробляючи номери або повні назви
-    for style_text in style_texts:
-        # Видаляємо крапку після числа, якщо вона є
-        if ". " in style_text:
-            style_text = style_text.replace(". ", ".")
-        
-        # Якщо текст починається з цифри (1-6), використовуємо мапінг
-        if style_text.startswith(("1", "2", "3", "4", "5", "6")):
-            num = style_text[0]  # Перший символ (цифра)
-            if lang == 'uk':
-                styles.append(style_mapping_uk[num])
-            else:
-                styles.append(style_mapping_en[num])
-        else:
-            # Інакше шукаємо відповідність у назвах стилів
-            for key, value in (style_mapping_uk.items() if lang == 'uk' else style_mapping_en.items()):
-                if value.lower() in style_text.lower():
-                    styles.append(value)
-                    break
-    
-    # Обмеження до трьох варіантів з повідомленням
-    original_count = len(styles)
-    if len(styles) > 3:
-        styles = styles[:3]
-        
-        # Повідомляємо користувача про обмеження
-        if lang == 'uk':
-            await update.message.reply_text(
-                f"Ви обрали {original_count} стилів, але дозволено максимум 3. "
-                f"Я врахую тільки перші три: {', '.join(styles)}."
-            )
-        else:
-            await update.message.reply_text(
-                f"You selected {original_count} styles, but a maximum of 3 is allowed. "
-                f"I will only consider the first three: {', '.join(styles)}."
-            )
-    
-    # Зберігаємо вибрані стилі
-    user_data_global[user_id]['styles'] = styles
-    
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали наступні стилі: {', '.join(styles)}.\n"
-            "Переходимо до наступного питання."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the following styles: {', '.join(styles)}.\n"
-            "Moving on to the next question."
-        )
-    
-    return await ask_purpose(update, context)
+    return result
 
-# Додаємо функцію для питання про мету подорожі
-async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про мету подорожі"""
-    user_id = update.effective_user.id
-    lang = user_data_global[user_id]['language']
+# Функція для оцінки співвідношення якості до ціни
+def estimate_value_for_money(program, category, hotel_data):
+    """
+    Оцінює співвідношення якості до ціни для програми лояльності у заданій категорії
     
-    keyboard = []
+    Args:
+        program: назва програми лояльності
+        category: категорія (Luxury, Comfort, Standard)
+        hotel_data: DataFrame з даними готелів
     
-    if lang == 'uk':
-        keyboard = [
-            ["Бізнес-подорожі / відрядження"],
-            ["Відпустка / релакс"],
-            ["Сімейний відпочинок"],
-            ["Довготривале проживання"]
-        ]
-        
-        await update.message.reply_text(
-            "Питання 4/4:\nЗ якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "(Оберіть до двох варіантів. Для вибору кількох варіантів, надішліть їх через кому, наприклад: \"Бізнес-подорожі / відрядження, Сімейний відпочинок\")",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
-    else:
-        keyboard = [
-            ["Business travel"],
-            ["Vacation / relaxation"],
-            ["Family vacation"],
-            ["Long-term stay"]
-        ]
-        
-        await update.message.reply_text(
-            "Question 4/4:\nFor what purpose do you usually stay at a hotel?\n"
-            "(Choose up to two options. For multiple choices, send them separated by commas, for example: \"Business travel, Family vacation\")",
-            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
-        )
+    Returns:
+        dict: оцінка співвідношення якості до ціни
+    """
+    # Фільтруємо дані
+    filtered_data = hotel_data[(hotel_data['loyalty_program'] == program) & 
+                             (hotel_data['segment'] == category)]
     
-    return PURPOSE
+    # Середня кількість готелів у категорії для всіх програм
+    all_programs_count = hotel_data[hotel_data['segment'] == category].groupby('loyalty_program').size().mean()
+    
+    # Кількість готелів у програмі та категорії
+    program_count = len(filtered_data)
+    
+    # Відносна доступність (порівняно з середньою)
+    availability_score = program_count / all_programs_count if all_programs_count > 0 else 0
+    
+    # Оцінка співвідношення якості до ціни (приблизна логіка)
+    if category == "Luxury":
+        value_rating = min(10, availability_score * 8)  # Максимум 10 балів
+    elif category == "Comfort":
+        value_rating = min(10, availability_score * 10)  # Максимум 10 балів
+    else:  # Standard
+        value_rating = min(10, availability_score * 12)  # Максимум 10 балів
+    
+    result = {
+        "program": program,
+        "category": category,
+        "hotels_count": program_count,
+        "average_count_all_programs": all_programs_count,
+        "availability_score": availability_score,
+        "value_for_money_rating": value_rating
+    }
+    
+    return result
 
-# Функція обробки вибору мети подорожі
-async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір мети подорожі"""
-    user_id = update.effective_user.id
-    text = update.message.text
-    lang = user_data_global[user_id]['language']
-    
-    # Обробка вибору мети
-    purposes = []
-    
-    # Перевіряємо на множинний вибір (якщо текст містить кому)
-    if "," in text:
-        purposes = [purpose.strip() for purpose in text.split(",")]
-    else:
-        purposes = [text.strip()]  # Один варіант
-    
-    # Обмеження до двох варіантів з повідомленням
-    original_count = len(purposes)
-    if len(purposes) > 2:
-        purposes = purposes[:2]
-        
-        # Повідомляємо користувача про обмеження
-        if lang == 'uk':
-            await update.message.reply_text(
-                f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-                f"Я врахую тільки перші дві: {', '.join(purposes)}."
-            )
-        else:
-            await update.message.reply_text(
-                f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-                f"I will only consider the first two: {', '.join(purposes)}."
-            )
-    
-    # Зберігаємо вибрані мети
-    user_data_global[user_id]['purposes'] = purposes
-    
-    if lang == 'uk':
-        await update.message.reply_text(
-            f"Дякую! Ви обрали наступні мети: {', '.join(purposes)}.\n"
-            "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
-        )
-    else:
-        await update.message.reply_text(
-            f"Thank you! You have chosen the following purposes: {', '.join(purposes)}.\n"
-            "Please wait while I analyze your answers and select the best loyalty programs for you."
-        )
-    
-    # Обчислюємо та відображаємо результати
-    return await calculate_and_show_results(update, context)
+# Щоб уникнути кругових імпортів і помилок, переконайтеся, що всі необхідні функції визначені
+# Перевірте відсутність залежностей, які можуть викликати помилки при запуску
 
-# Оновлений ConversationHandler
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("start", start)],
-    states={
-        LANGUAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, language_choice)],
-        REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region_choice)],
-        COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, country_choice)],
-        REGION_SELECTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region_selection)],  # Новий стан
-        CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, category_choice)],
-        STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, style_choice)],
-        PURPOSE: [MessageHandler(filters.TEXT & ~filters.COMMAND, purpose_choice)]
-    },
-    fallbacks=[
-        CommandHandler("cancel", cancel),
-        CommandHandler("start", start)
-    ]
-)
+# Додайте ці функції до вашого файлу hotel-quiz-bot.py
+# Також переконайтеся, що ви імпортували всі необхідні бібліотеки на початку файлу
 
-# Додавання обробника до застосунку
-def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
-    """Головна функція запуску бота з підтримкою webhook"""
-    # Завантаження даних
-    global hotel_data
-    hotel_data = load_hotel_data(csv_path)
-    
-    if hotel_data is None:
-        logger.error("Не вдалося завантажити дані. Бот не запущено.")
-        return
-    
-    # Додаткова перевірка наявності необхідних колонок
-    required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
-    missing_required = [col for col in required_columns if col not in hotel_data.columns]
-    
-    if missing_required:
-        logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
-        return
-    
-    # Переконуємося, що є колонка 'segment'
-    if 'segment' not in hotel_data.columns:
-        logger.error("Відсутня колонка 'segment'. Бот не запущено.")
-        return
-    
-    # Створення застосунку
-    app = Application.builder().token(token)
-    
-    # Побудова застосунку
-    application = app.build()
-    
-    # Додавання обробника розмови
-    application.add_handler(conv_handler)
-    
-    # Використання PORT для webhook
-    port = int(os.environ.get("PORT", "10000"))
-    
-    if webhook_url and webhook_path:
-        webhook_info = f"{webhook_url}{webhook_path}"
-        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=webhook_path,
-            webhook_url=webhook_info,
-            allowed_updates=Update.ALL_TYPES
-        )
-    else:
-        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    
-    logger.info("Бот запущено")
-
-if __name__ == "__main__":
-    # Використовуємо змінні середовища або значення за замовчуванням
-    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
-
-    if not CSV_PATH:
-        logger.error("CSV_PATH не задано. Завершення запуску.")
-        exit(1)
-    logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
-    
-    # Параметри для webhook (опціонально)
-    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
-    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-    
-    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
-    
-    # Перевіряємо наявність токена
-    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
-    
-    # Запускаємо бота з підтримкою webhook або polling
-    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
-
+# Кінець додаткових функцій
