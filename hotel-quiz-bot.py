@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
-import os  # Для кращої роботи з шляхами до файлів
+import os
 from telegram.ext import ApplicationBuilder
 import ssl
 from aiohttp import web
@@ -416,6 +416,43 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     return STYLE
 
+# Додаємо функцію для питання про мету подорожі
+async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Питання про мету подорожі"""
+    user_id = update.effective_user.id
+    lang = user_data_global[user_id]['language']
+    
+    keyboard = []
+    
+    if lang == 'uk':
+        keyboard = [
+            ["Бізнес-подорожі / відрядження"],
+            ["Відпустка / релакс"],
+            ["Сімейний відпочинок"],
+            ["Довготривале проживання"]
+        ]
+        
+        await update.message.reply_text(
+            "Питання 4/4:\nЗ якою метою ви зазвичай зупиняєтесь у готелі?\n"
+            "(Оберіть до двох варіантів. Для вибору кількох варіантів, надішліть їх через кому, наприклад: \"Бізнес-подорожі / відрядження, Сімейний відпочинок\")",
+            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        )
+    else:
+        keyboard = [
+            ["Business travel"],
+            ["Vacation / relaxation"],
+            ["Family vacation"],
+            ["Long-term stay"]
+        ]
+        
+        await update.message.reply_text(
+            "Question 4/4:\nFor what purpose do you usually stay at a hotel?\n"
+            "(Choose up to two options. For multiple choices, send them separated by commas, for example: \"Business travel, Family vacation\")",
+            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        )
+    
+    return PURPOSE
+
 # Оновлена функція обробки вибору стилю готелю
 async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє вибір стилю готелю"""
@@ -504,6 +541,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     
     return await ask_purpose(update, context)
 
+# Функція обробки вибору мети подорожі
 async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє вибір мети подорожі"""
     user_id = update.effective_user.id
@@ -552,6 +590,164 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Обчислюємо та відображаємо результати
     return await calculate_and_show_results(update, context)
+
+# Оновлена функція зіставлення бренду готелю зі стилями
+def map_hotel_style(hotel_brand):
+    """
+    Зіставляє бренд готелю зі стилями
+    
+    Args:
+        hotel_brand: бренд готелю (один рядок, не список)
+    
+    Returns:
+        Словник стилів з відповідними значеннями True/False
+    """
+    # Переконуємося, що hotel_brand є рядком
+    if not isinstance(hotel_brand, str):
+        hotel_brand = str(hotel_brand)
+    
+    hotel_brand = hotel_brand.lower()
+    
+    # Оновлений повний словник стилів та брендів
+    style_mapping = {
+        "Розкішний і вишуканий": [
+            "JW Marriott", "The Ritz-Carlton", "Conrad Hotels & Resorts", 
+            "Waldorf Astoria Hotels & Resorts", "InterContinental Hotels & Resorts", 
+            "Wyndham Grand", "Registry Collection Hotels", "Fairmont Hotels", 
+            "Raffles Hotels & Resorts", "Park Hyatt Hotels", "Alila Hotels", 
+            "Hyatt Regency", "Grand Hyatt", "Ascend Hotel Collection"
+        ],
+        
+        "Бутік і унікальний": [
+            "Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
+            "Mercure Hotels", "ibis Styles", "Park Hyatt Hotels", 
+            "Alila Hotels", "Ascend Hotel Collection"
+        ],
+        
+        "Класичний і традиційний": [
+            "The Ritz-Carlton", "Marriott Hotels", "Sheraton", 
+            "Waldorf Astoria Hotels & Resorts", "Hilton Hotels & Resorts", 
+            "InterContinental Hotels & Resorts", "Holiday Inn Hotels & Resorts", 
+            "Wyndham", "Fairmont Hotels", "Raffles Hotels & Resorts", 
+            "Ascend Hotel Collection"
+        ],
+        
+        "Сучасний і дизайнерський": [
+            "Conrad Hotels & Resorts", "Kimpton Hotels & Restaurants", 
+            "Crowne Plaza", "Wyndham Grand", "Novotel Hotels", 
+            "Ibis Hotels", "ibis Styles", "Cambria Hotels", 
+            "Park Hyatt Hotels", "Grand Hyatt", "Hyatt Place"
+        ],
+        
+        "Затишний і сімейний": [
+            "Fairfield Inn & Suites", "DoubleTree by Hilton", 
+            "Hampton by Hilton", "Holiday Inn Hotels & Resorts", 
+            "Candlewood Suites", "Wyndham", "Days Inn by Wyndham", 
+            "Mercure Hotels", "Novotel Hotels", "Quality Inn Hotels", 
+            "Comfort Inn Hotels", "Hyatt House"
+        ],
+        
+        "Практичний і економічний": [
+            "Fairfield Inn & Suites", "Courtyard by Marriott", 
+            "Hampton by Hilton", "Hilton Garden Inn", 
+            "Holiday Inn Hotels & Resorts", "Holiday Inn Express", 
+            "Candlewood Suites", "Wingate by Wyndham", 
+            "Super 8 by Wyndham", "Days Inn by Wyndham", 
+            "Ibis Hotels", "ibis Styles", "Quality Inn Hotels", 
+            "Comfort Inn Hotels", "Econo Lodge Hotels", 
+            "Rodeway Inn Hotels", "Hyatt Place", "Hyatt House"
+        ]
+    }
+    
+    # Додаємо англійські ключі для стилів
+    style_mapping_en = {
+        "Luxurious and refined": style_mapping["Розкішний і вишуканий"],
+        "Boutique and unique": style_mapping["Бутік і унікальний"],
+        "Classic and traditional": style_mapping["Класичний і традиційний"],
+        "Modern and designer": style_mapping["Сучасний і дизайнерський"],
+        "Cozy and family-friendly": style_mapping["Затишний і сімейний"],
+        "Practical and economical": style_mapping["Практичний і економічний"]
+    }
+    
+    # Об'єднуємо словники
+    combined_mapping = {**style_mapping, **style_mapping_en}
+    
+    result = {}
+    for style, brands in combined_mapping.items():
+        # Більш гнучке порівняння назв брендів
+        is_match = False
+        for brand in brands:
+            brand_lower = brand.lower()
+            # Перевіряємо, чи бренд готелю містить назву бренду зі списку
+            if brand_lower in hotel_brand:
+                is_match = True
+                break
+        result[style] = is_match
+    
+    return result
+
+# Оновлена функція зіставлення бренду готелю з метою подорожі
+def map_hotel_purpose(hotel_brand):
+    """
+    Зіставляє бренд готелю з метою подорожі
+    
+    Args:
+        hotel_brand: бренд готелю (один рядок, не список)
+    
+    Returns:
+        Словник цілей з відповідними значеннями True/False
+    """
+    # Переконуємося, що hotel_brand є рядком
+    if not isinstance(hotel_brand, str):
+        hotel_brand = str(hotel_brand)
+    
+    hotel_brand = hotel_brand.lower()
+    
+    purpose_mapping = {
+        "Бізнес-подорожі / відрядження": ["Marriott Hotels", "InterContinental Hotels & Resorts", "Crowne Plaza", 
+                                      "Hyatt Regency", "Grand Hyatt", "Courtyard by Marriott", "Hilton Garden Inn", 
+                                      "Sheraton", "DoubleTree by Hilton", "Novotel Hotels", "Cambria Hotels", 
+                                      "Fairfield Inn & Suites", "Holiday Inn Express", "Wingate by Wyndham", 
+                                      "Quality Inn Hotels", "ibis Hotels"],
+        
+        "Відпустка / релакс": ["The Ritz-Carlton", "JW Marriott", "Waldorf Astoria Hotels & Resorts", 
+                             "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
+                             "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
+                             "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
+                             "Ascend Hotel Collection"],
+        
+        "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
+                              "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
+                              "Comfort Inn Hotels", "Hampton by Hilton", "Holiday Inn Express", 
+                              "Days Inn by Wyndham", "Super 8 by Wyndham"],
+        
+        "Довготривале проживання": ["Hyatt House", "Candlewood Suites", "ibis Styles"]
+    }
+    
+    # Переклад для англійської мови
+    purpose_mapping_en = {
+        "Business travel": purpose_mapping["Бізнес-подорожі / відрядження"],
+        "Vacation / relaxation": purpose_mapping["Відпустка / релакс"],
+        "Family vacation": purpose_mapping["Сімейний відпочинок"],
+        "Long-term stay": purpose_mapping["Довготривале проживання"]
+    }
+    
+    # Об'єднуємо обидва словники
+    combined_mapping = {**purpose_mapping, **purpose_mapping_en}
+    
+    result = {}
+    for purpose, brands in combined_mapping.items():
+        # Більш гнучке порівняння назв брендів
+        is_match = False
+        for brand in brands:
+            brand_lower = brand.lower()
+            # Перевіряємо, чи бренд готелю містить назву бренду зі списку
+            if brand_lower in hotel_brand:
+                is_match = True
+                break
+        result[purpose] = is_match
+    
+    return result
 
 # Функції фільтрації готелів
 def filter_hotels_by_region(df, regions, countries=None):
@@ -962,8 +1158,8 @@ def calculate_scores(user_data, hotel_data):
             filtered_by_category = filtered_by_region
     else:
         filtered_by_category = filtered_by_region
-    
-    # Крок 3: Фільтруємо готелі за стилем у обраній категорії та регіоні
+
+# Крок 3: Фільтруємо готелі за стилем у обраній категорії та регіоні
     if styles and len(styles) > 0:
         style_filtered = filter_hotels_by_style(filtered_by_category, styles)
         style_counts_dict = {}
