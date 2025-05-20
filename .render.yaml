@@ -8,4 +8,6 @@ services:
       - key: CSV_PATH
         value: hotel_data.csv
       - key: TELEGRAM_BOT_TOKEN
-        value: 123456789:ABCdefGHIjkLmNoPQRstuVWxyZ
+        value: 8022857403:AAEvoVF6qmOzqp5UUP3rm4vZKzx84bnbUZ0
+      - key: WEBHOOK_HOST
+        value: hlp-loyalty-bot.onrender.com
