@@ -1429,7 +1429,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
 if __name__ == "__main__":
     # Використовуємо змінні середовища або значення за замовчуванням
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-    CSV_PATH = os.environ.get("CSV_PATH")
+    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
 
     if not CSV_PATH:
         logger.error("CSV_PATH не задано. Завершення запуску.")
