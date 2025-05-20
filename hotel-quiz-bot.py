@@ -7,6 +7,7 @@ import os  # Додано для кращої роботи з шляхами д�
 from telegram.ext import ApplicationBuilder
 import ssl
 from aiohttp import web
+PORT = int(os.environ.get("PORT", "10000"))
 
 # Налаштування логування
 logging.basicConfig(
@@ -1406,18 +1407,25 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     
     application.add_handler(conv_handler)
     
-    # Визначаємо режим запуску: webhook або polling
-    if webhook_url and webhook_port and webhook_path:
-        # Налаштування webhook
-        webhook_info = f"{webhook_url}{webhook_path}"
-        
-        # Запуск бота в режимі webhook
-        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=webhook_port,
-            url_path=webhook_path,
-            webhook_url=webhook_info
+ PORT = int(os.environ.get("PORT", "10000"))  # Це має бути поза main()
+
+...
+
+# Усередині main(...)
+if webhook_url and webhook_path:
+    webhook_info = f"{webhook_url}{webhook_path}"
+
+    logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,  # Використовуємо PORT з середовища
+        url_path=webhook_path,
+        webhook_url=webhook_info,
+        allowed_updates=Update.ALL_TYPES
+    )
+else:
+    logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
         )
     else:
         # Запуск бота в режимі polling (стандартний режим)
