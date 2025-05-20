@@ -1402,7 +1402,10 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
             STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, style_choice)],
             PURPOSE: [MessageHandler(filters.TEXT & ~filters.COMMAND, purpose_choice)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)]
+        fallbacks=[
+        CommandHandler("cancel", cancel),
+        CommandHandler("start", start)  # Додаємо /start як fallback]
+        
     )
     
     application.add_handler(conv_handler)
