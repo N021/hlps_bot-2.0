@@ -504,6 +504,55 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     
     return await ask_purpose(update, context)
 
+async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє вибір мети подорожі"""
+    user_id = update.effective_user.id
+    text = update.message.text
+    lang = user_data_global[user_id]['language']
+    
+    # Обробка вибору мети
+    purposes = []
+    
+    # Перевіряємо на множинний вибір (якщо текст містить кому)
+    if "," in text:
+        purposes = [purpose.strip() for purpose in text.split(",")]
+    else:
+        purposes = [text.strip()]  # Один варіант
+    
+    # Обмеження до двох варіантів з повідомленням
+    original_count = len(purposes)
+    if len(purposes) > 2:
+        purposes = purposes[:2]
+        
+        # Повідомляємо користувача про обмеження
+        if lang == 'uk':
+            await update.message.reply_text(
+                f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
+                f"Я врахую тільки перші дві: {', '.join(purposes)}."
+            )
+        else:
+            await update.message.reply_text(
+                f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
+                f"I will only consider the first two: {', '.join(purposes)}."
+            )
+    
+    # Зберігаємо вибрані мети
+    user_data_global[user_id]['purposes'] = purposes
+    
+    if lang == 'uk':
+        await update.message.reply_text(
+            f"Дякую! Ви обрали наступні мети: {', '.join(purposes)}.\n"
+            "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
+        )
+    else:
+        await update.message.reply_text(
+            f"Thank you! You have chosen the following purposes: {', '.join(purposes)}.\n"
+            "Please wait while I analyze your answers and select the best loyalty programs for you."
+        )
+    
+    # Обчислюємо та відображаємо результати
+    return await calculate_and_show_results(update, context)
+
 # Функції фільтрації готелів
 def filter_hotels_by_region(df, regions, countries=None):
     """
