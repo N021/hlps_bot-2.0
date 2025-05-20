@@ -1404,7 +1404,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
         },
         fallbacks=[
         CommandHandler("cancel", cancel),
-        CommandHandler("start", start)  # Додаємо /start як fallback]
+        CommandHandler("start", start)  # Додаємо /start як fallback
         
     )
     
