@@ -1782,6 +1782,32 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
     
     return ConversationHandler.END
 
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє помилки, що виникають під час роботи бота"""
+    logger.error(f"Виникла помилка: {context.error}")
+    
+    # Отримуємо інформацію про користувача
+    user_id = None
+    if update and update.effective_user:
+        user_id = update.effective_user.id
+    
+    # Логуємо детальну інформацію про помилку
+    logger.error(f"Помилка для користувача {user_id}: {context.error}")
+    
+    # Спроба надіслати повідомлення користувачеві
+    if update and update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Виникла помилка під час обробки запиту. Спробуйте використати команду /start, щоб почати знову."
+        )
+    
+    # Перевіряємо, чи це помилка через перервану розмову
+    if "conversation" in str(context.error).lower():
+        # Очищаємо дані користувача, якщо помилка пов'язана з розмовою
+        if user_id and user_id in user_data_global:
+            del user_data_global[user_id]
+            logger.info(f"Очищено дані користувача {user_id} через помилку розмови")
+
 def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
     """Головна функція запуску бота з підтримкою webhook"""
     # Завантаження даних
