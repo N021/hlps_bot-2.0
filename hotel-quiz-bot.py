@@ -114,25 +114,17 @@ def load_hotel_data(csv_path):
 
 # Функція для початку бота
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Початкова функція при команді /start"""
     user_id = update.effective_user.id
     
-    # Перевірка, чи вже не розпочато розмову з цим користувачем
-    if user_id in user_data_global and 'language' in user_data_global[user_id]:
-        # Якщо розмова вже активна, сповіщаємо користувача та пропонуємо перезапуск
-        lang = user_data_global[user_id].get('language', 'en')
-        if lang == 'uk':
-            await update.message.reply_text(
-                "Розмову вже розпочато. Щоб почати спочатку, використайте команду /cancel і потім /start."
-            )
-        else:
-            await update.message.reply_text(
-                "Conversation already started. To restart, use /cancel and then /start."
-            )
-        return ConversationHandler.END
+    # Завжди очищаємо дані користувача при команді /start
+    if user_id in user_data_global:
+        del user_data_global[user_id]
     
-    # Скидаємо дані користувача
+    # Ініціалізуємо нові дані
     user_data_global[user_id] = {}
+    
+    # Логуємо початок нової розмови
+    logger.info(f"Користувач {user_id} почав нову розмову. Дані очищено.")
     
     # Клавіатура для вибору мови з використанням InlineKeyboardMarkup
     keyboard = [
@@ -357,9 +349,10 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Скасовує розмову за командою /cancel"""
     user = update.message.from_user
-    logger.info(f"Користувач {user.id} скасував розмову.")
+    user_id = user.id
+    logger.info(f"Користувач {user_id} скасував розмову.")
     
-    lang = user_data_global.get(user.id, {}).get('language', 'en')
+    lang = user_data_global.get(user_id, {}).get('language', 'en')
     
     # Повідомлення про завершення розмови
     if lang == 'uk':
@@ -372,8 +365,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
     
     # Видаляємо дані користувача
-    if user.id in user_data_global:
-        del user_data_global[user.id]
+    if user_id in user_data_global:
+        del user_data_global[user_id]
+        logger.info(f"Дані користувача {user_id} успішно видалено")
     
     # Очищаємо контекст, якщо він доступний
     if hasattr(context, 'user_data'):
@@ -1825,19 +1819,33 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
             WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
             CATEGORY: [CallbackQueryHandler(category_choice)],
             WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
+            ConversationHandler.END: [CommandHandler("start", start)]  # Додано обробник для END стану
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("start", start)  # Додаємо /start як fallback
-        ]
+            CommandHandler("start", start)  # /start як fallback
+        ],
+        name="loyalty_programs_conversation",  # Додано ім'я для кращого логування
+        persistent=False  # Переконуємось, що дані не зберігаються між перезапусками
     )
     
+    # Додаємо основний обробник розмови
     application.add_handler(conv_handler)
+    
+    # Додаємо окремий обробник для команди /start з вищим пріоритетом (група 1)
+    application.add_handler(CommandHandler("start", start), group=1)
+    
+    # Додаємо обробник помилок для кращої діагностики
+    application.add_error_handler(error_handler)
     
     # Використання PORT для webhook
     port = int(os.environ.get("PORT", "10000"))
     
+    # Логуємо готовність бота до запуску
+    logger.info("Бот успішно налаштований і готовий до запуску")
+    
+    # Запуск бота у відповідному режимі
     if webhook_url and webhook_path:
         webhook_info = f"{webhook_url}{webhook_path}"
         logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
