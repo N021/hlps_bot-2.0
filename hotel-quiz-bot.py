@@ -296,10 +296,11 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         user_data_global[user_id]['regions'] = selected_regions
         user_data_global[user_id]['countries'] = None  # Виключаємо можливість вказувати країни
         
-        # Приховуємо клавіатуру після вибору
-        await query.edit_message_reply_markup(reply_markup=None)
+        # Оновлюємо повідомлення, видаляючи клавіатуру, але залишаючи текст
+        regions_description = query.message.text
+        await query.edit_message_text(text=regions_description, reply_markup=None)
         
-        # Відправляємо нове повідомлення з підтвердженням вибору (замість редагування поточного)
+        # Відправляємо нове повідомлення з підтвердженням вибору
         if lang == 'uk':
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
@@ -407,8 +408,9 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Зберігаємо вибрану категорію
     user_data_global[user_id]['category'] = category
     
-    # Приховуємо клавіатуру після вибору
-    await query.edit_message_reply_markup(reply_markup=None)
+    # Оновлюємо повідомлення, видаляючи клавіатуру, але залишаючи текст
+    category_text = query.message.text
+    await query.edit_message_text(text=category_text, reply_markup=None)
     
     # Відправляємо нове повідомлення з підтвердженням вибору
     if lang == 'uk':
@@ -579,8 +581,9 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         # Зберігаємо вибрані стилі
         user_data_global[user_id]['styles'] = selected_styles
         
-        # Приховуємо клавіатуру після вибору
-        await query.edit_message_reply_markup(reply_markup=None)
+        # Оновлюємо повідомлення, видаляючи клавіатуру, але залишаючи текст
+        style_text = query.message.text
+        await query.edit_message_text(text=style_text, reply_markup=None, parse_mode="Markdown")
         
         # Відправляємо нове повідомлення з підтвердженням вибору
         if lang == 'uk':
@@ -764,8 +767,9 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Зберігаємо вибрані цілі
         user_data_global[user_id]['purposes'] = selected_purposes
         
-        # Приховуємо клавіатуру після вибору
-        await query.edit_message_reply_markup(reply_markup=None)
+        # Оновлюємо повідомлення, видаляючи клавіатуру, але залишаючи текст
+        purpose_text = query.message.text
+        await query.edit_message_text(text=purpose_text, reply_markup=None, parse_mode="Markdown")
         
         # Відправляємо нове повідомлення з підтвердженням вибору
         if lang == 'uk':
@@ -1540,7 +1544,8 @@ def format_results(user_data, scores_df, lang='en'):
     for i, (index, row) in enumerate(top_programs.iterrows()):
         program = row['loyalty_program']
         
-        results += "<result>\n"
+        # Видаляємо теги <result> та </result> з виведення
+        # Початок блоку результату
         
         if lang == 'uk':
             results += f"{program} - посіла {i+1} місце з рейтингом {row['total_score']:.2f}\n"
@@ -1591,7 +1596,8 @@ def format_results(user_data, scores_df, lang='en'):
                 purpose_str = ', '.join(user_data['purposes'])
                 results += f"4) for {purpose_str} ({row['purpose_hotels']} hotels)\n"
         
-        results += "</result>\n\n"
+        # Додаємо пустий рядок між результатами
+        results += "\n"
     
     return results
 
@@ -1819,25 +1825,25 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     logger.info("Бот запущено")
 
 if __name__ == "__main__":
-   # Використовуємо змінні середовища або значення за замовчуванням
-   TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-   CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
+    # Використовуємо змінні середовища або значення за замовчуванням
+    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
 
-   if not CSV_PATH:
-       logger.error("CSV_PATH не задано. Завершення запуску.")
-       exit(1)
-   logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
-   
-   # Параметри для webhook (опціонально)
-   WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
-   WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-   
-   # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-   WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
-   
-   # Перевіряємо наявність токена
-   if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-       logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
-   
-   # Запускаємо бота з підтримкою webhook або polling
-   main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
+    if not CSV_PATH:
+        logger.error("CSV_PATH не задано. Завершення запуску.")
+        exit(1)
+    logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
+    
+    # Параметри для webhook (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Перевіряємо наявність токена
+    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
+    
+    # Запускаємо бота з підтримкою webhook або polling
+    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
