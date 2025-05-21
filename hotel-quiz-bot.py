@@ -24,6 +24,9 @@ LANGUAGE, REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING
 # Зберігання даних користувача
 user_data_global = {}
 
+# Глобальна змінна для даних про готелі
+hotel_data = None
+
 def analyze_csv_structure(df):
     """
     Аналізує структуру CSV файлу та записує інформацію в лог
@@ -956,6 +959,57 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return WAITING_PURPOSE_SUBMIT
 
 # Допоміжні функції для фільтрації та зіставлення
+def filter_hotels_by_style(df, styles):
+    """
+    Фільтрує готелі за стилем
+    
+    Args:
+        df: DataFrame з даними про готелі
+        styles: список обраних стилів
+    
+    Returns:
+        Відфільтрований DataFrame
+    """
+    if not styles or len(styles) == 0 or 'Hotel Brand' not in df.columns:
+        return df
+    
+    # Логування для налагодження
+    logger.info(f"Filtering by styles: {styles}")
+    
+    # Створюємо маску для фільтрації
+    style_mask = pd.Series(False, index=df.index)
+    
+    # Кількість готелів за стилем для логування
+    style_counts = {style: 0 for style in styles}
+    
+    for idx, row in df.iterrows():
+        if pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            
+            # Отримуємо відповідність стилю бренду
+            hotel_styles = map_hotel_style(hotel_brand)
+            
+            # Перевіряємо, чи відповідає готель хоча б одному з обраних стилів
+            for style in styles:
+                # Перевіряємо точну відповідність і ключові частини
+                style_lower = style.lower()
+                
+                for hotel_style, matches in hotel_styles.items():
+                    if matches and (hotel_style.lower() == style_lower or 
+                                    style_lower in hotel_style.lower() or
+                                    hotel_style.lower() in style_lower):
+                        style_mask.loc[idx] = True
+                        style_counts[style] += 1
+                        break
+    
+    # Записуємо в лог кількість готелів за кожним стилем
+    for style, count in style_counts.items():
+        logger.info(f"Found {count} hotels for style '{style}'")
+    
+    filtered_df = df[style_mask]
+    logger.info(f"Total number of hotels after filtering: {len(filtered_df)}")
+    
+    return filtered_df
 
 def map_hotel_style(hotel_brand):
     """
@@ -1254,7 +1308,6 @@ def filter_hotels_by_adjacent_category(df, category):
     
     # Повертаємо відфільтровані дані
     return df[adjacent_mask]
-
 
 def filter_hotels_by_purpose(df, purposes):
     """
@@ -1776,6 +1829,10 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         logger.info(f"Calculating scores for user {user_id}")
         logger.info(f"User data: {user_data}")
         
+        # Завантажуємо дані про готелі
+        csv_path = "hotel_data.csv"
+        hotel_data = load_hotel_data(csv_path)
+        
         # Перевіряємо наявність даних про готелі
         if hotel_data is None or hotel_data.empty:
             logger.error("Hotel data missing or empty!")
@@ -1837,3 +1894,130 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
                 results + 
                 "\nTo start a new survey, send the /start command."
             )
+        
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"Error calculating results: {e}")
+        
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="На жаль, виникла помилка при обробці результатів. Спробуйте пізніше або почніть знову з команди /start."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="Unfortunately, an error occurred while processing the results. Please try again later or start a new survey with the /start command."
+            )
+        
+        return ConversationHandler.END
+
+async def webhook(request):
+    """
+    Функція для обробки вебхуків від Telegram
+    
+    Args:
+        request: запит від Telegram
+    
+    Returns:
+        Відповідь для Telegram
+    """
+    if request.method == "POST":
+        await application.update_queue.put(
+            Update.de_json(data=await request.json(), bot=application.bot)
+        )
+        return web.Response(status=200)
+    return web.Response(status=405)
+
+async def set_webhook(app, path, token):
+    """
+    Встановлює вебхук для Telegram бота
+    
+    Args:
+        app: об'єкт додатку
+        path: шлях для вебхуку
+        token: токен бота
+    """
+    await app.bot.set_webhook(url=path.format(token=token))
+
+async def setup():
+    """
+    Налаштування додатку та бота
+    """
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://yourapp.example.com/webhook/{token}")
+    TOKEN = os.environ.get("TELEGRAM_TOKEN", "your_telegram_token")
+    
+    # Ініціалізація додатку та бота
+    application = Application.builder().token(TOKEN).build()
+    
+    # Додавання обробників команд
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            LANGUAGE: [CallbackQueryHandler(language_choice)],
+            REGION: [CallbackQueryHandler(region_choice)],
+            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+            CATEGORY: [CallbackQueryHandler(category_choice)],
+            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    
+    application.add_handler(conv_handler)
+    
+    # Налаштування вебхука
+    app = web.Application()
+    app.router.add_post(f'/{TOKEN}', webhook)
+    
+    await set_webhook(application, WEBHOOK_URL, TOKEN)
+    
+    return application, app
+
+# Розділ для запуску в режимі розробки
+if __name__ == '__main__':
+    # Завантаження даних про готелі при запуску
+    import asyncio
+    
+    try:
+        # Спроба завантажити дані про готелі
+        csv_path = "hotel_data.csv"
+        hotel_data = load_hotel_data(csv_path)
+        
+        if hotel_data is None:
+            logger.error(f"Failed to load hotel data from {csv_path}")
+        else:
+            logger.info(f"Successfully loaded hotel data with {len(hotel_data)} rows")
+        
+        # Отримання токену бота з середовища
+        TOKEN = os.environ.get("TELEGRAM_TOKEN")
+        
+        if not TOKEN:
+            logger.error("TELEGRAM_TOKEN not set in environment variables")
+            exit(1)
+        
+        # Режим розробки з використанням polling
+        application = Application.builder().token(TOKEN).build()
+        
+        # Додавання обробників команд
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start)],
+            states={
+                LANGUAGE: [CallbackQueryHandler(language_choice)],
+                REGION: [CallbackQueryHandler(region_choice)],
+                WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+                CATEGORY: [CallbackQueryHandler(category_choice)],
+                WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+                WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)],
+        )
+        
+        application.add_handler(conv_handler)
+        
+        # Запуск бота в режимі polling
+        application.run_polling()
+        
+    except Exception as e:
+        logger.error(f"Error starting the bot: {e}")
