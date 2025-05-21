@@ -2117,4 +2117,24 @@ def main():
     # Выбираем режим запуска в зависимости от наличия переменных окружения
     try:
         # Проверка режима запуска через переменную окружения
-        RUN_MODE = os.environ.get("RUN
+        RUN_MODE = os.environ.get("RUN_MODE", "webhook")
+        
+        if RUN_MODE == "polling" or not WEBHOOK_URL:
+            logger.info("Starting bot in polling mode")
+            application.run_polling()
+        else:
+            logger.info(f"Starting bot in webhook mode at {WEBHOOK_URL}, port {PORT}")
+            application.run_webhook(
+                listen="0.0.0.0",
+                port=PORT,
+                url_path=TOKEN,
+                webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+            )
+    except Exception as e:
+        logger.error(f"Error starting bot: {e}")
+        # Резервный режим - polling
+        logger.info("Falling back to polling mode")
+        application.run_polling()
+
+if __name__ == '__main__':
+    main()
