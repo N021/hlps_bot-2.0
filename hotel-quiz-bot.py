@@ -179,7 +179,7 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await asyncio.sleep(0.5)
         return await ask_region(update, context)
 
-# Функції вибору регіону
+# Виправлені функції вибору регіону
 async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про регіони подорожі з чекбоксами"""
     # Визначаємо, чи це відповідь на callback_query або новий запит
@@ -187,9 +187,11 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
+        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
+        message_id = None  # Нове повідомлення
     
     lang = user_data_global[user_id]['language']
     
@@ -269,12 +271,31 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="region_submit")])
     
-    # Надсилаємо нове повідомлення з питанням про регіон
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=title_text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            # Оновлюємо існуюче повідомлення
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception as e:
+            logger.error(f"Error updating message: {e}")
+            # Якщо не вдалося оновити повідомлення, надсилаємо нове
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    else:
+        # Надсилаємо нове повідомлення
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     
     return WAITING_REGION_SUBMIT
 
@@ -336,7 +357,7 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         else:
             user_data_global[user_id]['selected_regions'].append(region)
         
-        # Оновлюємо клавіатуру
+        # ВИПРАВЛЕНО: Оновлюємо клавіатуру, але залишаємось на тому ж питанні
         return await ask_region(update, context)
 
 # Функція скасування
@@ -448,7 +469,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Перехід до питання про стиль
     return await ask_style(update, context)
 
-# Функції стилю з чекбоксами
+# Виправлені функції стилю з чекбоксами
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -456,9 +477,11 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
+        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
+        message_id = None  # Нове повідомлення
     
     lang = user_data_global[user_id]['language']
     
@@ -536,13 +559,34 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
     
-    # Надсилаємо нове повідомлення з питанням про стиль
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=title_text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-    )
+    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            # Оновлюємо існуюче повідомлення
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+            )
+        except Exception as e:
+            logger.error(f"Error updating style message: {e}")
+            # Якщо не вдалося оновити повідомлення, надсилаємо нове
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+    else:
+        # Надсилаємо нове повідомлення
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+        )
     
     return WAITING_STYLE_SUBMIT
 
@@ -633,10 +677,10 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         else:
             user_data_global[user_id]['selected_styles'].append(style)
         
-        # Оновлюємо клавіатуру
+        # ВИПРАВЛЕНО: Оновлюємо клавіатуру з новим вибором, але залишаємося на тому ж питанні
         return await ask_style(update, context)
 
-# Функції вибору мети з чекбоксами
+# Виправлені функції вибору мети з чекбоксами
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про мету подорожі з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -644,9 +688,11 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
+        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
+        message_id = None  # Нове повідомлення
     
     lang = user_data_global[user_id]['language']
     
@@ -714,13 +760,34 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
     
-    # Надсилаємо нове повідомлення з питанням про мету
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=title_text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-    )
+    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            # Оновлюємо існуюче повідомлення
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+            )
+        except Exception as e:
+            logger.error(f"Error updating purpose message: {e}")
+            # Якщо не вдалося оновити повідомлення, надсилаємо нове
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+    else:
+        # Надсилаємо нове повідомлення
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+        )
     
     return WAITING_PURPOSE_SUBMIT
 
@@ -810,7 +877,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             user_data_global[user_id]['selected_purposes'].append(purpose)
         
-        # Оновлюємо клавіатуру
+        # ВИПРАВЛЕНО: Оновлюємо клавіатуру, але залишаємось на тому ж питанні
         return await ask_purpose(update, context)
 
 # Допоміжні функції для фільтрації та зіставлення
@@ -1447,8 +1514,8 @@ def calculate_scores(user_data, hotel_data):
     if styles and len(styles) > 0:
         style_filtered = filter_hotels_by_style(filtered_by_category, styles)
         style_counts_dict = {}
-        
-        for program in loyalty_programs:
+
+    for program in loyalty_programs:
             style_mask = style_filtered['loyalty_program'] == program
             style_counts_dict[program] = style_mask.sum()
             
