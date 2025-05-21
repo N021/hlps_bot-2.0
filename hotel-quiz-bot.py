@@ -1759,64 +1759,64 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     hotel_data = load_hotel_data(csv_path)
     
     if hotel_data is None:
-       logger.error("Не вдалося завантажити дані. Бот не запущено.")
-       return
-   
-   # Додаткова перевірка наявності необхідних колонок
-   required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
-   missing_required = [col for col in required_columns if col not in hotel_data.columns]
-   
-   if missing_required:
-       logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
-       return
-   
-   # Переконуємося, що є колонка 'segment'
-   if 'segment' not in hotel_data.columns:
-       logger.error("Відсутня колонка 'segment'. Бот не запущено.")
-       return
-   
-   # Створення застосунку
-   app = Application.builder().token(token)
-   
-   # Побудова застосунку
-   application = app.build()
-   
-   # Налаштування обробників
-   conv_handler = ConversationHandler(
-       entry_points=[CommandHandler("start", start)],
-       states={
-           LANGUAGE: [CallbackQueryHandler(language_choice)],
-           WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-           CATEGORY: [CallbackQueryHandler(category_choice)],
-           WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-           WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
-       },
-       fallbacks=[
-           CommandHandler("cancel", cancel),
-           CommandHandler("start", start)  # Додаємо /start як fallback
-       ]
-   )
-   
-   application.add_handler(conv_handler)
-   
-   # Використання PORT для webhook
-   port = int(os.environ.get("PORT", "10000"))
-   
-   if webhook_url and webhook_path:
-       webhook_info = f"{webhook_url}{webhook_path}"
-       logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-       application.run_webhook(
-           listen="0.0.0.0",
-           port=port,
-           url_path=webhook_path,
-           webhook_url=webhook_info,
-           allowed_updates=Update.ALL_TYPES
-       )
-   else:
-       logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
-       application.run_polling(allowed_updates=Update.ALL_TYPES)
-   
-   logger.info("Бот запущено")
+        logger.error("Не вдалося завантажити дані. Бот не запущено.")
+        return
+    
+    # Додаткова перевірка наявності необхідних колонок
+    required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
+    missing_required = [col for col in required_columns if col not in hotel_data.columns]
+    
+    if missing_required:
+        logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
+        return
+    
+    # Переконуємося, що є колонка 'segment'
+    if 'segment' not in hotel_data.columns:
+        logger.error("Відсутня колонка 'segment'. Бот не запущено.")
+        return
+    
+    # Створення застосунку
+    app = Application.builder().token(token)
+    
+    # Побудова застосунку
+    application = app.build()
+    
+    # Налаштування обробників
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            LANGUAGE: [CallbackQueryHandler(language_choice)],
+            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+            CATEGORY: [CallbackQueryHandler(category_choice)],
+            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start)  # Додаємо /start як fallback
+        ]
+    )
+    
+    application.add_handler(conv_handler)
+    
+    # Використання PORT для webhook
+    port = int(os.environ.get("PORT", "10000"))
+    
+    if webhook_url and webhook_path:
+        webhook_info = f"{webhook_url}{webhook_path}"
+        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_info,
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    logger.info("Бот запущено")
 
 if __name__ == "__main__":
    # Використовуємо змінні середовища або значення за замовчуванням
