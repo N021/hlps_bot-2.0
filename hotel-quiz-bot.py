@@ -1255,26 +1255,6 @@ def filter_hotels_by_adjacent_category(df, category):
     # Повертаємо відфільтровані дані
     return df[adjacent_mask]
 
-# Перевіряємо точну відповідність і ключові частини
-                purpose_lower = purpose.lower()
-                
-                for hotel_purpose, matches in hotel_purposes.items():
-                    if matches and (hotel_purpose.lower() == purpose_lower or 
-                                    purpose_lower in hotel_purpose.lower() or
-                                    hotel_purpose.lower() in purpose_lower):
-                        purpose_mask.loc[idx] = True
-                        purpose_counts[purpose] += 1
-                        break
-    
-    # Записуємо в лог кількість готелів за кожною метою
-    for purpose, count in purpose_counts.items():
-        logger.info(f"Found {count} hotels for purpose '{purpose}'")
-    
-    filtered_df = df[purpose_mask]
-    logger.info(f"Total number of hotels after filtering: {len(filtered_df)}")
-    
-    return filtered_df
-
 
 def filter_hotels_by_purpose(df, purposes):
     """
