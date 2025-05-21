@@ -243,8 +243,8 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Оновлюємо клавіатуру
         return await ask_region(update, context)
 
-def main(token, csv_path):
-    """Головна функція запуску бота"""
+def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
+    """Головна функція запуску бота з підтримкою webhook"""
     # Завантаження даних
     hotel_data = load_hotel_data(csv_path)
     
@@ -267,9 +267,22 @@ def main(token, csv_path):
     
     app.add_handler(conv_handler)
     
-    # Запуск бота
-    logger.info("Запуск бота в режимі polling...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Використання PORT для webhook
+    port = int(os.environ.get("PORT", "10000"))
+    
+    if webhook_url and webhook_path:
+        webhook_info = f"{webhook_url}{webhook_path}"
+        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_info,
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
     
     logger.info("Бот запущено")
 
@@ -282,5 +295,12 @@ if __name__ == "__main__":
     if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
         logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
     
-    # Запускаємо бота
-    main(TOKEN, CSV_PATH)
+    # Параметри для webhook (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Запускаємо бота з підтримкою webhook або polling
+    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
