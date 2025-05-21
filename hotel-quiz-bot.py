@@ -4,6 +4,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 import os
 import json
+import asyncio  # Додайте цей імпорт
 from telegram.ext import ApplicationBuilder
 import ssl
 from aiohttp import web
@@ -115,6 +116,22 @@ def load_hotel_data(csv_path):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початкова функція при команді /start"""
     user_id = update.effective_user.id
+    
+    # Перевірка, чи вже не розпочато розмову з цим користувачем
+    if user_id in user_data_global and 'language' in user_data_global[user_id]:
+        # Якщо розмова вже активна, сповіщаємо користувача та пропонуємо перезапуск
+        lang = user_data_global[user_id].get('language', 'en')
+        if lang == 'uk':
+            await update.message.reply_text(
+                "Розмову вже розпочато. Щоб почати спочатку, використайте команду /cancel і потім /start."
+            )
+        else:
+            await update.message.reply_text(
+                "Conversation already started. To restart, use /cancel and then /start."
+            )
+        return ConversationHandler.END
+    
+    # Скидаємо дані користувача
     user_data_global[user_id] = {}
     
     # Клавіатура для вибору мови з використанням InlineKeyboardMarkup
@@ -298,7 +315,10 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
         # Оновлюємо повідомлення, видаляючи клавіатуру, але залишаючи текст
         regions_description = query.message.text
-        await query.edit_message_text(text=regions_description, reply_markup=None)
+        try:
+            await query.edit_message_text(text=regions_description)
+        except Exception as e:
+            logger.error(f"Помилка при оновленні повідомлення: {e}")
         
         # Відправляємо нове повідомлення з підтвердженням вибору
         if lang == 'uk':
@@ -311,6 +331,10 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 chat_id=query.message.chat_id,
                 text=f"Thank you! You have chosen the following regions: {', '.join(selected_regions)}."
             )
+        
+        # Додаємо невелику затримку перед наступним питанням
+        import asyncio
+        await asyncio.sleep(0.5)
         
         # Переходимо до питання про категорію
         return await ask_category(update, context)
@@ -337,6 +361,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     lang = user_data_global.get(user.id, {}).get('language', 'en')
     
+    # Повідомлення про завершення розмови
     if lang == 'uk':
         await update.message.reply_text(
             "Розмову завершено. Щоб почати знову, надішліть команду /start."
@@ -346,8 +371,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "Conversation ended. To start again, send the /start command."
         )
     
+    # Видаляємо дані користувача
     if user.id in user_data_global:
         del user_data_global[user.id]
+    
+    # Очищаємо контекст, якщо він доступний
+    if hasattr(context, 'user_data'):
+        context.user_data.clear()
     
     return ConversationHandler.END
 
