@@ -447,11 +447,13 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Зберігаємо вибрану категорію
     user_data_global[user_id]['category'] = category
     
-    # Оновлюємо повідомлення, видаляючи клавіатуру, але зберігаючи текст
-    category_text = query.message.text
-    await query.edit_message_text(text=category_text, reply_markup=None)
+    # Оновлюємо повідомлення з питанням 2/4, видаляючи тільки кнопки
+    await query.edit_message_text(
+        text=query.message.text,  # Зберігаємо оригінальний текст питання 2/4
+        reply_markup=None  # Видаляємо кнопки
+    )
     
-    # Надсилаємо нове повідомлення, підтверджуючи вибір
+    # Надсилаємо окреме повідомлення-підтвердження
     if lang == 'uk':
         await context.bot.send_message(
             chat_id=query.message.chat_id,
@@ -466,7 +468,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Коротка пауза перед наступним питанням
     await asyncio.sleep(1.0)
     
-    # Перехід до питання про стиль
+    # Перехід до питання про стиль (питання 3/4)
     return await ask_style(update, context)
 
 # Виправлені функції стилю з чекбоксами
