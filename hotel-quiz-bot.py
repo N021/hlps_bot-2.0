@@ -464,7 +464,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     # Коротка пауза перед наступним питанням
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1.0)
     
     # Перехід до питання про стиль
     return await ask_style(update, context)
@@ -652,7 +652,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             )
         
         # Коротка пауза перед наступним питанням
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1.0)
         
         # Перехід до питання про мету подорожі
         return await ask_purpose(update, context)
