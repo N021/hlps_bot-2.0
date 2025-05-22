@@ -420,10 +420,12 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         await context.bot.send_message(
             chat_id=chat_id,
-            text="Question 2/4:\nWhich hotel category do you usually choose?",
+            text=(
+                "Question 2/4:\nWhich hotel category do you usually choose?\n"
                 "1. Luxury (premium class)\n"
                 "2. Comfort (middle class)\n"
                 "3. Standard (economy class)\n"
+            ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
