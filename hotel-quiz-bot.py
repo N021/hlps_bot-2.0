@@ -131,8 +131,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Клавіатура для вибору мови за допомогою InlineKeyboardMarkup
     keyboard = [
         [InlineKeyboardButton("Українська (Ukrainian)", callback_data='lang_uk')],
-        [InlineKeyboardButton("English (Англійська)", callback_data='lang_en')],
-        [InlineKeyboardButton("Other (Інша)", callback_data='lang_other')]
+        [InlineKeyboardButton("English (Англійська)", callback_data='lang_en')]
     ]
     
     await update.message.reply_text(
@@ -404,7 +403,8 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                "Питання 2/4:\nЯку категорію готелів ви зазвичай обираєте?\n"
+                "Питання 2/4:\n"
+                "Яку категорію готелів ви зазвичай обираєте?\n\n"
                 "1. Luxury (преміум-клас)\n"
                 "2. Comfort (середній клас)\n"
                 "3. Standard (економ-клас)\n"
@@ -421,7 +421,8 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                "Question 2/4:\nWhich hotel category do you usually choose?\n"
+                "Question 2/4:\n"
+                "Which hotel category do you usually choose?\n\n"
                 "1. Luxury (premium class)\n"
                 "2. Comfort (middle class)\n"
                 "3. Standard (economy class)\n"
