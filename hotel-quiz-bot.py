@@ -403,13 +403,15 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         await context.bot.send_message(
             chat_id=chat_id,
-            text="Питання 2/4:\nЯку категорію готелів ви зазвичай обираєте?"
-                 "1. Luxury\n"
-                 "2. Comfort\n"
-                 "3. Standard\n"
+            text=(
+                "Питання 2/4:\nЯку категорію готелів ви зазвичай обираєте?\n"
+                "1. Luxury\n"
+                "2. Comfort\n"
+                "3. Standard\n"
+            ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    else:
+        else:
         keyboard = [
             [InlineKeyboardButton("Luxury (premium class)", callback_data='category_Luxury')],
             [InlineKeyboardButton("Comfort (middle class)", callback_data='category_Comfort')],
