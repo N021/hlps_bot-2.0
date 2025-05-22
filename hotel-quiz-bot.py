@@ -460,6 +460,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return await ask_style(update, context)  # → Question 3/4
 
 # Виправлені функції стилю з чекбоксами
+# Виправлені функції стилю з чекбоксами
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -467,7 +468,8 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
+        # ВИПРАВЛЕННЯ: НЕ зберігаємо message_id для редагування
+        message_id = None  # Завжди створюємо нове повідомлення
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
@@ -549,34 +551,13 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
     
-    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
-    if message_id:
-        try:
-            # Оновлюємо існуюче повідомлення
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-            )
-        except Exception as e:
-            logger.error(f"Error updating style message: {e}")
-            # Якщо не вдалося оновити повідомлення, надсилаємо нове
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-    else:
-        # Надсилаємо нове повідомлення
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=title_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-        )
+    # ВИПРАВЛЕННЯ: Завжди надсилаємо нове повідомлення
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=title_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+    )
     
     return WAITING_STYLE_SUBMIT
 
@@ -671,6 +652,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return await ask_style(update, context)
 
 # Виправлені функції вибору мети з чекбоксами
+# Виправлені функції вибору мети з чекбоксами
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про мету подорожі з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -678,7 +660,8 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
+        # ВИПРАВЛЕННЯ: НЕ зберігаємо message_id для редагування
+        message_id = None  # Завжди створюємо нове повідомлення
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
@@ -750,34 +733,13 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
     
-    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
-    if message_id:
-        try:
-            # Оновлюємо існуюче повідомлення
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-            )
-        except Exception as e:
-            logger.error(f"Error updating purpose message: {e}")
-            # Якщо не вдалося оновити повідомлення, надсилаємо нове
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-    else:
-        # Надсилаємо нове повідомлення
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=title_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-        )
+    # ВИПРАВЛЕННЯ: Завжди надсилаємо нове повідомлення
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=title_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+    )
     
     return WAITING_PURPOSE_SUBMIT
 
