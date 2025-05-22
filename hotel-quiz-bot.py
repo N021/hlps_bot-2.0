@@ -135,7 +135,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ]
     
     await update.message.reply_text(
-        "Please select your preferred language for our conversation "
+        "Please select your preferred language for our conversation\n"
         "(будь ласка, оберіть мову, якою вам зручніше спілкуватися):",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -395,9 +395,9 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # Створюємо InlineKeyboard для вибору категорії
     if lang == 'uk':
         keyboard = [
-            [InlineKeyboardButton("Luxury (преміум-клас)", callback_data='category_Luxury')],
-            [InlineKeyboardButton("Comfort (середній клас)", callback_data='category_Comfort')],
-            [InlineKeyboardButton("Standard (економ-клас)", callback_data='category_Standard')]
+            [InlineKeyboardButton("1. Luxury (преміум-клас)", callback_data='category_Luxury')],
+            [InlineKeyboardButton("2. Comfort (середній клас)", callback_data='category_Comfort')],
+            [InlineKeyboardButton("3. Standard (економ-клас)", callback_data='category_Standard')]
         ]
         
         await context.bot.send_message(
@@ -413,9 +413,9 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
     else:
         keyboard = [
-            [InlineKeyboardButton("Luxury (premium class)", callback_data='category_Luxury')],
-            [InlineKeyboardButton("Comfort (middle class)", callback_data='category_Comfort')],
-            [InlineKeyboardButton("Standard (economy class)", callback_data='category_Standard')]
+            [InlineKeyboardButton("1. Luxury (premium class)", callback_data='category_Luxury')],
+            [InlineKeyboardButton("2. Comfort (middle class)", callback_data='category_Comfort')],
+            [InlineKeyboardButton("3. Standard (economy class)", callback_data='category_Standard')]
         ]
         
         await context.bot.send_message(
