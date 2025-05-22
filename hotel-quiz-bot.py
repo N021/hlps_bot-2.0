@@ -840,9 +840,6 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         purpose_text = query.message.text
         await query.edit_message_text(text=purpose_text, reply_markup=None, parse_mode="Markdown")
         
-        # Збільшуємо паузу перед підтвердженням
-        await asyncio.sleep(1.0)
-        
         # Надсилаємо нове повідомлення, підтверджуючи вибір
         if lang == 'uk':
             await context.bot.send_message(
