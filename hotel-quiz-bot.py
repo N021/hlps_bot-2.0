@@ -447,11 +447,10 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Зберігаємо вибрану категорію
     user_data_global[user_id]['category'] = category
     
-    # Оновлюємо повідомлення, видаляючи клавіатуру, але зберігаючи текст
-    category_text = query.message.text
-    await query.edit_message_text(text=category_text, reply_markup=None)
+    # ВИПРАВЛЕНО: Залишаємо оригінальне питання без змін
+    # НЕ редагуємо попереднє повідомлення
     
-    # Надсилаємо нове повідомлення, підтверджуючи вибір
+    # Надсилаємо ТІЛЬКИ підтвердження як нове повідомлення
     if lang == 'uk':
         await context.bot.send_message(
             chat_id=query.message.chat_id,
@@ -464,7 +463,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     # Коротка пауза перед наступним питанням
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.5)
     
     # Перехід до питання про стиль
     return await ask_style(update, context)
@@ -472,16 +471,17 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # Виправлені функції стилю з чекбоксами
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та детальними описами"""
-    # Визначаємо, чи це відповідь на callback_query
+    # Визначаємо, чи це відповідь на callback_query або новий виклик
     if update.callback_query:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
+        # ВИПРАВЛЕНО: Не використовуємо message_id для нових питань
+        is_update = False  # Це завжди нове питання, не оновлення існуючого
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
-        message_id = None  # Нове повідомлення
+        is_update = False  # Нове повідомлення
     
     lang = user_data_global[user_id]['language']
     
@@ -559,34 +559,14 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
     
-    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
-    if message_id:
-        try:
-            # Оновлюємо існуюче повідомлення
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-            )
-        except Exception as e:
-            logger.error(f"Error updating style message: {e}")
-            # Якщо не вдалося оновити повідомлення, надсилаємо нове
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-    else:
-        # Надсилаємо нове повідомлення
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=title_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
-        )
+    # ВИПРАВЛЕНО: Завжди надсилаємо нове повідомлення для нових питань
+    # Використовуємо edit_message_text ТІЛЬКИ для оновлення чекбоксів в тому ж питанні
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=title_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
     
     return WAITING_STYLE_SUBMIT
 
