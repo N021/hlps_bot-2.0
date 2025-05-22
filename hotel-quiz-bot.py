@@ -2125,66 +2125,66 @@ def main():
         return
     
     # Створюємо додаток
-   app = Application.builder().token(TOKEN).build()
-   
-   # Налаштовуємо обробники
-   conv_handler = ConversationHandler(
-       entry_points=[CommandHandler("start", start)],
-       states={
-           LANGUAGE: [CallbackQueryHandler(language_choice)],
-           WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-           CATEGORY: [CallbackQueryHandler(category_choice)],
-           WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-           WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
-           ConversationHandler.END: [CommandHandler("start", start)]  # Додано обробник для стану END
-       },
-       fallbacks=[
-           CommandHandler("cancel", cancel),
-           CommandHandler("start", start)  # /start як fallback
-       ],
-       name="loyalty_programs_conversation",  # Додано ім'я для кращого логування
-       persistent=False  # Забезпечуємо, що дані не зберігаються між перезапусками
-   )
-   
-   # Додаємо основний обробник розмови
-   app.add_handler(conv_handler)
-   
-   # Додаємо обробник помилок для кращої діагностики
-   app.add_error_handler(error_handler)
-   
-   # Використовуємо PORT для webhook
-   port = int(os.environ.get("PORT", "10000"))
-   
-   # Webhook параметри (опціонально)
-   WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Прибираємо https://, якщо присутній
-   WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-   
-   # Формуємо повний URL для webhook, якщо вказано WEBHOOK_HOST
-   WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
-   
-   # Перевіряємо наявність токена
-   if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-       logger.warning("Bot token not configured! Set the TELEGRAM_BOT_TOKEN environment variable or change the value in the code.")
-   
-   # Журналюємо готовність бота
-   logger.info("Bot successfully configured and ready to launch")
-   
-   # Запускаємо бота у відповідному режимі
-   if WEBHOOK_URL and WEBHOOK_PATH:
-       webhook_info = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
-       logger.info(f"Starting bot in webhook mode at {webhook_info}")
-       app.run_webhook(
-           listen="0.0.0.0",
-           port=port,
-           url_path=WEBHOOK_PATH,
-           webhook_url=webhook_info,
-           allowed_updates=Update.ALL_TYPES
-       )
-   else:
-       logger.info("WEBHOOK_URL not specified. Starting bot in polling mode...")
-       app.run_polling(allowed_updates=Update.ALL_TYPES)
-   
-   logger.info("Bot launched")
+    app = Application.builder().token(TOKEN).build()
+    
+    # Налаштовуємо обробники
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            LANGUAGE: [CallbackQueryHandler(language_choice)],
+            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+            CATEGORY: [CallbackQueryHandler(category_choice)],
+            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
+            ConversationHandler.END: [CommandHandler("start", start)]  # Додано обробник для стану END
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start)  # /start як fallback
+        ],
+        name="loyalty_programs_conversation",  # Додано ім'я для кращого логування
+        persistent=False  # Забезпечуємо, що дані не зберігаються між перезапусками
+    )
+    
+    # Додаємо основний обробник розмови
+    app.add_handler(conv_handler)
+    
+    # Додаємо обробник помилок для кращої діагностики
+    app.add_error_handler(error_handler)
+    
+    # Використовуємо PORT для webhook
+    port = int(os.environ.get("PORT", "10000"))
+    
+    # Webhook параметри (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Прибираємо https://, якщо присутній
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повний URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Перевіряємо наявність токена
+    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+        logger.warning("Bot token not configured! Set the TELEGRAM_BOT_TOKEN environment variable or change the value in the code.")
+    
+    # Журналюємо готовність бота
+    logger.info("Bot successfully configured and ready to launch")
+    
+    # Запускаємо бота у відповідному режимі
+    if WEBHOOK_URL and WEBHOOK_PATH:
+        webhook_info = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
+        logger.info(f"Starting bot in webhook mode at {webhook_info}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=WEBHOOK_PATH,
+            webhook_url=webhook_info,
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        logger.info("WEBHOOK_URL not specified. Starting bot in polling mode...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    logger.info("Bot launched")
 
 if __name__ == "__main__":
-   main()
+    main()
