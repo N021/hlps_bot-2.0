@@ -460,7 +460,6 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return await ask_style(update, context)  # → Question 3/4
 
 # Виправлені функції стилю з чекбоксами
-# Остаточно виправлені функції стилю з чекбоксами
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -468,8 +467,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        # ВАЖЛИВО: НЕ зберігаємо message_id при ПЕРЕХОДІ між питаннями
-        message_id = None  # Завжди створюємо нове повідомлення при переході між питаннями
+        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
@@ -551,153 +549,34 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
     
-    # Завжди надсилаємо нове повідомлення при переході між питаннями
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=title_text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
-    
-    return WAITING_STYLE_SUBMIT
-
-async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір стилю через чекбокси"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    callback_data = query.data
-    
-    # Якщо користувач натиснув "Відповісти"
-    if callback_data == "style_submit":
-        selected_styles = user_data_global[user_id]['selected_styles']
-        lang = user_data_global[user_id]['language']
-        
-        # Перевіряємо, чи вибрано хоча б один стиль
-        if not selected_styles:
-            if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б один стиль", show_alert=True)
-            else:
-                await query.answer("Please select at least one style", show_alert=True)
-            return WAITING_STYLE_SUBMIT
-        
-        # Обмеження до трьох варіантів
-        if len(selected_styles) > 3:
-            original_count = len(selected_styles)
-            user_data_global[user_id]['selected_styles'] = selected_styles[:3]
-            
-            if lang == 'uk':
-                await query.answer(
-                    f"Ви обрали {original_count} стилів, але дозволено максимум 3. "
-                    f"Враховано тільки перші три стилі.", 
-                    show_alert=True
-                )
-            else:
-                await query.answer(
-                    f"You selected {original_count} styles, but a maximum of 3 is allowed. "
-                    f"Only the first three have been considered.", 
-                    show_alert=True
-                )
-            
-            # ВИПРАВЛЕННЯ: При перевищенні ліміту редагуємо існуюче повідомлення
-            return await update_style_keyboard(query, user_data_global[user_id])
-        
-        # Зберігаємо вибрані стилі
-        user_data_global[user_id]['styles'] = selected_styles
-        
-        # Оновлюємо повідомлення, видаляючи клавіатуру, але зберігаючи текст
-        style_text = query.message.text
-        await query.edit_message_text(text=style_text, reply_markup=None, parse_mode="Markdown")
-        
-        # Надсилаємо нове повідомлення, підтверджуючи вибір
-        if lang == 'uk':
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні стилі: {', '.join(selected_styles)}."
+    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            # Оновлюємо існуюче повідомлення
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
             )
-        else:
+        except Exception as e:
+            logger.error(f"Error updating style message: {e}")
+            # Якщо не вдалося оновити повідомлення, надсилаємо нове
             await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following styles: {', '.join(selected_styles)}."
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
             )
-        
-        # Коротка пауза перед наступним питанням
-        await asyncio.sleep(1.0)
-        
-        # Перехід до питання про мету подорожі
-        return await ask_purpose(update, context)
-    
-    # Якщо це вибір або скасування вибору стилю
     else:
-        # Обробляємо вибір стилю
-        style = callback_data.replace("style_", "")
-        
-        # Перевіряємо, чи не перевищено максимальну кількість стилів (3)
-        if style not in user_data_global[user_id]['selected_styles'] and len(user_data_global[user_id]['selected_styles']) >= 3:
-            lang = user_data_global[user_id]['language']
-            if lang == 'uk':
-                await query.answer("Ви вже обрали максимальну кількість стилів (3)", show_alert=True)
-            else:
-                await query.answer("You have already selected the maximum number of styles (3)", show_alert=True)
-            return WAITING_STYLE_SUBMIT
-        
-        # Перемикаємо стан вибору стилю
-        if style in user_data_global[user_id]['selected_styles']:
-            user_data_global[user_id]['selected_styles'].remove(style)
-        else:
-            user_data_global[user_id]['selected_styles'].append(style)
-        
-        # ВИПРАВЛЕННЯ: Редагуємо існуюче повідомлення для оновлення чекбоксів
-        return await update_style_keyboard(query, user_data_global[user_id])
-
-async def update_style_keyboard(query, user_data):
-    """Оновлює клавіатуру стилів без створення нового повідомлення"""
-    lang = user_data['language']
-    
-    # Створюємо InlineKeyboard з чекбоксами для стилів
-    if lang == 'uk':
-        styles = [
-            "Розкішний і вишуканий", 
-            "Бутік і унікальний", 
-            "Класичний і традиційний", 
-            "Сучасний і дизайнерський",
-            "Затишний і сімейний", 
-            "Практичний і економічний"
-        ]
-        submit_text = "Відповісти"
-    else:
-        styles = [
-            "Luxurious and refined", 
-            "Boutique and unique",
-            "Classic and traditional", 
-            "Modern and designer",
-            "Cozy and family-friendly", 
-            "Practical and economical"
-        ]
-        submit_text = "Submit"
-    
-    # Створюємо клавіатуру з чекбоксами для стилів
-    keyboard = []
-    selected_styles = user_data['selected_styles']
-    
-    # Додаємо стилі з номерами
-    for i, style in enumerate(styles):
-        # Додаємо символ чекбоксу залежно від вибору
-        checkbox = "✅ " if style in selected_styles else "☐ "
-        keyboard.append([InlineKeyboardButton(
-            f"{checkbox}{i+1}. {style}", 
-            callback_data=f"style_{style}"
-        )])
-    
-    # Додаємо кнопку "Відповісти" внизу
-    keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
-    
-    # Редагуємо існуюче повідомлення, оновлюючи тільки клавіатуру
-    try:
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception as e:
-        logger.error(f"Error updating style keyboard: {e}")
+        # Надсилаємо нове повідомлення
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+        )
     
     return WAITING_STYLE_SUBMIT
 
@@ -792,7 +671,6 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return await ask_style(update, context)
 
 # Виправлені функції вибору мети з чекбоксами
-# Остаточно виправлені функції вибору мети з чекбоксами
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про мету подорожі з чекбоксами та детальними описами"""
     # Визначаємо, чи це відповідь на callback_query
@@ -800,8 +678,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        # ВАЖЛИВО: НЕ зберігаємо message_id при ПЕРЕХОДІ між питаннями
-        message_id = None  # Завжди створюємо нове повідомлення при переході між питаннями
+        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
@@ -873,148 +750,34 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
     
-    # Завжди надсилаємо нове повідомлення при переході між питаннями
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=title_text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
-    
-    return WAITING_PURPOSE_SUBMIT
-
-async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір мети через чекбокси"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    callback_data = query.data
-    
-    # Якщо користувач натиснув "Відповісти"
-    if callback_data == "purpose_submit":
-        selected_purposes = user_data_global[user_id]['selected_purposes']
-        lang = user_data_global[user_id]['language']
-        
-        # Перевіряємо, чи вибрано хоча б одну мету
-        if not selected_purposes:
-            if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б одну мету", show_alert=True)
-            else:
-                await query.answer("Please select at least one purpose", show_alert=True)
-            return WAITING_PURPOSE_SUBMIT
-        
-        # Обмеження до двох варіантів
-        if len(selected_purposes) > 2:
-            original_count = len(selected_purposes)
-            user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
-            
-            if lang == 'uk':
-                await query.answer(
-                    f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-                    f"Враховано тільки перші дві цілі.", 
-                    show_alert=True
-                )
-            else:
-                await query.answer(
-                    f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-                    f"Only the first two have been considered.", 
-                    show_alert=True
-                )
-            
-            # ВИПРАВЛЕННЯ: При перевищенні ліміту редагуємо існуюче повідомлення
-            return await update_purpose_keyboard(query, user_data_global[user_id])
-        
-        # Зберігаємо вибрані цілі
-        user_data_global[user_id]['purposes'] = selected_purposes
-        
-        # Оновлюємо повідомлення, видаляючи клавіатуру, але зберігаючи текст
-        purpose_text = query.message.text
-        await query.edit_message_text(text=purpose_text, reply_markup=None, parse_mode="Markdown")
-        
-        # Надсилаємо нове повідомлення, підтверджуючи вибір
-        if lang == 'uk':
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
-                "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
+    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            # Оновлюємо існуюче повідомлення
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
             )
-        else:
+        except Exception as e:
+            logger.error(f"Error updating purpose message: {e}")
+            # Якщо не вдалося оновити повідомлення, надсилаємо нове
             await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following purposes: {', '.join(selected_purposes)}.\n"
-                "Please wait while I analyze your answers and select the best loyalty programs for you."
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
             )
-        
-        # Розрахунок і відображення результатів
-        return await calculate_and_show_results(update, context)
-    
-    # Якщо це вибір або скасування вибору мети
     else:
-        # Обробляємо вибір мети
-        purpose = callback_data.replace("purpose_", "")
-        
-        # Перевіряємо, чи не перевищено максимальну кількість цілей (2)
-        if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
-            lang = user_data_global[user_id]['language']
-            if lang == 'uk':
-                await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
-            else:
-                await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
-            return WAITING_PURPOSE_SUBMIT
-        
-        # Перемикаємо стан вибору мети
-        if purpose in user_data_global[user_id]['selected_purposes']:
-            user_data_global[user_id]['selected_purposes'].remove(purpose)
-        else:
-            user_data_global[user_id]['selected_purposes'].append(purpose)
-        
-        # ВИПРАВЛЕННЯ: Редагуємо існуюче повідомлення для оновлення чекбоксів
-        return await update_purpose_keyboard(query, user_data_global[user_id])
-
-async def update_purpose_keyboard(query, user_data):
-    """Оновлює клавіатуру цілей без створення нового повідомлення"""
-    lang = user_data['language']
-    
-    # Створюємо InlineKeyboard з чекбоксами для цілей
-    if lang == 'uk':
-        purposes = [
-            "Бізнес-подорожі / відрядження",
-            "Відпустка / релакс",
-            "Сімейний відпочинок",
-            "Довготривале проживання"
-        ]
-        submit_text = "Відповісти"
-    else:
-        purposes = [
-            "Business travel",
-            "Vacation / relaxation",
-            "Family vacation",
-            "Long-term stay"
-        ]
-        submit_text = "Submit"
-    
-    # Створюємо клавіатуру з чекбоксами для цілей
-    keyboard = []
-    selected_purposes = user_data['selected_purposes']
-    
-    # Додаємо цілі з номерами
-    for i, purpose in enumerate(purposes):
-        # Додаємо символ чекбоксу залежно від вибору
-        checkbox = "✅ " if purpose in selected_purposes else "☐ "
-        keyboard.append([InlineKeyboardButton(
-            f"{checkbox}{i+1}. {purpose}", 
-            callback_data=f"purpose_{purpose}"
-        )])
-    
-    # Додаємо кнопку "Відповісти" внизу
-    keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
-    
-    # Редагуємо існуюче повідомлення, оновлюючи тільки клавіатуру
-    try:
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception as e:
-        logger.error(f"Error updating purpose keyboard: {e}")
+        # Надсилаємо нове повідомлення
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"  # Додаємо підтримку Markdown форматування
+        )
     
     return WAITING_PURPOSE_SUBMIT
 
