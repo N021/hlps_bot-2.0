@@ -411,7 +411,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        else:
+    else:
         keyboard = [
             [InlineKeyboardButton("Luxury (premium class)", callback_data='category_Luxury')],
             [InlineKeyboardButton("Comfort (middle class)", callback_data='category_Comfort')],
