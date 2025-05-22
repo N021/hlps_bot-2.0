@@ -1515,7 +1515,230 @@ def calculate_scores(user_data, hotel_data):
         style_filtered = filter_hotels_by_style(filtered_by_category, styles)
         style_counts_dict = {}
 
-    for program in loyalty_programs:
+# Функції для розрахунку та відображення результатів
+def get_region_score(df, regions=None, countries=None):
+    """
+    Розраховує бали для програм лояльності за регіонами/країнами
+    
+    Args:
+        df: DataFrame з даними про готелі
+        regions: список обраних регіонів
+        countries: список обраних країн
+    
+    Returns:
+        Словник з програмами лояльності та їхніми балами
+    """
+    region_scores = {}
+    
+    try:
+        if regions and len(regions) > 0:
+            # Використовуємо колонку для кількості готелів у регіоні
+            if 'Total hotels of Corporation / Loyalty Program in this region' in df.columns:
+                # Беремо унікальні значення для кожної програми лояльності
+                region_data = df.drop_duplicates('loyalty_program')[['loyalty_program', 'Total hotels of Corporation / Loyalty Program in this region']]
+                region_counts = region_data.set_index('loyalty_program')['Total hotels of Corporation / Loyalty Program in this region']
+            else:
+                # Якщо колонка відсутня, просто рахуємо кількість готелів
+                region_counts = df.groupby('loyalty_program').size()
+                logger.warning("Column 'Total hotels of Corporation / Loyalty Program in this region' missing. Using row count.")
+        
+        elif countries and len(countries) > 0:
+            # Використовуємо колонку для кількості готелів у країні
+            if 'Total hotels of Corporation / Loyalty Program in this country' in df.columns:
+                # Беремо унікальні значення для кожної програми лояльності
+                country_data = df.drop_duplicates('loyalty_program')[['loyalty_program', 'Total hotels of Corporation / Loyalty Program in this country']]
+                region_counts = country_data.set_index('loyalty_program')['Total hotels of Corporation / Loyalty Program in this country']
+            else:
+                # Якщо колонка відсутня, просто рахуємо кількість готелів
+                region_counts = df.groupby('loyalty_program').size()
+                logger.warning("Column 'Total hotels of Corporation / Loyalty Program in this country' missing. Using row count.")
+        
+        else:
+            # Якщо не вибрано ні регіонів, ні країн, повертаємо порожній словник
+            return {}
+        
+        # Переконуємося, що region_counts не містить NaN або None
+        region_counts = region_counts.fillna(0).astype(float)
+        
+        # Розподіляємо бали за рейтингом (21, 18, 15, 12, 9, 6, 3)
+        score_values = [21, 18, 15, 12, 9, 6, 3]
+        
+        # Сортуємо програми за кількістю готелів
+        ranked_programs = region_counts.sort_values(ascending=False)
+        
+        # Нормалізуємо, якщо вибрано кілька регіонів/країн
+        normalization_factor = 1.0
+        if regions and len(regions) > 0:
+            normalization_factor = float(len(regions))
+        elif countries and len(countries) > 0:
+            normalization_factor = float(len(countries))
+        
+        # Присвоюємо бали за рейтингом
+        for i, (program, _) in enumerate(ranked_programs.items()):
+            if i < len(score_values):
+                region_scores[program] = score_values[i] / normalization_factor
+            else:
+                region_scores[program] = 0.0
+                
+    except Exception as e:
+        logger.error(f"Error calculating region scores: {e}")
+    
+    return region_scores
+
+def calculate_scores(user_data, hotel_data):
+    """
+    Розраховує загальний рейтинг для кожної програми лояльності на основі відповідей користувача
+    
+    Args:
+        user_data: словник з відповідями користувача
+        hotel_data: DataFrame з даними про готелі
+    
+    Returns:
+        DataFrame з програмами лояльності та їхніми балами
+    """
+    # Отримуємо відповіді користувача
+    regions = user_data.get('regions', [])
+    countries = user_data.get('countries', [])
+    category = user_data.get('category')
+    styles = user_data.get('styles', [])
+    purposes = user_data.get('purposes', [])
+    
+    # Перевіряємо на None і перетворюємо на порожні списки, щоб уникнути помилок
+    if regions is None:
+        regions = []
+    if countries is None:
+        countries = []
+    if styles is None:
+        styles = []
+    if purposes is None:
+        purposes = []
+    
+    # Ініціалізуємо DataFrame для зберігання результатів
+    loyalty_programs = hotel_data['loyalty_program'].unique()
+    scores_df = pd.DataFrame({
+        'loyalty_program': loyalty_programs,
+        'region_score': 0.0,  # Явно вказуємо тип float для точності
+        'category_score': 0.0,
+        'style_score': 0.0,
+        'purpose_score': 0.0,
+        'total_score': 0.0,
+        'region_hotels': 0,
+        'category_hotels': 0,
+        'style_hotels': 0,
+        'purpose_hotels': 0
+    })
+    
+    # Крок 1: Фільтруємо готелі за регіоном
+    filtered_by_region = filter_hotels_by_region(hotel_data, regions, countries)
+    
+    # Використовуємо готові значення з колонок для регіонів і країн
+    if regions and len(regions) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this region"
+        if 'Total hotels of Corporation / Loyalty Program in this region' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне значення з колонки
+                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = region_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо готелі
+            region_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in region_counts:
+                    scores_df.at[index, 'region_hotels'] = region_counts[program]
+    
+    elif countries and len(countries) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
+        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне значення з колонки
+                    country_hotels = program_data['Total hotels of Corporation / Loyalty Program in this country'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = country_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо готелі
+            country_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in country_counts:
+                    scores_df.at[index, 'region_hotels'] = country_counts[program]
+    
+    # Розподіляємо бали за регіонами/країнами
+    region_scores = get_region_score(filtered_by_region, regions, countries)
+    for index, row in scores_df.iterrows():
+        program = row['loyalty_program']
+        if program in region_scores:
+            scores_df.at[index, 'region_score'] = region_scores[program]
+    
+    # Крок 2: Фільтруємо готелі за категорією у вибраному регіоні
+    if category:
+        filtered_by_category = filter_hotels_by_category(filtered_by_region, category)
+        
+        category_counts = filtered_by_category.groupby('loyalty_program').size()
+        
+        # Розподіляємо бали за категорією (21, 18, 15, 12, 9, 6, 3)
+        if not category_counts.empty:
+            category_scores = {}
+            ranked_programs = category_counts.sort_values(ascending=False)
+            
+            # Бали за рейтингом
+            score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+            for i, (program, _) in enumerate(ranked_programs.items()):
+                if i < len(score_values):
+                    category_scores[program] = score_values[i]
+                else:
+                    category_scores[program] = 0.0
+            
+            # Додаємо бали за суміжні категорії
+            adjacent_filtered = filter_hotels_by_adjacent_category(filtered_by_region, category)
+            adjacent_counts = adjacent_filtered.groupby('loyalty_program').size()
+            
+            # Бали за суміжні категорії (7, 6, 5, 4, 3, 2, 1)
+            adjacent_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+            adjacent_scores = {}
+            
+            if not adjacent_counts.empty:
+                ranked_adjacent = adjacent_counts.sort_values(ascending=False)
+                for i, (program, _) in enumerate(ranked_adjacent.items()):
+                    if i < len(adjacent_score_values):
+                        adjacent_scores[program] = adjacent_score_values[i]
+                    else:
+                        adjacent_scores[program] = 0.0
+            
+            # Оновлюємо DataFrame з балами
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                
+                # Бали за повне співпадіння
+                if program in category_scores:
+                    scores_df.at[index, 'category_score'] = category_scores[program]
+                
+                # Додаємо бали за суміжні категорії
+                if program in adjacent_scores:
+                    scores_df.at[index, 'category_score'] += adjacent_scores[program]
+                
+                # Записуємо кількість готелів у категорії
+                category_mask = filtered_by_category['loyalty_program'] == program
+                scores_df.at[index, 'category_hotels'] = category_mask.sum()
+        else:
+            # Якщо категорія не вибрана, використовуємо всі готелі
+            filtered_by_category = filtered_by_region
+    else:
+        filtered_by_category = filtered_by_region
+    
+    # Крок 3: Фільтруємо готелі за стилем у вибраній категорії та регіоні
+    if styles and len(styles) > 0:
+        style_filtered = filter_hotels_by_style(filtered_by_category, styles)
+        style_counts_dict = {}
+        
+        for program in loyalty_programs:
             style_mask = style_filtered['loyalty_program'] == program
             style_counts_dict[program] = style_mask.sum()
             
@@ -1902,66 +2125,66 @@ def main():
         return
     
     # Створюємо додаток
-    app = Application.builder().token(TOKEN).build()
-    
-    # Налаштовуємо обробники
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            LANGUAGE: [CallbackQueryHandler(language_choice)],
-            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-            CATEGORY: [CallbackQueryHandler(category_choice)],
-            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
-            ConversationHandler.END: [CommandHandler("start", start)]  # Додано обробник для стану END
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start)  # /start як fallback
-        ],
-        name="loyalty_programs_conversation",  # Додано ім'я для кращого логування
-        persistent=False  # Забезпечуємо, що дані не зберігаються між перезапусками
-    )
-    
-    # Додаємо основний обробник розмови
-    app.add_handler(conv_handler)
-    
-    # Додаємо обробник помилок для кращої діагностики
-    app.add_error_handler(error_handler)
-    
-    # Використовуємо PORT для webhook
-    port = int(os.environ.get("PORT", "10000"))
-    
-    # Webhook параметри (опціонально)
-    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Прибираємо https://, якщо присутній
-    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-    
-    # Формуємо повний URL для webhook, якщо вказано WEBHOOK_HOST
-    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
-    
-    # Перевіряємо наявність токена
-    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-        logger.warning("Bot token not configured! Set the TELEGRAM_BOT_TOKEN environment variable or change the value in the code.")
-    
-    # Журналюємо готовність бота
-    logger.info("Bot successfully configured and ready to launch")
-    
-    # Запускаємо бота у відповідному режимі
-    if WEBHOOK_URL and WEBHOOK_PATH:
-        webhook_info = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
-        logger.info(f"Starting bot in webhook mode at {webhook_info}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=WEBHOOK_PATH,
-            webhook_url=webhook_info,
-            allowed_updates=Update.ALL_TYPES
-        )
-    else:
-        logger.info("WEBHOOK_URL not specified. Starting bot in polling mode...")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
-    
-    logger.info("Bot launched")
+   app = Application.builder().token(TOKEN).build()
+   
+   # Налаштовуємо обробники
+   conv_handler = ConversationHandler(
+       entry_points=[CommandHandler("start", start)],
+       states={
+           LANGUAGE: [CallbackQueryHandler(language_choice)],
+           WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+           CATEGORY: [CallbackQueryHandler(category_choice)],
+           WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+           WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)],
+           ConversationHandler.END: [CommandHandler("start", start)]  # Додано обробник для стану END
+       },
+       fallbacks=[
+           CommandHandler("cancel", cancel),
+           CommandHandler("start", start)  # /start як fallback
+       ],
+       name="loyalty_programs_conversation",  # Додано ім'я для кращого логування
+       persistent=False  # Забезпечуємо, що дані не зберігаються між перезапусками
+   )
+   
+   # Додаємо основний обробник розмови
+   app.add_handler(conv_handler)
+   
+   # Додаємо обробник помилок для кращої діагностики
+   app.add_error_handler(error_handler)
+   
+   # Використовуємо PORT для webhook
+   port = int(os.environ.get("PORT", "10000"))
+   
+   # Webhook параметри (опціонально)
+   WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Прибираємо https://, якщо присутній
+   WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+   
+   # Формуємо повний URL для webhook, якщо вказано WEBHOOK_HOST
+   WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+   
+   # Перевіряємо наявність токена
+   if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+       logger.warning("Bot token not configured! Set the TELEGRAM_BOT_TOKEN environment variable or change the value in the code.")
+   
+   # Журналюємо готовність бота
+   logger.info("Bot successfully configured and ready to launch")
+   
+   # Запускаємо бота у відповідному режимі
+   if WEBHOOK_URL and WEBHOOK_PATH:
+       webhook_info = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
+       logger.info(f"Starting bot in webhook mode at {webhook_info}")
+       app.run_webhook(
+           listen="0.0.0.0",
+           port=port,
+           url_path=WEBHOOK_PATH,
+           webhook_url=webhook_info,
+           allowed_updates=Update.ALL_TYPES
+       )
+   else:
+       logger.info("WEBHOOK_URL not specified. Starting bot in polling mode...")
+       app.run_polling(allowed_updates=Update.ALL_TYPES)
+   
+   logger.info("Bot launched")
 
 if __name__ == "__main__":
-    main()
+   main()
