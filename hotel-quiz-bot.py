@@ -405,9 +405,9 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             chat_id=chat_id,
             text=(
                 "Питання 2/4:\nЯку категорію готелів ви зазвичай обираєте?\n"
-                "1. Luxury\n"
-                "2. Comfort\n"
-                "3. Standard\n"
+                "1. Luxury (преміум-клас)\n"
+                "2. Comfort (середній клас)\n"
+                "3. Standard (економ-клас)\n"
             ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -421,6 +421,9 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await context.bot.send_message(
             chat_id=chat_id,
             text="Question 2/4:\nWhich hotel category do you usually choose?",
+                "1. Luxury (premium class)\n"
+                "2. Comfort (middle class)\n"
+                "3. Standard (economy class)\n"
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
