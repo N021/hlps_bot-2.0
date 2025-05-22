@@ -179,187 +179,6 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await asyncio.sleep(0.5)
         return await ask_region(update, context)
 
-# Виправлені функції вибору регіону
-async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про регіони подорожі з чекбоксами"""
-    # Визначаємо, чи це відповідь на callback_query або новий запит
-    if update.callback_query:
-        query = update.callback_query
-        user_id = query.from_user.id
-        chat_id = query.message.chat_id
-        message_id = query.message.message_id  # Додано: зберігаємо ID повідомлення для редагування
-    else:
-        user_id = update.message.from_user.id
-        chat_id = update.message.chat_id
-        message_id = None  # Нове повідомлення
-    
-    lang = user_data_global[user_id]['language']
-    
-    # Ініціалізуємо вибрані регіони, якщо їх ще не обрано
-    if 'selected_regions' not in user_data_global[user_id]:
-        user_data_global[user_id]['selected_regions'] = []
-    
-    # Створюємо InlineKeyboard з чекбоксами
-    if lang == 'uk':
-        regions = [
-            "Європа", "Північна Америка", "Азія",
-            "Близький Схід", "Африка", "Південна Америка",
-            "Карибський басейн", "Океанія"
-        ]
-        
-        # Створюємо докладний опис з нумерацією для кращого відображення
-        regions_description = (
-            "Питання 1/4:\n"
-            "У яких регіонах світу ви плануєте подорожувати?\n"
-            "*(Оберіть один або декілька варіантів)*\n\n"
-            "1. Європа\n"
-            "2. Północна Америка\n"
-            "3. Азія\n"
-            "4. Близький Схід\n"
-            "5. Африка\n"
-            "6. Південна Америка\n"
-            "7. Карибський басейн\n"
-            "8. Океанія"
-        )
-        
-        title_text = regions_description
-        submit_text = "Відповісти"
-    else:
-        regions = [
-            "Europe", "North America", "Asia",
-            "Middle East", "Africa", "South America",
-            "Caribbean", "Oceania"
-        ]
-        
-        # Створюємо докладний опис з нумерацією для кращого відображення
-        regions_description = (
-            "Question 1/4:\n"
-            "In which regions of the world are you planning to travel?\n"
-            "*(Select one or multiple options)*\n\n"
-            "1. Europe\n"
-            "2. North America\n"
-            "3. Asia\n"
-            "4. Middle East\n"
-            "5. Africa\n"
-            "6. South America\n"
-            "7. Caribbean\n"
-            "8. Oceania"
-        )
-        
-        title_text = regions_description
-        submit_text = "Submit"
-    
-    # Створюємо клавіатуру з чекбоксами для регіонів
-    keyboard = []
-    selected_regions = user_data_global[user_id]['selected_regions']
-    
-    # Групуємо регіони по 2 в ряду з номерами
-    for i in range(0, len(regions), 2):
-        row = []
-        for j in range(2):
-            if i + j < len(regions):
-                region = regions[i + j]
-                region_index = i + j + 1  # Номер регіону (починаючи з 1)
-                # Додаємо символ чекбоксу залежно від вибору
-                checkbox = "✅ " if region in selected_regions else "☐ "
-                row.append(InlineKeyboardButton(
-                    f"{checkbox}{region_index}. {region}", 
-                    callback_data=f"region_{region}"
-                ))
-        keyboard.append(row)
-    
-    # Додаємо кнопку "Відповісти" внизу
-    keyboard.append([InlineKeyboardButton(submit_text, callback_data="region_submit")])
-    
-    # ВИПРАВЛЕНО: використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
-    if message_id:
-        try:
-            # Оновлюємо існуюче повідомлення
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except Exception as e:
-            logger.error(f"Error updating message: {e}")
-            # Якщо не вдалося оновити повідомлення, надсилаємо нове
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-    else:
-        # Надсилаємо нове повідомлення
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=title_text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    
-    return WAITING_REGION_SUBMIT
-
-async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір регіону через чекбокси"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    callback_data = query.data
-    
-    # Якщо користувач натиснув "Відповісти"
-    if callback_data == "region_submit":
-        selected_regions = user_data_global[user_id]['selected_regions']
-        lang = user_data_global[user_id]['language']
-        
-        # Перевіряємо, чи вибрано хоча б один регіон
-        if not selected_regions:
-            if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б один регіон", show_alert=True)
-            else:
-                await query.answer("Please select at least one region", show_alert=True)
-            return WAITING_REGION_SUBMIT
-        
-        # Зберігаємо вибрані регіони як основні дані
-        user_data_global[user_id]['regions'] = selected_regions
-        user_data_global[user_id]['countries'] = None  # Виключаємо можливість уточнення країн
-        
-        # Оновлюємо повідомлення, видаляючи клавіатуру, але зберігаючи текст
-        regions_description = query.message.text
-        await query.edit_message_text(text=regions_description)
-        
-        # Надсилаємо нове повідомлення, підтверджуючи вибір
-        if lang == 'uk':
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні регіони: {', '.join(selected_regions)}."
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following regions: {', '.join(selected_regions)}."
-            )
-        
-        # Коротка пауза перед наступним питанням
-        await asyncio.sleep(0.5)
-        
-        # Перехід до питання про категорію
-        return await ask_category(update, context)
-    
-    # Якщо це вибір або скасування вибору регіону
-    else:
-        # Обробляємо вибір регіону
-        region = callback_data.replace("region_", "")
-        
-        # Перемикаємо стан вибору регіону
-        if region in user_data_global[user_id]['selected_regions']:
-            user_data_global[user_id]['selected_regions'].remove(region)
-        else:
-            user_data_global[user_id]['selected_regions'].append(region)
-        
-        # ВИПРАВЛЕНО: Оновлюємо клавіатуру, але залишаємось на тому ж питанні
-        return await ask_region(update, context)
-
 # Функція скасування
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Скасовує розмову з командою /cancel"""
@@ -390,7 +209,177 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     return ConversationHandler.END
 
-# ВИПРАВЛЕНІ Функції категорії
+# Функції вибору регіону
+async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Питання про регіони подорожі з чекбоксами"""
+    # Визначаємо, чи це відповідь на callback_query або новий запит
+    if update.callback_query:
+        query = update.callback_query
+        user_id = query.from_user.id
+        chat_id = query.message.chat_id
+        message_id = query.message.message_id
+    else:
+        user_id = update.message.from_user.id
+        chat_id = update.message.chat_id
+        message_id = None
+    
+    lang = user_data_global[user_id]['language']
+    
+    # Ініціалізуємо вибрані регіони, якщо їх ще не обрано
+    if 'selected_regions' not in user_data_global[user_id]:
+        user_data_global[user_id]['selected_regions'] = []
+    
+    # Створюємо InlineKeyboard з чекбоксами
+    if lang == 'uk':
+        regions = [
+            "Європа", "Північна Америка", "Азія",
+            "Близький Схід", "Африка", "Південна Америка",
+            "Карибський басейн", "Океанія"
+        ]
+        
+        regions_description = (
+            "Питання 1/4:\n"
+            "У яких регіонах світу ви плануєте подорожувати?\n"
+            "*(Оберіть один або декілька варіантів)*\n\n"
+            "1. Європа\n"
+            "2. Північна Америка\n"
+            "3. Азія\n"
+            "4. Близький Схід\n"
+            "5. Африка\n"
+            "6. Південна Америка\n"
+            "7. Карибський басейн\n"
+            "8. Океанія"
+        )
+        
+        title_text = regions_description
+        submit_text = "Відповісти"
+    else:
+        regions = [
+            "Europe", "North America", "Asia",
+            "Middle East", "Africa", "South America",
+            "Caribbean", "Oceania"
+        ]
+        
+        regions_description = (
+            "Question 1/4:\n"
+            "In which regions of the world are you planning to travel?\n"
+            "*(Select one or multiple options)*\n\n"
+            "1. Europe\n"
+            "2. North America\n"
+            "3. Asia\n"
+            "4. Middle East\n"
+            "5. Africa\n"
+            "6. South America\n"
+            "7. Caribbean\n"
+            "8. Oceania"
+        )
+        
+        title_text = regions_description
+        submit_text = "Submit"
+    
+    # Створюємо клавіатуру з чекбоксами для регіонів
+    keyboard = []
+    selected_regions = user_data_global[user_id]['selected_regions']
+    
+    # Групуємо регіони по 2 в ряду з номерами
+    for i in range(0, len(regions), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(regions):
+                region = regions[i + j]
+                region_index = i + j + 1
+                checkbox = "✅ " if region in selected_regions else "☐ "
+                row.append(InlineKeyboardButton(
+                    f"{checkbox}{region_index}. {region}", 
+                    callback_data=f"region_{region}"
+                ))
+        keyboard.append(row)
+    
+    # Додаємо кнопку "Відповісти" внизу
+    keyboard.append([InlineKeyboardButton(submit_text, callback_data="region_submit")])
+    
+    # Використовуємо edit_message_text, якщо це оновлення існуючого повідомлення
+    if message_id:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception as e:
+            logger.error(f"Error updating message: {e}")
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    else:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    return WAITING_REGION_SUBMIT
+
+async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє вибір регіону через чекбокси"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    callback_data = query.data
+    
+    # Якщо користувач натиснув "Відповісти"
+    if callback_data == "region_submit":
+        selected_regions = user_data_global[user_id]['selected_regions']
+        lang = user_data_global[user_id]['language']
+        
+        # Перевіряємо, чи вибрано хоча б один регіон
+        if not selected_regions:
+            if lang == 'uk':
+                await query.answer("Будь ласка, виберіть хоча б один регіон", show_alert=True)
+            else:
+                await query.answer("Please select at least one region", show_alert=True)
+            return WAITING_REGION_SUBMIT
+        
+        # Зберігаємо вибрані регіони
+        user_data_global[user_id]['regions'] = selected_regions
+        user_data_global[user_id]['countries'] = None
+        
+        # Оновлюємо повідомлення, видаляючи клавіатуру
+        await query.edit_message_text(text=query.message.text)
+        
+        # Надсилаємо нове повідомлення з підтвердженням
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Дякую! Ви обрали наступні регіони: {', '.join(selected_regions)}."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Thank you! You have chosen the following regions: {', '.join(selected_regions)}."
+            )
+        
+        await asyncio.sleep(0.5)
+        return await ask_category(update, context)
+    
+    # Якщо це вибір регіону
+    else:
+        region = callback_data.replace("region_", "")
+        
+        # Перемикаємо стан вибору регіону
+        if region in user_data_global[user_id]['selected_regions']:
+            user_data_global[user_id]['selected_regions'].remove(region)
+        else:
+            user_data_global[user_id]['selected_regions'].append(region)
+        
+        # Оновлюємо клавіатуру
+        return await ask_region(update, context)
+
+# Функції категорії
 async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про категорію готелю"""
     # Визначаємо, чи це відповідь на callback_query
@@ -443,11 +432,10 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     category = callback_data.replace("category_", "")
     user_data_global[user_id]['category'] = category
 
-    # ✅ ВИПРАВЛЕНО: НЕ редагуємо питання 2/4 — залишаємо його в історії без змін
-    # Просто видаляємо клавіатуру з попереднього повідомлення
+    # Видаляємо клавіатуру з попереднього повідомлення
     await query.edit_message_text(
-        text=query.message.text,  # Залишаємо той самий текст
-        reply_markup=None  # Видаляємо тільки клавіатуру
+        text=query.message.text,
+        reply_markup=None
     )
 
     # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
@@ -464,24 +452,19 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await asyncio.sleep(1.0)
 
-    return await ask_style(update, context)  # → Question 3/4
+    return await ask_style(update, context)
 
 # ВИПРАВЛЕНІ функції стилю з чекбоксами
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та детальними описами"""
-    # ✅ ВИПРАВЛЕНО: Завжди надсилаємо нове повідомлення, а не редагуємо попереднє
+    
     if update.callback_query:
         query = update.callback_query
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        # Перевіряємо, чи це перший виклик функції чи оновлення вибору
-        is_update_selection = 'selected_styles' in user_data_global[user_id] and \
-                             len(user_data_global[user_id].get('selected_styles', [])) > 0 and \
-                             hasattr(user_data_global[user_id], 'style_message_id')
     else:
         user_id = update.message.from_user.id
         chat_id = update.message.chat_id
-        is_update_selection = False
     
     lang = user_data_global[user_id]['language']
     
@@ -491,7 +474,6 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     # Створюємо InlineKeyboard з чекбоксами для стилів
     if lang == 'uk':
-        # Основні назви стилів для кнопок
         styles = [
             "Розкішний і вишуканий", 
             "Бутік і унікальний", 
@@ -501,7 +483,6 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "Практичний і економічний"
         ]
         
-        # Детальний опис стилів для відображення в повідомленні
         styles_description = (
             "Питання 3/4:\n"
             "Який стиль готелю ви зазвичай обираєте?\n"
@@ -517,7 +498,6 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         title_text = styles_description
         submit_text = "Відповісти"
     else:
-        # Основні назви стилів для кнопок
         styles = [
             "Luxurious and refined", 
             "Boutique and unique",
@@ -527,7 +507,6 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "Practical and economical"
         ]
         
-        # Детальний опис стилів для відображення в повідомленні
         styles_description = (
             "Question 3/4:\n"
             "What hotel style do you usually choose?\n"
@@ -549,7 +528,6 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     # Додаємо стилі з номерами
     for i, style in enumerate(styles):
-        # Додаємо символ чекбоксу залежно від вибору
         checkbox = "✅ " if style in selected_styles else "☐ "
         keyboard.append([InlineKeyboardButton(
             f"{checkbox}{i+1}. {style}", 
@@ -559,9 +537,10 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Додаємо кнопку "Відповісти" внизу
     keyboard.append([InlineKeyboardButton(submit_text, callback_data="style_submit")])
     
-    # ✅ ВИПРАВЛЕНО: Якщо це оновлення вибору і у нас є ID повідомлення, оновлюємо існуюче
-    if is_update_selection and 'style_message_id' in user_data_global[user_id]:
+    # ВИПРАВЛЕННЯ: Перевіряємо, чи це оновлення існуючого повідомлення зі стилями
+    if 'style_message_id' in user_data_global[user_id]:
         try:
+            # Оновлюємо існуюче повідомлення зі стилями
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=user_data_global[user_id]['style_message_id'],
@@ -569,18 +548,14 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
+            return WAITING_STYLE_SUBMIT
         except Exception as e:
             logger.error(f"Error updating style message: {e}")
-            # Якщо не вдалося оновити, надсилаємо нове
-            message = await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-            user_data_global[user_id]['style_message_id'] = message.message_id
-    else:
-        # ✅ ВИПРАВЛЕНО: Завжди надсилаємо НОВЕ повідомлення для питання 3/4
+            # Видаляємо недійсний ID повідомлення
+            del user_data_global[user_id]['style_message_id']
+    
+    # Надсилаємо НОВЕ повідомлення для питання 3/4
+    try:
         message = await context.bot.send_message(
             chat_id=chat_id,
             text=title_text,
@@ -588,6 +563,15 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             parse_mode="Markdown"
         )
         # Зберігаємо ID повідомлення для майбутніх оновлень
+        user_data_global[user_id]['style_message_id'] = message.message_id
+    except Exception as e:
+        logger.error(f"Error sending style message: {e}")
+        # Відправляємо без Markdown, якщо є проблеми з форматуванням
+        message = await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         user_data_global[user_id]['style_message_id'] = message.message_id
     
     return WAITING_STYLE_SUBMIT
@@ -630,15 +614,17 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                     f"Only the first three have been considered.", 
                     show_alert=True
                 )
-            
             # Оновлюємо вибір та клавіатуру
             return await ask_style(update, context)
         
         # Зберігаємо вибрані стилі
         user_data_global[user_id]['styles'] = selected_styles
         
-        # ✅ ВИПРАВЛЕНО: Видаляємо клавіатуру, але зберігаємо текст питання 3/4
-        await query.edit_message_text(text=query.message.text, reply_markup=None, parse_mode="Markdown")
+        # ВИПРАВЛЕННЯ: Видаляємо клавіатуру, але зберігаємо текст питання 3/4
+        try:
+            await query.edit_message_text(text=query.message.text, reply_markup=None, parse_mode="Markdown")
+        except:
+            await query.edit_message_text(text=query.message.text, reply_markup=None)
         
         # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
         if lang == 'uk':
@@ -656,15 +642,11 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if 'style_message_id' in user_data_global[user_id]:
             del user_data_global[user_id]['style_message_id']
         
-        # Коротка пауза перед наступним питанням
         await asyncio.sleep(1.0)
-        
-        # Перехід до питання про мету подорожі
         return await ask_purpose(update, context)
     
     # Якщо це вибір або скасування вибору стилю
     else:
-        # Обробляємо вибір стилю
         style = callback_data.replace("style_", "")
         
         # Перевіряємо, чи не перевищено максимальну кількість стилів (3)
@@ -682,216 +664,8 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         else:
             user_data_global[user_id]['selected_styles'].append(style)
         
-        # ✅ ВИПРАВЛЕНО: Оновлюємо клавіатуру з новим вибором, але залишаємося на тому ж питанні
+        # ВИПРАВЛЕННЯ: Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
-
-# ВИПРАВЛЕНІ функції вибору мети з чекбоксами
-async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про мету подорожі з чекбоксами та детальними описами"""
-    # ✅ ВИПРАВЛЕНО: Завжди надсилаємо нове повідомлення, а не редагуємо попереднє
-    if update.callback_query:
-        query = update.callback_query
-        user_id = query.from_user.id
-        chat_id = query.message.chat_id
-        # Перевіряємо, чи це перший виклик функції чи оновлення вибору
-        is_update_selection = 'selected_purposes' in user_data_global[user_id] and \
-                             len(user_data_global[user_id].get('selected_purposes', [])) > 0 and \
-                             hasattr(user_data_global[user_id], 'purpose_message_id')
-    else:
-        user_id = update.message.from_user.id
-        chat_id = update.message.chat_id
-        is_update_selection = False
-    
-    lang = user_data_global[user_id]['language']
-    
-    # Ініціалізуємо вибрані цілі, якщо їх ще не обрано
-    if 'selected_purposes' not in user_data_global[user_id]:
-        user_data_global[user_id]['selected_purposes'] = []
-    
-    # Створюємо InlineKeyboard з чекбоксами для цілей
-    if lang == 'uk':
-        purposes = [
-            "Бізнес-подорожі / відрядження",
-            "Відпустка / релакс",
-            "Сімейний відпочинок",
-            "Довготривале проживання"
-        ]
-        
-        # Детальний опис цілей в основному тексті
-        purpose_description = (
-            "Питання 4/4:\n"
-            "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "*(Оберіть до двох варіантів)*\n\n"
-            "1. **Бізнес-подорожі / відрядження** (зручність для роботи, доступ до ділових центрів)\n"
-            "2. **Відпустка / релакс** (комфорт, розваги, відпочинок)\n"
-            "3. **Сімейний відпочинок** (розваги для дітей, сімейні номери)\n"
-            "4. **Довготривале проживання** (відчуття дому, кухня, пральня)"
-        )
-        
-        title_text = purpose_description
-        submit_text = "Відповісти"
-    else:
-        purposes = [
-            "Business travel",
-            "Vacation / relaxation",
-            "Family vacation",
-            "Long-term stay"
-        ]
-        
-        # Детальний опис цілей в основному тексті
-        purpose_description = (
-            "Question 4/4:\n"
-            "For what purpose do you usually stay at a hotel?\n"
-            "*(Choose up to two options)*\n\n"
-            "1. **Business travel** (convenience for work, access to business centers)\n"
-            "2. **Vacation / relaxation** (comfort, entertainment, rest)\n"
-            "3. **Family vacation** (activities for children, family rooms)\n"
-            "4. **Long-term stay** (home feeling, kitchen, laundry)"
-        )
-        
-        title_text = purpose_description
-        submit_text = "Submit"
-    
-    # Створюємо клавіатуру з чекбоксами для цілей з номерами
-    keyboard = []
-    selected_purposes = user_data_global[user_id]['selected_purposes']
-    
-    # Додаємо цілі з номерами
-    for i, purpose in enumerate(purposes):
-        # Додаємо символ чекбоксу залежно від вибору
-        checkbox = "✅ " if purpose in selected_purposes else "☐ "
-        keyboard.append([InlineKeyboardButton(
-            f"{checkbox}{i+1}. {purpose}", 
-            callback_data=f"purpose_{purpose}"
-        )])
-    
-    # Додаємо кнопку "Відповісти" внизу
-    keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
-    
-    # ✅ ВИПРАВЛЕНО: Якщо це оновлення вибору і у нас є ID повідомлення, оновлюємо існуюче
-    if is_update_selection and 'purpose_message_id' in user_data_global[user_id]:
-        try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=user_data_global[user_id]['purpose_message_id'],
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Error updating purpose message: {e}")
-            # Якщо не вдалося оновити, надсилаємо нове
-            message = await context.bot.send_message(
-                chat_id=chat_id,
-                text=title_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-            user_data_global[user_id]['purpose_message_id'] = message.message_id
-    else:
-        # ✅ ВИПРАВЛЕНО: Завжди надсилаємо НОВЕ повідомлення для питання 4/4
-        message = await context.bot.send_message(
-            chat_id=chat_id,
-            text=title_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-        # Зберігаємо ID повідомлення для майбутніх оновлень
-        user_data_global[user_id]['purpose_message_id'] = message.message_id
-    
-    return WAITING_PURPOSE_SUBMIT
-
-async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробляє вибір мети через чекбокси"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    callback_data = query.data
-    
-    # Якщо користувач натиснув "Відповісти"
-    if callback_data == "purpose_submit":
-        selected_purposes = user_data_global[user_id]['selected_purposes']
-        lang = user_data_global[user_id]['language']
-        
-        # Перевіряємо, чи вибрано хоча б одну мету
-        if not selected_purposes:
-            if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б одну мету", show_alert=True)
-            else:
-                await query.answer("Please select at least one purpose", show_alert=True)
-            return WAITING_PURPOSE_SUBMIT
-        
-        # Обмеження до двох варіантів
-        if len(selected_purposes) > 2:
-            original_count = len(selected_purposes)
-            user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
-            
-            if lang == 'uk':
-                await query.answer(
-                    f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-                    f"Враховано тільки перші дві цілі.", 
-                    show_alert=True
-                )
-            else:
-                await query.answer(
-                    f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-                    f"Only the first two have been considered.", 
-                    show_alert=True
-                )
-            
-            # Оновлюємо вибір та клавіатуру
-            return await ask_purpose(update, context)
-        
-        # Зберігаємо вибрані цілі
-        user_data_global[user_id]['purposes'] = selected_purposes
-        
-        # ✅ ВИПРАВЛЕНО: Видаляємо клавіатуру, але зберігаємо текст питання 4/4
-        await query.edit_message_text(text=query.message.text, reply_markup=None, parse_mode="Markdown")
-        
-        # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
-        if lang == 'uk':
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
-                "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following purposes: {', '.join(selected_purposes)}.\n"
-                "Please wait while I analyze your answers and select the best loyalty programs for you."
-            )
-        
-        # Очищуємо ID повідомлення з метою
-        if 'purpose_message_id' in user_data_global[user_id]:
-            del user_data_global[user_id]['purpose_message_id']
-        
-        # Розрахунок і відображення результатів
-        return await calculate_and_show_results(update, context)
-    
-    # Якщо це вибір або скасування вибору мети
-    else:
-        # Обробляємо вибір мети
-        purpose = callback_data.replace("purpose_", "")
-        
-        # Перевіряємо, чи не перевищено максимальну кількість цілей (2)
-        if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
-            lang = user_data_global[user_id]['language']
-            if lang == 'uk':
-                await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
-            else:
-                await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
-            return WAITING_PURPOSE_SUBMIT
-        
-        # Перемикаємо стан вибору мети
-        if purpose in user_data_global[user_id]['selected_purposes']:
-            user_data_global[user_id]['selected_purposes'].remove(purpose)
-        else:
-            user_data_global[user_id]['selected_purposes'].append(purpose)
-        
-        # ✅ ВИПРАВЛЕНО: Оновлюємо клавіатуру, але залишаємось на тому ж питанні
-        return await ask_purpose(update, context)
 
 # Допоміжні функції для фільтрації та зіставлення
 
@@ -1150,50 +924,6 @@ def filter_hotels_by_category(df, category):
     # Повертаємо відфільтровані дані
     return df[category_mask]
 
-def filter_hotels_by_adjacent_category(df, category):
-    """
-    Фільтрує готелі за суміжною категорією
-    
-    Args:
-        df: DataFrame з даними про готелі
-        category: основна категорія
-    
-    Returns:
-        DataFrame з готелями суміжної категорії
-    """
-    if not category:
-        return pd.DataFrame()  # Повертаємо порожній DataFrame
-    
-    # Перевіряємо, чи є колонка 'segment'
-    if 'segment' not in df.columns:
-        logger.error("Missing 'segment' column. Bot not started.")
-        return pd.DataFrame()
-    
-    # Визначаємо суміжні категорії
-    category_lower = category.lower()
-    if category_lower == 'luxury':
-        # Суміжна категорія до Luxury - Comfort
-        adjacent_mask = df['segment'].str.lower().apply(
-            lambda x: any(seg in x.lower() for seg in ['midscale', 'middle', 'comfort'])
-        )
-    elif category_lower == 'comfort':
-        # Суміжні категорії до Comfort - Luxury і Standard
-        adjacent_mask = df['segment'].str.lower().apply(
-            lambda x: any(seg in x.lower() for seg in ['luxury', 'upscale', 'standard', 'economy', 'budget'])
-        )
-    elif category_lower == 'standard':
-        # Суміжна категорія до Standard - Comfort
-        adjacent_mask = df['segment'].str.lower().apply(
-            lambda x: any(seg in x.lower() for seg in ['midscale', 'middle', 'comfort'])
-        )
-    else:
-        # Якщо категорія не відповідає відомим, повертаємо порожній DataFrame
-        return pd.DataFrame()
-    
-    # Повертаємо відфільтровані дані
-    return df[adjacent_mask]
-
-# Функції фільтрації за стилем та метою (продовження)
 def filter_hotels_by_style(df, styles):
     """Фільтрує готелі за стилем"""
     if not styles or len(styles) == 0:
@@ -1242,7 +972,6 @@ def filter_hotels_by_purpose(df, purposes):
     
     return df[purpose_mask]
 
-# Функції розрахунку результатів (скорочена версія через обмеження місця)
 def get_region_score(df, regions=None, countries=None):
     """Розраховує бали для програм лояльності за регіонами/країнами"""
     region_scores = {}
@@ -1303,7 +1032,7 @@ def calculate_scores(user_data, hotel_data):
         'purpose_hotels': 0
     })
     
-    # Розрахунок балів (спрощена версія)
+    # Розрахунок балів за регіонами
     filtered_by_region = filter_hotels_by_region(hotel_data, regions, countries)
     region_scores = get_region_score(filtered_by_region, regions, countries)
     
@@ -1311,8 +1040,13 @@ def calculate_scores(user_data, hotel_data):
         program = row['loyalty_program']
         if program in region_scores:
             scores_df.at[index, 'region_score'] = region_scores[program]
+            
+        # Підрахунок кількості готелів за регіонами
+        program_region_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+        scores_df.at[index, 'region_hotels'] = len(program_region_hotels)
     
-    # Додаткові розрахунки для категорій, стилів та цілей...
+    # Додаткові розрахунки для категорій, стилів та цілей можна додати тут
+    
     scores_df['total_score'] = (
         scores_df['region_score'] + 
         scores_df['category_score'] + 
@@ -1332,15 +1066,15 @@ def format_results(user_data, scores_df, lang='en'):
         program = row['loyalty_program']
         
         if lang == 'uk':
-            results += f"{program} - посіла {i+1} місце з рейтингом {row['total_score']:.2f}\n"
-            if user_data.get('regions'):
+            results += f"{program} - посіла {i+1} місце з рейтингом {row['total_score']:.1f}\n"
+            if user_data.get('regions') and row['region_hotels'] > 0:
                 region_str = ', '.join(user_data['regions'])
-                results += f"1) у {region_str} - ({row['region_hotels']} готелів)\n"
+                results += f"У {region_str}: {row['region_hotels']} готелів\n"
         else:
-            results += f"{program} - ranked {i+1} with a score of {row['total_score']:.2f}\n"
-            if user_data.get('regions'):
+            results += f"{program} - ranked {i+1} with a score of {row['total_score']:.1f}\n"
+            if user_data.get('regions') and row['region_hotels'] > 0:
                 region_str = ', '.join(user_data['regions'])
-                results += f"1) in {region_str} - ({row['region_hotels']} hotels)\n"
+                results += f"In {region_str}: {row['region_hotels']} hotels\n"
         
         results += "\n"
     
