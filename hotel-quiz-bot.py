@@ -667,6 +667,213 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         # ВИПРАВЛЕННЯ: Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
 
+# ВИПРАВЛЕНІ функції вибору мети з чекбоксами
+async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Питання про мету подорожі з чекбоксами та детальними описами"""
+    
+    if update.callback_query:
+        query = update.callback_query
+        user_id = query.from_user.id
+        chat_id = query.message.chat_id
+    else:
+        user_id = update.message.from_user.id
+        chat_id = update.message.chat_id
+    
+    lang = user_data_global[user_id]['language']
+    
+    # Ініціалізуємо вибрані цілі, якщо їх ще не обрано
+    if 'selected_purposes' not in user_data_global[user_id]:
+        user_data_global[user_id]['selected_purposes'] = []
+    
+    # Створюємо InlineKeyboard з чекбоксами для цілей
+    if lang == 'uk':
+        purposes = [
+            "Бізнес-подорожі / відрядження",
+            "Відпустка / релакс",
+            "Сімейний відпочинок",
+            "Довготривале проживання"
+        ]
+        
+        purpose_description = (
+            "Питання 4/4:\n"
+            "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
+            "*(Оберіть до двох варіантів)*\n\n"
+            "1. **Бізнес-подорожі / відрядження** (зручність для роботи, доступ до ділових центрів)\n"
+            "2. **Відпустка / релакс** (комфорт, розваги, відпочинок)\n"
+            "3. **Сімейний відпочинок** (розваги для дітей, сімейні номери)\n"
+            "4. **Довготривале проживання** (відчуття дому, кухня, пральня)"
+        )
+        
+        title_text = purpose_description
+        submit_text = "Відповісти"
+    else:
+        purposes = [
+            "Business travel",
+            "Vacation / relaxation",
+            "Family vacation",
+            "Long-term stay"
+        ]
+        
+        purpose_description = (
+            "Question 4/4:\n"
+            "For what purpose do you usually stay at a hotel?\n"
+            "*(Choose up to two options)*\n\n"
+            "1. **Business travel** (convenience for work, access to business centers)\n"
+            "2. **Vacation / relaxation** (comfort, entertainment, rest)\n"
+            "3. **Family vacation** (activities for children, family rooms)\n"
+            "4. **Long-term stay** (home feeling, kitchen, laundry)"
+        )
+        
+        title_text = purpose_description
+        submit_text = "Submit"
+    
+    # Створюємо клавіатуру з чекбоксами для цілей з номерами
+    keyboard = []
+    selected_purposes = user_data_global[user_id]['selected_purposes']
+    
+    # Додаємо цілі з номерами
+    for i, purpose in enumerate(purposes):
+        checkbox = "✅ " if purpose in selected_purposes else "☐ "
+        keyboard.append([InlineKeyboardButton(
+            f"{checkbox}{i+1}. {purpose}", 
+            callback_data=f"purpose_{purpose}"
+        )])
+    
+    # Додаємо кнопку "Відповісти" внизу
+    keyboard.append([InlineKeyboardButton(submit_text, callback_data="purpose_submit")])
+    
+    # ВИПРАВЛЕННЯ: Перевіряємо, чи це оновлення існуючого повідомлення з метою
+    if 'purpose_message_id' in user_data_global[user_id]:
+        try:
+            # Оновлюємо існуюче повідомлення з метою
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=user_data_global[user_id]['purpose_message_id'],
+                text=title_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+            return WAITING_PURPOSE_SUBMIT
+        except Exception as e:
+            logger.error(f"Error updating purpose message: {e}")
+            # Видаляємо недійсний ID повідомлення
+            del user_data_global[user_id]['purpose_message_id']
+    
+    # Надсилаємо НОВЕ повідомлення для питання 4/4
+    try:
+        message = await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        # Зберігаємо ID повідомлення для майбутніх оновлень
+        user_data_global[user_id]['purpose_message_id'] = message.message_id
+    except Exception as e:
+        logger.error(f"Error sending purpose message: {e}")
+        # Відправляємо без Markdown, якщо є проблеми з форматуванням
+        message = await context.bot.send_message(
+            chat_id=chat_id,
+            text=title_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        user_data_global[user_id]['purpose_message_id'] = message.message_id
+    
+    return WAITING_PURPOSE_SUBMIT
+
+async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє вибір мети через чекбокси"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    callback_data = query.data
+    
+    # Якщо користувач натиснув "Відповісти"
+    if callback_data == "purpose_submit":
+        selected_purposes = user_data_global[user_id]['selected_purposes']
+        lang = user_data_global[user_id]['language']
+        
+        # Перевіряємо, чи вибрано хоча б одну мету
+        if not selected_purposes:
+            if lang == 'uk':
+                await query.answer("Будь ласка, виберіть хоча б одну мету", show_alert=True)
+            else:
+                await query.answer("Please select at least one purpose", show_alert=True)
+            return WAITING_PURPOSE_SUBMIT
+        
+        # Обмеження до двох варіантів
+        if len(selected_purposes) > 2:
+            original_count = len(selected_purposes)
+            user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
+            
+            if lang == 'uk':
+                await query.answer(
+                    f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
+                    f"Враховано тільки перші дві цілі.", 
+                    show_alert=True
+                )
+            else:
+                await query.answer(
+                    f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
+                    f"Only the first two have been considered.", 
+                    show_alert=True
+                )
+            # Оновлюємо вибір та клавіатуру
+            return await ask_purpose(update, context)
+        
+        # Зберігаємо вибрані цілі
+        user_data_global[user_id]['purposes'] = selected_purposes
+        
+        # ВИПРАВЛЕННЯ: Видаляємо клавіатуру, але зберігаємо текст питання 4/4
+        try:
+            await query.edit_message_text(text=query.message.text, reply_markup=None, parse_mode="Markdown")
+        except:
+            await query.edit_message_text(text=query.message.text, reply_markup=None)
+        
+        # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
+                "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Thank you! You have chosen the following purposes: {', '.join(selected_purposes)}.\n"
+                "Please wait while I analyze your answers and select the best loyalty programs for you."
+            )
+        
+        # Очищуємо ID повідомлення з метою
+        if 'purpose_message_id' in user_data_global[user_id]:
+            del user_data_global[user_id]['purpose_message_id']
+        
+        # Розрахунок і відображення результатів
+        return await calculate_and_show_results(update, context)
+    
+    # Якщо це вибір або скасування вибору мети
+    else:
+        purpose = callback_data.replace("purpose_", "")
+        
+        # Перевіряємо, чи не перевищено максимальну кількість цілей (2)
+        if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
+            lang = user_data_global[user_id]['language']
+            if lang == 'uk':
+                await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
+            else:
+                await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
+            return WAITING_PURPOSE_SUBMIT
+        
+        # Перемикаємо стан вибору мети
+        if purpose in user_data_global[user_id]['selected_purposes']:
+            user_data_global[user_id]['selected_purposes'].remove(purpose)
+        else:
+            user_data_global[user_id]['selected_purposes'].append(purpose)
+        
+        # ВИПРАВЛЕННЯ: Оновлюємо клавіатуру з новим вибором
+        return await ask_purpose(update, context)
+
 # Допоміжні функції для фільтрації та зіставлення
 
 def map_hotel_style(hotel_brand):
