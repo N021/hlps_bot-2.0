@@ -197,8 +197,7 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         keyboard = [
             ["Європа", "Північна Америка", "Азія"],
             ["Близький Схід", "Африка", "Південна Америка"],
-            ["Карибський басейн", "Океанія"],
-            ["Мене цікавлять лише конкретні країни"]
+            ["Карибський басейн", "Океанія"]
         ]
         
         await update.message.reply_text(
@@ -211,7 +210,6 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             ["Europe", "North America", "Asia"],
             ["Middle East", "Africa", "South America"],
             ["Caribbean", "Oceania"],
-            ["I'm only interested in specific countries"]
         ]
         
         await update.message.reply_text(
