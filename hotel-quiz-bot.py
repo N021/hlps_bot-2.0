@@ -1240,6 +1240,8 @@ def filter_hotels_by_purpose(df, purposes):
     
     return filtered_df
 
+
+
 # Функції обчислення балів та скорингу
 
 def get_region_score(df, regions=None, countries=None):
@@ -1361,6 +1363,25 @@ def calculate_scores(user_data, hotel_data):
     if regions and len(regions) > 0:
         # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this region"
         if 'Total hotels of Corporation / Loyalty Program in this region' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне значення з колонки
+                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = region_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо кількість готелів
+            region_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in region_counts:
+                    scores_df.at[index, 'region_hotels'] = region_counts[program]
+    
+    elif countries and len(countries) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
+        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
             for index, row in scores_df.iterrows():
                 program = row['loyalty_program']
                 program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
@@ -1521,26 +1542,7 @@ def calculate_scores(user_data, hotel_data):
     # Сортуємо за загальним рейтингом
     scores_df = scores_df.sort_values('total_score', ascending=False)
     
-    return scores_df значення з колонки
-                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
-                    scores_df.at[index, 'region_hotels'] = region_hotels
-        else:
-            # Якщо колонка відсутня, просто рахуємо кількість готелів
-            region_counts = filtered_by_region.groupby('loyalty_program').size()
-            for index, row in scores_df.iterrows():
-                program = row['loyalty_program']
-                if program in region_counts:
-                    scores_df.at[index, 'region_hotels'] = region_counts[program]
-    
-    elif countries and len(countries) > 0:
-        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
-        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
-            for index, row in scores_df.iterrows():
-                program = row['loyalty_program']
-                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
-                
-                if not program_data.empty:
-                    # Використовуємо унікальне
+    return scores_df
 
 # Функції форматування результатів та основна логіка
 
