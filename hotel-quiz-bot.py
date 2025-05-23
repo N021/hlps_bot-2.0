@@ -25,6 +25,9 @@ LANGUAGE, REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING
 user_data_global = {}
 hotel_data = None  # Глобальна змінна для даних готелів
 
+# ДОДАНО: Глобальна змінна для зберігання результатів розрахунків
+last_calculation_results = {}
+
 def analyze_csv_structure(df):
     """
     Аналізує структуру CSV файлу та записує інформацію в лог
@@ -1364,25 +1367,6 @@ def calculate_scores(user_data, hotel_data):
                 
                 if not program_data.empty:
                     # Використовуємо унікальне значення з колонки
-                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
-                    scores_df.at[index, 'region_hotels'] = region_hotels
-        else:
-            # Якщо колонка відсутня, просто рахуємо кількість готелів
-            region_counts = filtered_by_region.groupby('loyalty_program').size()
-            for index, row in scores_df.iterrows():
-                program = row['loyalty_program']
-                if program in region_counts:
-                    scores_df.at[index, 'region_hotels'] = region_counts[program]
-    
-    elif countries and len(countries) > 0:
-        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
-        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
-            for index, row in scores_df.iterrows():
-                program = row['loyalty_program']
-                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
-                
-                if not program_data.empty:
-                    # Використовуємо унікальне значення з колонки
                     country_hotels = program_data['Total hotels of Corporation / Loyalty Program in this country'].iloc[0]
                     scores_df.at[index, 'region_hotels'] = country_hotels
         else:
@@ -1526,22 +1510,6 @@ def calculate_scores(user_data, hotel_data):
             if program in purpose_scores:
                 scores_df.at[index, 'purpose_score'] = purpose_scores[program]
     
-    # Додаткове логування для стилів
-    if styles and len(styles) > 0:
-        logger.info(f"Фільтрація за стилями: {styles}")
-        # Вивести кількість готелів для кожного стилю
-        for style in styles:
-            style_hotels_count = 0
-            for program in loyalty_programs:
-                program_data = style_filtered[style_filtered['loyalty_program'] == program]
-                style_hotels_count += len(program_data)
-            logger.info(f"Загальна кількість готелів для стилю '{style}': {style_hotels_count}")
-            
-            # Перевірити, чи є готелі цього стилю для кожної програми лояльності
-            for program in loyalty_programs:
-                program_data = style_filtered[style_filtered['loyalty_program'] == program]
-                logger.info(f"Програма '{program}' - {len(program_data)} готелів для стилю '{style}'")
-    
     # Обчислюємо загальний рейтинг
     scores_df['total_score'] = (
         scores_df['region_score'] + 
@@ -1553,7 +1521,26 @@ def calculate_scores(user_data, hotel_data):
     # Сортуємо за загальним рейтингом
     scores_df = scores_df.sort_values('total_score', ascending=False)
     
-    return scores_df
+    return scores_df значення з колонки
+                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
+                    scores_df.at[index, 'region_hotels'] = region_hotels
+        else:
+            # Якщо колонка відсутня, просто рахуємо кількість готелів
+            region_counts = filtered_by_region.groupby('loyalty_program').size()
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                if program in region_counts:
+                    scores_df.at[index, 'region_hotels'] = region_counts[program]
+    
+    elif countries and len(countries) > 0:
+        # Перевіряємо наявність колонки "Total hotels of Corporation / Loyalty Program in this country"
+        if 'Total hotels of Corporation / Loyalty Program in this country' in filtered_by_region.columns:
+            for index, row in scores_df.iterrows():
+                program = row['loyalty_program']
+                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+                
+                if not program_data.empty:
+                    # Використовуємо унікальне
 
 # Функції форматування результатів та основна логіка
 
@@ -1633,28 +1620,21 @@ def format_results(user_data, scores_df, lang='en'):
     
     return results
 
+# МОДИФІКОВАНА функція calculate_and_show_results з збереженням результатів для /test
 async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обчислює результати та відображає їх користувачеві
-    
-    Args:
-        update: об'єкт Update від Telegram
-        context: контекст бота
-    
-    Returns:
-        int: ідентифікатор кінцевого стану розмови
     """
+    global last_calculation_results  # Додано для збереження результатів
+    
     user_id = update.effective_user.id
     user_data = user_data_global[user_id]
     lang = user_data['language']
     
-    # Виконуємо аналіз та підрахунок балів
     try:
-        # Логуємо інформацію для відладки
         logger.info(f"Розрахунок балів для користувача {user_id}")
         logger.info(f"Дані користувача: {user_data}")
         
-        # Перевіряємо, чи є дані готелів
         if hotel_data is None or hotel_data.empty:
             logger.error("Дані готелів відсутні або порожні!")
             if lang == 'uk':
@@ -1672,7 +1652,14 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         # Підраховуємо бали для кожної програми лояльності
         scores_df = calculate_scores(user_data, hotel_data)
         
-        # Перевіряємо, чи є результати
+        # ЗБЕРІГАЄМО ДЕТАЛЬНІ РЕЗУЛЬТАТИ ДЛЯ /test
+        last_calculation_results[user_id] = {
+            'user_data': user_data.copy(),
+            'scores_df': scores_df.copy(),
+            'timestamp': pd.Timestamp.now(),
+            'detailed_breakdown': create_detailed_breakdown(user_data, scores_df, hotel_data)
+        }
+        
         if scores_df.empty:
             if lang == 'uk':
                 await context.bot.send_message(
@@ -1698,14 +1685,16 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
                 chat_id=update.callback_query.message.chat_id,
                 text="Аналіз завершено! Ось топ-5 програм лояльності готелів, які найкраще відповідають вашим уподобанням:\n\n" + 
                 results + 
-                "\nЩоб почати нове опитування, надішліть команду /start."
+                "\nЩоб переглянути детальні розрахунки, напишіть /test\n" +
+                "Щоб почати нове опитування, надішліть команду /start."
             )
         else:
             await context.bot.send_message(
                 chat_id=update.callback_query.message.chat_id,
                 text="Analysis completed! Here are the top 5 hotel loyalty programs that best match your preferences:\n\n" + 
                 results + 
-                "\nTo start a new survey, send the /start command."
+                "\nTo see detailed calculations, type /test\n" +
+                "To start a new survey, send the /start command."
             )
     
     except Exception as e:
@@ -1722,98 +1711,255 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
                 text="An error occurred while analyzing your answers. Please try again by sending the /start command."
             )
     
-    # Видаляємо дані користувача
-    if user_id in user_data_global:
-        del user_data_global[user_id]
-    
+    # НЕ видаляємо дані користувача тут, щоб /test працював
     return ConversationHandler.END
 
-def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
-    """Головна функція запуску бота з підтримкою webhook"""
-    # Завантаження даних
-    global hotel_data
-    hotel_data = load_hotel_data(csv_path)
+# НОВІ ФУНКЦІЇ ДЛЯ /TEST КОМАНДИ
+
+def create_detailed_breakdown(user_data, scores_df, hotel_data):
+    """
+    Створює детальний розбір нарахування балів
+    """
+    regions = user_data.get('regions', [])
+    category = user_data.get('category')
+    styles = user_data.get('styles', [])
+    purposes = user_data.get('purposes', [])
     
-    if hotel_data is None:
-        logger.error("Не вдалося завантажити дані. Бот не запущено.")
-        return
+    breakdown = {
+        'filtering_steps': {},
+        'scoring_details': {},
+        'top_programs': [],
+        'program_details': {}  # Додаємо детальну інформацію по програмах
+    }
     
-    # Додаткова перевірка наявності необхідних колонок
-    required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
-    missing_required = [col for col in required_columns if col not in hotel_data.columns]
-    
-    if missing_required:
-        logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
-        return
-    
-    # Переконуємося, що є колонка 'segment'
-    if 'segment' not in hotel_data.columns:
-        logger.error("Відсутня колонка 'segment'. Бот не запущено.")
-        return
-    
-    # Створення застосунку
-    app = Application.builder().token(token)
-    
-    # Побудова застосунку
-    application = app.build()
-    
-    # Налаштування обробників
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            LANGUAGE: [CallbackQueryHandler(language_choice)],
-            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-            CATEGORY: [CallbackQueryHandler(category_choice)],
-            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start)  # Додаємо /start як fallback
-        ]
-    )
-    
-    application.add_handler(conv_handler)
-    
-    # Використання PORT для webhook
-    port = int(os.environ.get("PORT", "10000"))
-    
-    if webhook_url and webhook_path:
-        webhook_info = f"{webhook_url}{webhook_path}"
-        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=webhook_path,
-            webhook_url=webhook_info,
-            allowed_updates=Update.ALL_TYPES
-        )
+    # Крок 1: Аналіз фільтрації за регіоном
+    filtered_by_region = filter_hotels_by_region(hotel_data, regions)
+    region_counts = {}
+    if 'Total hotels of Corporation / Loyalty Program in this region' in filtered_by_region.columns:
+        for program in filtered_by_region['loyalty_program'].unique():
+            program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
+            if not program_data.empty:
+                region_counts[program] = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
     else:
-        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        region_counts = filtered_by_region.groupby('loyalty_program').size().to_dict()
     
-    logger.info("Бот запущено")
+    breakdown['filtering_steps']['region'] = {
+        'total_hotels': len(filtered_by_region),
+        'programs_count': len(region_counts),
+        'program_hotels': region_counts
+    }
+    
+    # Розрахунок балів за регіон
+    region_scores = get_region_score(filtered_by_region, regions)
+    breakdown['scoring_details']['region'] = {
+        'scoring_method': 'Ranked by hotel count: [21, 18, 15, 12, 9, 6, 3]',
+        'ranked_programs': dict(sorted(region_counts.items(), key=lambda x: x[1], reverse=True)),
+        'assigned_scores': region_scores
+    }
+    
+    # Крок 2: Детальний аналіз категорії для кожної програми
+    if category:
+        filtered_by_category = filter_hotels_by_category(filtered_by_region, category)
+        category_counts = filtered_by_category.groupby('loyalty_program').size().to_dict()
+        
+        # Суміжні категорії
+        adjacent_categories = get_adjacent_categories(category)
+        
+        # Детальний розбір по кожній програмі та категорії
+        for program in hotel_data['loyalty_program'].unique():
+            if program not in breakdown['program_details']:
+                breakdown['program_details'][program] = {}
+            
+            # Кількість готелів основної категорії
+            main_count = category_counts.get(program, 0)
+            breakdown['program_details'][program]['main_category'] = {
+                'category': category,
+                'hotels': main_count
+            }
+            
+            # Кількість готелів суміжних категорій
+            adjacent_details = {}
+            for adj_cat in adjacent_categories:
+                adj_filtered = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_count = len(adj_filtered[adj_filtered['loyalty_program'] == program])
+                if adj_count > 0:
+                    adjacent_details[adj_cat] = adj_count
+            
+            breakdown['program_details'][program]['adjacent_categories'] = adjacent_details
+        
+        # Розрахунок балів за категорію
+        main_scores = {}
+        if category_counts:
+            ranked_main = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
+            score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+            for i, (program, _) in enumerate(ranked_main):
+                main_scores[program] = score_values[i] if i < len(score_values) else 0.0
+        
+        # Суміжні бали - рахуємо загальну кількість суміжних готелів
+        adjacent_total_counts = {}
+        for program in hotel_data['loyalty_program'].unique():
+            total_adjacent = 0
+            for adj_cat in adjacent_categories:
+                adj_filtered = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_count = len(adj_filtered[adj_filtered['loyalty_program'] == program])
+                total_adjacent += adj_count
+            if total_adjacent > 0:
+                adjacent_total_counts[program] = total_adjacent
+        
+        adjacent_scores = {}
+        if adjacent_total_counts:
+            ranked_adjacent = sorted(adjacent_total_counts.items(), key=lambda x: x[1], reverse=True)
+            adjacent_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+            for i, (program, _) in enumerate(ranked_adjacent):
+                adjacent_scores[program] = adjacent_score_values[i] if i < len(adjacent_score_values) else 0.0
+        
+        breakdown['scoring_details']['category'] = {
+            'main_scoring': 'Ranked by main category: [21, 18, 15, 12, 9, 6, 3]',
+            'main_scores': main_scores,
+            'adjacent_scoring': 'Ranked by adjacent categories: [7, 6, 5, 4, 3, 2, 1]',
+            'adjacent_scores': adjacent_scores,
+            'adjacent_total_counts': adjacent_total_counts
+        }
+    else:
+        filtered_by_category = filtered_by_region
 
-if __name__ == "__main__":
-    # Використовуємо змінні середовища або значення за замовчуванням
-    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
+    # Крок 3: Аналіз стилю
+    if styles:
+        style_filtered_category = filter_hotels_by_style(filtered_by_category, styles)
+        style_filtered_region = filter_hotels_by_style(filtered_by_region, styles)
+        
+        style_counts_category = {}
+        style_counts_region = {}
+        
+        for program in hotel_data['loyalty_program'].unique():
+            style_counts_category[program] = len(style_filtered_category[style_filtered_category['loyalty_program'] == program])
+            style_counts_region[program] = len(style_filtered_region[style_filtered_region['loyalty_program'] == program])
+        
+        breakdown['filtering_steps']['style'] = {
+            'selected_styles': styles,
+            'hotels_in_category_and_style': style_counts_category,
+            'hotels_in_region_and_style': style_counts_region,
+            'used_for_scoring': 'category' if sum(style_counts_category.values()) > 0 else 'region'
+        }
+        
+        # Розрахунок балів за стиль (використовуємо той же алгоритм що і в коді)
+        style_scores = {}
+        style_counts_for_scoring = style_counts_category if sum(style_counts_category.values()) > 0 else style_counts_region
+        ranked_style = sorted(style_counts_for_scoring.items(), key=lambda x: x[1], reverse=True)
+        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+        
+        for i, (program, _) in enumerate(ranked_style):
+            style_scores[program] = (score_values[i] if i < len(score_values) else 0.0) / len(styles)
+        
+        breakdown['scoring_details']['style'] = {
+            'scoring_method': f'Ranked by style hotels: [21, 18, 15, 12, 9, 6, 3] / {len(styles)}',
+            'ranked_programs': dict(ranked_style),
+            'assigned_scores': style_scores
+        }
+    
+    # Крок 4: Аналіз мети
+    if purposes:
+        purpose_filtered_category = filter_hotels_by_purpose(filtered_by_category, purposes)
+        purpose_filtered_region = filter_hotels_by_purpose(filtered_by_region, purposes)
+        
+        purpose_counts_category = {}
+        purpose_counts_region = {}
+        
+        for program in hotel_data['loyalty_program'].unique():
+            purpose_counts_category[program] = len(purpose_filtered_category[purpose_filtered_category['loyalty_program'] == program])
+            purpose_counts_region[program] = len(purpose_filtered_region[purpose_filtered_region['loyalty_program'] == program])
+        
+        breakdown['filtering_steps']['purpose'] = {
+            'selected_purposes': purposes,
+            'hotels_in_category_and_purpose': purpose_counts_category,
+            'hotels_in_region_and_purpose': purpose_counts_region,
+            'used_for_scoring': 'category' if sum(purpose_counts_category.values()) > 0 else 'region'
+        }
+        
+        # Розрахунок балів за мету
+        purpose_scores = {}
+        purpose_counts_for_scoring = purpose_counts_category if sum(purpose_counts_category.values()) > 0 else purpose_counts_region
+        ranked_purpose = sorted(purpose_counts_for_scoring.items(), key=lambda x: x[1], reverse=True)
+        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+        
+        for i, (program, _) in enumerate(ranked_purpose):
+            purpose_scores[program] = (score_values[i] if i < len(score_values) else 0.0) / len(purposes)
+        
+        breakdown['scoring_details']['purpose'] = {
+            'scoring_method': f'Ranked by purpose hotels: [21, 18, 15, 12, 9, 6, 3] / {len(purposes)}',
+            'ranked_programs': dict(ranked_purpose),
+            'assigned_scores': purpose_scores
+        }
+    
+    # Топ-5 програм з детальним розбором
+    top_5 = scores_df.head(5)
+    for _, row in top_5.iterrows():
+        program = row['loyalty_program']
+        breakdown['top_programs'].append({
+            'program': program,
+            'total_score': row['total_score'],
+            'region_score': row['region_score'],
+            'category_score': row['category_score'],
+            'style_score': row['style_score'],
+            'purpose_score': row['purpose_score'],
+            'region_hotels': row['region_hotels'],
+            'category_hotels': row['category_hotels'],
+            'style_hotels': row['style_hotels'],
+            'purpose_hotels': row['purpose_hotels']
+        })
+    
+    return breakdown
 
-    if not CSV_PATH:
-        logger.error("CSV_PATH не задано. Завершення запуску.")
-        exit(1)
-    logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
+def get_adjacent_categories(category):
+    """Повертає суміжні категорії"""
+    adjacent_mapping = {
+        "Luxury": ["Comfort"],
+        "Comfort": ["Luxury", "Standard", "Standart"],
+        "Standard": ["Comfort"],
+    }
+    return adjacent_mapping.get(category, [])
+
+async def test_calculations(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Команда /test для відображення детальних розрахунків останніх балів
+    """
+    user_id = update.effective_user.id
     
-    # Параметри для webhook (опціонально)
-    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
-    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    # Перевіряємо, чи є збережені результати
+    if user_id not in last_calculation_results:
+        await update.message.reply_text(
+            "❌ Немає збережених результатів розрахунків.\n"
+            "Спочатку пройдіть опитування командою /start та отримайте результати."
+        )
+        return
     
-    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    try:
+        results = last_calculation_results[user_id]
+        user_data = results['user_data']
+        lang = user_data.get('language', 'en')
+        breakdown = results['detailed_breakdown']
+        
+        # Формуємо звіт
+        report = format_detailed_report(breakdown, lang)
+        
+        # Відправляємо звіт частинами
+        await send_long_message(update, context, report)
+        
+    except Exception as e:
+        logger.error(f"Помилка в /test команді: {e}")
+        await update.message.reply_text(f"❌ Помилка при формуванні звіту: {e}")
+
+def format_detailed_report(breakdown, lang='en'):
+    """
+    Форматує детальний звіт розрахунків
+    """
+    if lang == 'uk':
+        report = "🔍 ДЕТАЛЬНИЙ ЗВІТ РОЗРАХУНКІВ БАЛІВ\n"
+        report += "=" * 40 + "\n\n"
+    else:
+        report = "🔍 DETAILED SCORING CALCULATIONS REPORT\n"
+        report += "=" * 40 + "\n\n"
     
-    # Перевіряємо наявність токена
-    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
-    
-    # Запускаємо бота з підтримкою webhook або polling
-    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
+    # Фінальний розбір топ-5 з детальною інформацією
+    if lang == 'uk':
+        report += "🏆 ДЕТАЛЬНИЙ РОЗБІР ТОП-5 ПРОГРА
