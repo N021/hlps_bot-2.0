@@ -1546,6 +1546,8 @@ def calculate_scores(user_data, hotel_data):
 
 # Функції форматування результатів та основна логіка
 
+# Функції форматування результатів та основна логіка
+
 def format_results(user_data, scores_df, lang='en'):
     """
     Форматує результати для відображення користувачу
@@ -1654,7 +1656,7 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         # Підраховуємо бали для кожної програми лояльності
         scores_df = calculate_scores(user_data, hotel_data)
         
-        # ЗБЕРІГАЄМО ДЕТАЛЬНІ РЕЗУЛЬТАТИ ДЛЯ /test
+        # ЗБЕРІГАЄМО ДЕТАЛЬНІ РЕЗУЛЬТАТИ ДЛЯ /TEST
         last_calculation_results[user_id] = {
             'user_data': user_data.copy(),
             'scores_df': scores_df.copy(),
@@ -1964,4 +1966,254 @@ def format_detailed_report(breakdown, lang='en'):
     
     # Фінальний розбір топ-5 з детальною інформацією
     if lang == 'uk':
-        report += "🏆 ДЕТАЛЬНИЙ РОЗБІР ТОП-5 ПРОГРА
+        report += "🏆 ДЕТАЛЬНИЙ РОЗБІР ТОП-5 ПРОГРАМ:\n"
+        report += "=" * 40 + "\n"
+    else:
+        report += "🏆 DETAILED TOP-5 PROGRAMS BREAKDOWN:\n"
+        report += "=" * 40 + "\n"
+    
+    for i, program_data in enumerate(breakdown['top_programs']):
+        program = program_data['program']
+        
+        if lang == 'uk':
+            report += f"\n🥇 {i+1}. {program}\n"
+            report += f"Загальний бал: {program_data['total_score']:.2f}\n"
+            report += "-" * 30 + "\n"
+        else:
+            report += f"\n🥇 {i+1}. {program}\n"
+            report += f"Total score: {program_data['total_score']:.2f}\n"
+            report += "-" * 30 + "\n"
+        
+        # Деталі по регіону
+        if lang == 'uk':
+            report += f"📍 РЕГІОН: {program_data['region_score']:.1f} балів\n"
+            report += f"   {program_data['region_hotels']} готелів у регіоні\n\n"
+        else:
+            report += f"📍 REGION: {program_data['region_score']:.1f} points\n"
+            report += f"   {program_data['region_hotels']} hotels in region\n\n"
+        
+        # Детальний розбір категорії
+        program_details = breakdown['program_details'].get(program, {})
+        
+        if 'main_category' in program_details:
+            main_cat = program_details['main_category']
+            category_score = program_data['category_score']
+            
+            if lang == 'uk':
+                report += f"🏨 КАТЕГОРІЯ: {category_score:.1f} балів\n"
+                report += f"   (основна)\n"
+                report += f"   {main_cat['hotels']} готелів ({main_cat['category']}) – {get_main_category_score(program, breakdown):.1f} балів\n"
+            else:
+                report += f"🏨 CATEGORY: {category_score:.1f} points\n"
+                report += f"   (main)\n"
+                report += f"   {main_cat['hotels']} hotels ({main_cat['category']}) – {get_main_category_score(program, breakdown):.1f} points\n"
+            
+            # Суміжні категорії
+            adjacent_cats = program_details.get('adjacent_categories', {})
+            if adjacent_cats:
+                if lang == 'uk':
+                    report += f"   (суміжні)\n"
+                else:
+                    report += f"   (adjacent)\n"
+                
+                adj_score = get_adjacent_category_score(program, breakdown)
+                for adj_cat, hotels in adjacent_cats.items():
+                    if lang == 'uk':
+                        report += f"   {hotels} готелів ({adj_cat}) – {adj_score:.1f} балів\n"
+                    else:
+                        report += f"   {hotels} hotels ({adj_cat}) – {adj_score:.1f} points\n"
+            report += "\n"
+        
+        # Деталі по стилю
+        if program_data['style_score'] > 0:
+            if lang == 'uk':
+                report += f"🎨 СТИЛЬ: {program_data['style_score']:.1f} балів\n"
+                report += f"   {get_style_hotels_for_program(program, breakdown)} готелів відповідного стилю\n\n"
+            else:
+                report += f"🎨 STYLE: {program_data['style_score']:.1f} points\n"
+                report += f"   {get_style_hotels_for_program(program, breakdown)} hotels of matching style\n\n"
+        else:
+            if lang == 'uk':
+                report += f"🎨 СТИЛЬ: 0 балів\n"
+                report += f"   0 готелів відповідного стилю\n\n"
+            else:
+                report += f"🎨 STYLE: 0 points\n"
+                report += f"   0 hotels of matching style\n\n"
+        
+        # Деталі по меті
+        if program_data['purpose_score'] > 0:
+            if lang == 'uk':
+                report += f"🎯 МЕТА: {program_data['purpose_score']:.1f} балів\n"
+                report += f"   {get_purpose_hotels_for_program(program, breakdown)} готелів для обраної мети\n\n"
+            else:
+                report += f"🎯 PURPOSE: {program_data['purpose_score']:.1f} points\n"
+                report += f"   {get_purpose_hotels_for_program(program, breakdown)} hotels for selected purpose\n\n"
+        else:
+            if lang == 'uk':
+                report += f"🎯 МЕТА: 0 балів\n"
+                report += f"   0 готелів для обраної мети\n\n"
+            else:
+                report += f"🎯 PURPOSE: 0 points\n"
+                report += f"   0 hotels for selected purpose\n\n"
+        
+        # Підсумок
+        if lang == 'uk':
+            report += f"➕ ПІДСУМОК:\n"
+            report += f"   {program_data['region_score']:.1f} + {program_data['category_score']:.1f} + {program_data['style_score']:.1f} + {program_data['purpose_score']:.1f} = {program_data['total_score']:.2f} балів\n"
+        else:
+            report += f"➕ SUMMARY:\n"
+            report += f"   {program_data['region_score']:.1f} + {program_data['category_score']:.1f} + {program_data['style_score']:.1f} + {program_data['purpose_score']:.1f} = {program_data['total_score']:.2f} points\n"
+        
+        if i < len(breakdown['top_programs']) - 1:
+            report += "\n" + "="*40 + "\n"
+    
+    return report
+
+def get_main_category_score(program, breakdown):
+    """Отримати бали за основну категорію для програми"""
+    if 'category' in breakdown['scoring_details']:
+        return breakdown['scoring_details']['category']['main_scores'].get(program, 0.0)
+    return 0.0
+
+def get_adjacent_category_score(program, breakdown):
+    """Отримати бали за суміжні категорії для програми"""
+    if 'category' in breakdown['scoring_details']:
+        return breakdown['scoring_details']['category']['adjacent_scores'].get(program, 0.0)
+    return 0.0
+
+def get_style_hotels_for_program(program, breakdown):
+    """Отримати кількість готелів відповідного стилю для програми"""
+    if 'style' in breakdown['scoring_details']:
+        return breakdown['scoring_details']['style']['ranked_programs'].get(program, 0)
+    return 0
+
+def get_purpose_hotels_for_program(program, breakdown):
+    """Отримати кількість готелів для мети для програми"""
+    if 'purpose' in breakdown['scoring_details']:
+        return breakdown['scoring_details']['purpose']['ranked_programs'].get(program, 0)
+    return 0
+
+async def send_long_message(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, max_length: int = 4000):
+    """
+    Відправляє довге повідомлення частинами
+    """
+    if len(text) <= max_length:
+        await update.message.reply_text(text)
+        return
+    
+    # Розбиваємо повідомлення на частини
+    parts = []
+    current_part = ""
+    
+    for line in text.split('\n'):
+        if len(current_part + line + '\n') > max_length:
+            if current_part:
+                parts.append(current_part.strip())
+                current_part = line + '\n'
+            else:
+                parts.append(line[:max_length])
+        else:
+            current_part += line + '\n'
+    
+    if current_part:
+        parts.append(current_part.strip())
+    
+    # Відправляємо частинами
+    for i, part in enumerate(parts):
+        if i == 0:
+            await update.message.reply_text(part)
+        else:
+            await context.bot.send_message(chat_id=update.message.chat_id, text=part)
+
+def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
+    """Головна функція запуску бота з підтримкою webhook"""
+    # Завантаження даних
+    global hotel_data
+    hotel_data = load_hotel_data(csv_path)
+    
+    if hotel_data is None:
+        logger.error("Не вдалося завантажити дані. Бот не запущено.")
+        return
+    
+    # Додаткова перевірка наявності необхідних колонок
+    required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
+    missing_required = [col for col in required_columns if col not in hotel_data.columns]
+    
+    if missing_required:
+        logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
+        return
+    
+    # Переконуємося, що є колонка 'segment'
+    if 'segment' not in hotel_data.columns:
+        logger.error("Відсутня колонка 'segment'. Бот не запущено.")
+        return
+    
+    # Створення застосунку
+    app = Application.builder().token(token)
+    
+    # Побудова застосунку
+    application = app.build()
+    
+    # Налаштування обробників
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            LANGUAGE: [CallbackQueryHandler(language_choice)],
+            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+            CATEGORY: [CallbackQueryHandler(category_choice)],
+            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start)  # Додаємо /start як fallback
+        ]
+    )
+    
+    application.add_handler(conv_handler)
+    
+    # ДОДАНО: Обробник для команди /test
+    application.add_handler(CommandHandler("test", test_calculations))
+    
+    # Використання PORT для webhook
+    port = int(os.environ.get("PORT", "10000"))
+    
+    if webhook_url and webhook_path:
+        webhook_info = f"{webhook_url}{webhook_path}"
+        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_info,
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    logger.info("Бот запущено")
+
+if __name__ == "__main__":
+    # Використовуємо змінні середовища або значення за замовчуванням
+    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
+
+    if not CSV_PATH:
+        logger.error("CSV_PATH не задано. Завершення запуску.")
+        exit(1)
+    logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
+    
+    # Параметри для webhook (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Перевіряємо наявність токена
+    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
+    
+    # Запускаємо бота з підтримкою webhook або polling
+    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
