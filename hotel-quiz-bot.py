@@ -1085,6 +1085,11 @@ def map_hotel_purpose(hotel_brand):
 # ===============================
 
 # Функції фільтрації готелів
+# ===============================
+# ЧАСТИНА 10: НОВА ЛОГІКА ПІДРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ (ВИПРАВЛЕНА)
+# ===============================
+
+# Функції фільтрації готелів
 def filter_hotels_by_region(df, regions=None, countries=None):
     """Фільтрує готелі за регіоном або країною"""
     if not regions and not countries:
@@ -1648,10 +1653,33 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
             else:
                 await context.bot.send_message(
                     chat_id=update.callback_query.message.chat_id,
+                    text="Unfortunately, there is a problem with the hotel data. Please try again later."
+                )
+            return ConversationHandler.END
+        
+        # ВИПРАВЛЕНО: Підраховуємо бали для кожної програми лояльності
+        scores_df = calculate_scores(user_data, hotel_data)
+        
+        # Зберігаємо результати для /test
+        last_calculation_results[user_id] = {
+            'user_data': user_data.copy(),
+            'scores_df': scores_df.copy(),
+            'timestamp': pd.Timestamp.now()
+        }
+        
+        if scores_df.empty:
+            if lang == 'uk':
+                await context.bot.send_message(
+                    chat_id=update.callback_query.message.chat_id,
+                    text="На жаль, не вдалося знайти програми лояльності, які відповідають вашим уподобанням. "
+                    "Спробуйте змінити параметри пошуку, надіславши команду /start знову."
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=update.callback_query.message.chat_id,
                     text="Unfortunately, I couldn't find any loyalty programs that match your preferences. "
                     "Try changing your search parameters by sending the /start command again."
                 )
-            
             return ConversationHandler.END
         
         # Форматуємо результати для відображення
@@ -1973,28 +2001,4 @@ if __name__ == "__main__":
         logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
     
     # Запускаємо бота з підтримкою webhook або polling
-    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)_query.message.chat_id,
-                    text="Unfortunately, there is a problem with the hotel data. Please try again later."
-                )
-            return ConversationHandler.END
-        
-        # Підраховуємо бали для кожної програми лояльності
-        scores_df = calculate_scores(user_data, hotel_data)
-        
-        # Зберігаємо результати для /test
-        last_calculation_results[user_id] = {
-            'user_data': user_data.copy(),
-            'scores_df': scores_df.copy(),
-            'timestamp': pd.Timestamp.now()
-        }
-        
-        if scores_df.empty:
-            if lang == 'uk':
-                await context.bot.send_message(
-                    chat_id=update.callback_query.message.chat_id,
-                    text="На жаль, не вдалося знайти програми лояльності, які відповідають вашим уподобанням. "
-                    "Спробуйте змінити параметри пошуку, надіславши команду /start знову."
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id=update.callback
+    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
