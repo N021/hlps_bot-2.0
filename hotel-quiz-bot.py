@@ -1003,18 +1003,19 @@ def map_hotel_purpose(hotel_brand):
                                       "Hyatt Regency", "Grand Hyatt", "Courtyard by Marriott", "Hilton Garden Inn", 
                                       "Sheraton", "DoubleTree by Hilton", "Novotel Hotels", "Cambria Hotels", 
                                       "Fairfield Inn & Suites", "Holiday Inn Express", "Wingate by Wyndham", 
-                                      "Quality Inn Hotels", "ibis Hotels"],
+                                      "Quality Inn Hotels", "ibis Hotels", "Econo Lodge Hotels", "Hyatt Place", "Rodeway Inn Hotels"],
         
         "Відпустка / релакс": ["The Ritz-Carlton", "JW Marriott", "Waldorf Astoria Hotels & Resorts", 
                              "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
                              "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
                              "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
-                             "Ascend Hotel Collection"],
+                             "Ascend Hotel Collection", "Hilton Hotels & Resorts", "Wyndham Grand", "Grand Hyatt"],
         
         "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
                               "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
                               "Comfort Inn Hotels", "Hampton by Hilton", "Holiday Inn Express", 
-                              "Days Inn by Wyndham", "Super 8 by Wyndham"],
+                              "Days Inn by Wyndham", "Super 8 by Wyndham", "Hilton Hotels & Resorts", "Wyndham Grand", "Marriott Hotels", 
+                              "Courtyard by Marriott", "Crowne Plaza", "The Ritz-Carlton"],
         
         "Довготривале проживання": ["Hyatt House", "Candlewood Suites", "ibis Styles"]
     }
