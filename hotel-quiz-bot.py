@@ -1461,75 +1461,157 @@ def calculate_scores(user_data, hotel_data):
     else:
         filtered_by_category = filtered_by_region
 
-    # Крок 3: Фільтруємо готелі за стилем у обраній категорії та регіоні
+    # Крок 3: ОНОВЛЕНА ЛОГІКА - Фільтруємо готелі за стилем з урахуванням сегментів
     if styles and len(styles) > 0:
-        style_filtered = filter_hotels_by_style(filtered_by_category, styles)
-        style_counts_dict = {}
+        # Отримуємо суміжні категорії
+        adjacent_categories = get_adjacent_categories(category) if category else []
         
-        for program in loyalty_programs:
-            style_mask = style_filtered['loyalty_program'] == program
-            style_counts_dict[program] = style_mask.sum()
+        # Розраховуємо готелі за стилем для main категорії
+        main_style_counts = {}
+        if category:
+            # Фільтруємо готелі main категорії за стилем
+            main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+            main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
             
-            # Записуємо кількість готелів за стилем
-            scores_df.loc[scores_df['loyalty_program'] == program, 'style_hotels'] = style_mask.sum()
+            for program in loyalty_programs:
+                style_mask = main_style_filtered['loyalty_program'] == program
+                main_style_counts[program] = style_mask.sum()
         
-        # Розподіляємо бали за стилями (21, 18, 15, 12, 9, 6, 3)
-        style_scores = {}
-        ranked_programs = sorted(style_counts_dict.items(), key=lambda x: x[1], reverse=True)
+        # Розраховуємо готелі за стилем для adjacent категорій
+        adjacent_style_scores = {}
         
-        # Бали за рейтингом
-        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
-        for i, (program, _) in enumerate(ranked_programs):
-            if i < len(score_values):
-                style_scores[program] = score_values[i]
-            else:
-                style_scores[program] = 0.0
+        if adjacent_categories:
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
+                
+                adj_style_counts = {}
+                for program in loyalty_programs:
+                    style_mask = adj_style_filtered['loyalty_program'] == program
+                    adj_style_counts[program] = style_mask.sum()
+                
+                # Нараховуємо бали за цю adjacent категорію
+                if adj_style_counts and sum(adj_style_counts.values()) > 0:
+                    ranked_adj_style = sorted(adj_style_counts.items(), key=lambda x: x[1], reverse=True)
+                    adj_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+                    
+                    adj_category_scores = {}
+                    for i, (program, _) in enumerate(ranked_adj_style):
+                        if i < len(adj_score_values):
+                            adj_category_scores[program] = adj_score_values[i]
+                        else:
+                            adj_category_scores[program] = 0.0
+                    
+                    # Зберігаємо бали за цю категорію
+                    for program in loyalty_programs:
+                        if program not in adjacent_style_scores:
+                            adjacent_style_scores[program] = 0.0
+                        # Для Comfort (має 2 adjacent) - беремо максимум
+                        current_score = adj_category_scores.get(program, 0.0)
+                        adjacent_style_scores[program] = max(adjacent_style_scores[program], current_score)
+        
+        # Нараховуємо бали за main категорію
+        main_style_scores = {}
+        if main_style_counts and sum(main_style_counts.values()) > 0:
+            ranked_main_style = sorted(main_style_counts.items(), key=lambda x: x[1], reverse=True)
+            main_score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+            
+            for i, (program, _) in enumerate(ranked_main_style):
+                if i < len(main_score_values):
+                    main_style_scores[program] = main_score_values[i]
+                else:
+                    main_style_scores[program] = 0.0
         
         # Нормалізуємо бали, якщо обрано кілька стилів
-        if len(styles) > 1:
-            for program in style_scores:
-                style_scores[program] /= len(styles)
+        normalization_factor = len(styles) if len(styles) > 1 else 1
         
-        # Оновлюємо DataFrame з балами
+        # Оновлюємо DataFrame з балами та статистикою
         for index, row in scores_df.iterrows():
             program = row['loyalty_program']
-            if program in style_scores:
-                scores_df.at[index, 'style_score'] = style_scores[program]
-    
-    # Крок 4: Фільтруємо готелі за метою у обраних стилі, категорії та регіоні
-    if purposes and len(purposes) > 0:
-        purpose_filtered = filter_hotels_by_purpose(filtered_by_category, purposes)
-        purpose_counts_dict = {}
-        
-        for program in loyalty_programs:
-            purpose_mask = purpose_filtered['loyalty_program'] == program
-            purpose_counts_dict[program] = purpose_mask.sum()
             
-            # Записуємо кількість готелів за метою
-            scores_df.loc[scores_df['loyalty_program'] == program, 'purpose_hotels'] = purpose_mask.sum()
+            # Загальний бал = main + adjacent
+            main_score = main_style_scores.get(program, 0.0) / normalization_factor
+            adj_score = adjacent_style_scores.get(program, 0.0) / normalization_factor
+            scores_df.at[index, 'style_score'] = main_score + adj_score
+            
+            # Кількість готелів показуємо тільки main категорії (для консистентності з виводом)
+            scores_df.at[index, 'style_hotels'] = main_style_counts.get(program, 0)
+
+    # Крок 4: ОНОВЛЕНА ЛОГІКА - Фільтруємо готелі за метою з урахуванням сегментів
+    if purposes and len(purposes) > 0:
+        # Отримуємо суміжні категорії
+        adjacent_categories = get_adjacent_categories(category) if category else []
         
-        # Розподіляємо бали за метою (21, 18, 15, 12, 9, 6, 3)
-        purpose_scores = {}
-        ranked_programs = sorted(purpose_counts_dict.items(), key=lambda x: x[1], reverse=True)
+        # Розраховуємо готелі за метою для main категорії
+        main_purpose_counts = {}
+        if category:
+            # Фільтруємо готелі main категорії за метою
+            main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+            main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
+            
+            for program in loyalty_programs:
+                purpose_mask = main_purpose_filtered['loyalty_program'] == program
+                main_purpose_counts[program] = purpose_mask.sum()
         
-        # Бали за рейтингом
-        score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
-        for i, (program, _) in enumerate(ranked_programs):
-            if i < len(score_values):
-                purpose_scores[program] = score_values[i]
-            else:
-                purpose_scores[program] = 0.0
+        # Розраховуємо готелі за метою для adjacent категорій
+        adjacent_purpose_scores = {}
+        
+        if adjacent_categories:
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, purposes)
+                
+                adj_purpose_counts = {}
+                for program in loyalty_programs:
+                    purpose_mask = adj_purpose_filtered['loyalty_program'] == program
+                    adj_purpose_counts[program] = purpose_mask.sum()
+                
+                # Нараховуємо бали за цю adjacent категорію
+                if adj_purpose_counts and sum(adj_purpose_counts.values()) > 0:
+                    ranked_adj_purpose = sorted(adj_purpose_counts.items(), key=lambda x: x[1], reverse=True)
+                    adj_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+                    
+                    adj_category_scores = {}
+                    for i, (program, _) in enumerate(ranked_adj_purpose):
+                        if i < len(adj_score_values):
+                            adj_category_scores[program] = adj_score_values[i]
+                        else:
+                            adj_category_scores[program] = 0.0
+                    
+                    # Зберігаємо бали за цю категорію
+                    for program in loyalty_programs:
+                        if program not in adjacent_purpose_scores:
+                            adjacent_purpose_scores[program] = 0.0
+                        # Для Comfort (має 2 adjacent) - беремо максимум
+                        current_score = adj_category_scores.get(program, 0.0)
+                        adjacent_purpose_scores[program] = max(adjacent_purpose_scores[program], current_score)
+        
+        # Нараховуємо бали за main категорію
+        main_purpose_scores = {}
+        if main_purpose_counts and sum(main_purpose_counts.values()) > 0:
+            ranked_main_purpose = sorted(main_purpose_counts.items(), key=lambda x: x[1], reverse=True)
+            main_score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
+            
+            for i, (program, _) in enumerate(ranked_main_purpose):
+                if i < len(main_score_values):
+                    main_purpose_scores[program] = main_score_values[i]
+                else:
+                    main_purpose_scores[program] = 0.0
         
         # Нормалізуємо бали, якщо обрано кілька цілей
-        if len(purposes) > 1:
-            for program in purpose_scores:
-                purpose_scores[program] /= len(purposes)
+        normalization_factor = len(purposes) if len(purposes) > 1 else 1
         
-        # Оновлюємо DataFrame з балами
+        # Оновлюємо DataFrame з балами та статистикою
         for index, row in scores_df.iterrows():
             program = row['loyalty_program']
-            if program in purpose_scores:
-                scores_df.at[index, 'purpose_score'] = purpose_scores[program]
+            
+            # Загальний бал = main + adjacent
+            main_score = main_purpose_scores.get(program, 0.0) / normalization_factor
+            adj_score = adjacent_purpose_scores.get(program, 0.0) / normalization_factor
+            scores_df.at[index, 'purpose_score'] = main_score + adj_score
+            
+            # Кількість готелів показуємо тільки main категорії (для консистентності з виводом)
+            scores_df.at[index, 'purpose_hotels'] = main_purpose_counts.get(program, 0)
     
     # Обчислюємо загальний рейтинг
     scores_df['total_score'] = (
@@ -1543,10 +1625,6 @@ def calculate_scores(user_data, hotel_data):
     scores_df = scores_df.sort_values('total_score', ascending=False)
     
     return scores_df
-
-# Функції форматування результатів та основна логіка
-
-# Функції форматування результатів та основна логіка
 
 def format_results(user_data, scores_df, lang='en'):
     """
