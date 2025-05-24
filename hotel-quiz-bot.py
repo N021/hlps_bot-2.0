@@ -1170,6 +1170,15 @@ def filter_hotels_by_purpose(df, purposes):
     
     return filtered_df
 
+def get_adjacent_categories(category):
+    """Повертає суміжні категорії"""
+    adjacent_mapping = {
+        "Luxury": ["Comfort"],
+        "Comfort": ["Luxury", "Standard"],
+        "Standard": ["Comfort"],
+    }
+    return adjacent_mapping.get(category, [])
+
 def distribute_scores_with_ties(counts_dict, score_values):
     """
     Універсальна функція для розподілу балів з урахуванням однакових значень
