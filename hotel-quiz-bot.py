@@ -2129,7 +2129,7 @@ def get_detailed_category_scores(filtered_by_region, program, category):
     return scores
 
 def get_detailed_style_scores(filtered_by_region, program, category, styles):
-    """Розраховує детальні бали для стилів"""
+    """Розраховує детальні бали для стилів з правильним розподілом при ties"""
     scores = {'main': {}, 'adjacent': {}}
     
     if not styles or not category:
@@ -2138,25 +2138,20 @@ def get_detailed_style_scores(filtered_by_region, program, category, styles):
     # Основна категорія
     main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
     main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
-    main_counts = main_style_filtered.groupby('loyalty_program').size()
+    main_counts = main_style_filtered.groupby('loyalty_program').size().to_dict()
     
-    main_score = 0.0
-    if len(main_counts) > 0:
-        ranked_main = main_counts.sort_values(ascending=False)
-        main_score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
-        
-        for i, (prog, _) in enumerate(ranked_main.items()):
-            if prog == program and i < len(main_score_values):
-                main_score = main_score_values[i]
-                break
+    # Використовуємо нову функцію розподілу балів
+    main_score_values = [21, 18, 15, 12, 9, 6, 3]
+    main_scores = distribute_scores_with_ties(main_counts, main_score_values)
+    main_total_score = main_scores.get(program, 0.0)
     
     # Нормалізуємо, якщо кілька стилів
     if len(styles) > 1:
-        main_score = main_score / len(styles)
+        main_total_score = main_total_score / len(styles)
     
     for style in styles:
         main_program_hotels = len(filter_hotels_by_style(main_category_hotels[main_category_hotels['loyalty_program'] == program], [style]))
-        scores['main'][style] = {'hotels': main_program_hotels, 'points': main_score}
+        scores['main'][style] = {'hotels': main_program_hotels, 'points': main_total_score}
     
     # Суміжні категорії
     adjacent_categories = get_adjacent_categories(category)
@@ -2165,17 +2160,12 @@ def get_detailed_style_scores(filtered_by_region, program, category, styles):
     for adj_cat in adjacent_categories:
         adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
         adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
-        adj_counts = adj_style_filtered.groupby('loyalty_program').size()
+        adj_counts = adj_style_filtered.groupby('loyalty_program').size().to_dict()
         
-        adj_score = 0.0
-        if len(adj_counts) > 0:
-            ranked_adj = adj_counts.sort_values(ascending=False)
-            adj_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
-            
-            for i, (prog, _) in enumerate(ranked_adj.items()):
-                if prog == program and i < len(adj_score_values):
-                    adj_score = adj_score_values[i]
-                    break
+        # Використовуємо нову функцію розподілу балів
+        adj_score_values = [7, 6, 5, 4, 3, 2, 1]
+        adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
+        adj_score = adj_scores.get(program, 0.0)
         
         # Нормалізуємо, якщо кілька стилів
         if len(styles) > 1:
@@ -2191,7 +2181,7 @@ def get_detailed_style_scores(filtered_by_region, program, category, styles):
     return scores
 
 def get_detailed_purpose_scores(filtered_by_region, program, category, purposes):
-    """Розраховує детальні бали для цілей"""
+    """Розраховує детальні бали для цілей з правильним розподілом при ties"""
     scores = {'main': {}, 'adjacent': {}}
     
     if not purposes or not category:
@@ -2200,25 +2190,20 @@ def get_detailed_purpose_scores(filtered_by_region, program, category, purposes)
     # Основна категорія
     main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
     main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
-    main_counts = main_purpose_filtered.groupby('loyalty_program').size()
+    main_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
     
-    main_score = 0.0
-    if len(main_counts) > 0:
-        ranked_main = main_counts.sort_values(ascending=False)
-        main_score_values = [21.0, 18.0, 15.0, 12.0, 9.0, 6.0, 3.0]
-        
-        for i, (prog, _) in enumerate(ranked_main.items()):
-            if prog == program and i < len(main_score_values):
-                main_score = main_score_values[i]
-                break
+    # Використовуємо нову функцію розподілу балів
+    main_score_values = [21, 18, 15, 12, 9, 6, 3]
+    main_scores = distribute_scores_with_ties(main_counts, main_score_values)
+    main_total_score = main_scores.get(program, 0.0)
     
     # Нормалізуємо, якщо кілька цілей
     if len(purposes) > 1:
-        main_score = main_score / len(purposes)
+        main_total_score = main_total_score / len(purposes)
     
     for purpose in purposes:
         main_program_hotels = len(filter_hotels_by_purpose(main_category_hotels[main_category_hotels['loyalty_program'] == program], [purpose]))
-        scores['main'][purpose] = {'hotels': main_program_hotels, 'points': main_score}
+        scores['main'][purpose] = {'hotels': main_program_hotels, 'points': main_total_score}
     
     # Суміжні категорії
     adjacent_categories = get_adjacent_categories(category)
@@ -2227,17 +2212,12 @@ def get_detailed_purpose_scores(filtered_by_region, program, category, purposes)
     for adj_cat in adjacent_categories:
         adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
         adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, purposes)
-        adj_counts = adj_purpose_filtered.groupby('loyalty_program').size()
+        adj_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
         
-        adj_score = 0.0
-        if len(adj_counts) > 0:
-            ranked_adj = adj_counts.sort_values(ascending=False)
-            adj_score_values = [7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
-            
-            for i, (prog, _) in enumerate(ranked_adj.items()):
-                if prog == program and i < len(adj_score_values):
-                    adj_score = adj_score_values[i]
-                    break
+        # Використовуємо нову функцію розподілу балів
+        adj_score_values = [7, 6, 5, 4, 3, 2, 1]
+        adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
+        adj_score = adj_scores.get(program, 0.0)
         
         # Нормалізуємо, якщо кілька цілей
         if len(purposes) > 1:
