@@ -262,7 +262,7 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "У яких регіонах світу ви плануєте подорожувати?\n"
             "*(Оберіть один або декілька варіантів)*\n\n"
             "1. Європа\n"
-            "2. Północна Америка\n"
+            "2. Північна Америка\n"
             "3. Азія\n"
             "4. Близький Схід\n"
             "5. Африка\n"
@@ -917,18 +917,12 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return await ask_purpose(update, context)
 
 # ===============================
-# ЧАСТИНА 9: ФУНКЦІЇ MAPPING ГОТЕЛІВ ЗІ СТИЛЯМИ ТА МЕТОЮ
+# ЧАСТИНА 9: ФУНКЦІЇ MAPPING ГОТЕЛІВ ЗІ СТИЛЯМИ ТА МЕТОЮ (ВИПРАВЛЕНІ)
 # ===============================
 
 def map_hotel_style(hotel_brand):
     """
-    Зіставляє бренд готелю зі стилями
-    
-    Args:
-        hotel_brand: бренд готелю (один рядок, не список)
-    
-    Returns:
-        Словник стилів із відповідними значеннями True/False
+    Зіставляє бренд готелю зі стилями з покращеною обробкою
     """
     # Переконуємося, що hotel_brand є рядком
     if not isinstance(hotel_brand, str):
@@ -936,78 +930,115 @@ def map_hotel_style(hotel_brand):
     
     hotel_brand = hotel_brand.lower()
     
-    # Оновлений повний словник стилів і брендів
+    # Повний словник стилів і брендів (українською та англійською)
     style_mapping = {
+        # Українські стилі
         "Розкішний і вишуканий": [
-            "JW Marriott", "The Ritz-Carlton", "Conrad Hotels & Resorts", 
-            "Waldorf Astoria Hotels & Resorts", "InterContinental Hotels & Resorts", 
-            "Wyndham Grand", "Registry Collection Hotels", "Fairmont Hotels", 
-            "Raffles Hotels & Resorts", "Park Hyatt Hotels", "Alila Hotels", 
-            "Hyatt Regency", "Grand Hyatt", "Ascend Hotel Collection"
+            "jw marriott", "the ritz-carlton", "conrad hotels & resorts", 
+            "waldorf astoria hotels & resorts", "intercontinental hotels & resorts", 
+            "wyndham grand", "registry collection hotels", "fairmont hotels", 
+            "raffles hotels & resorts", "park hyatt hotels", "alila hotels", 
+            "hyatt regency", "grand hyatt", "ascend hotel collection"
         ],
         
         "Бутік і унікальний": [
-            "Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
-            "Mercure Hotels", "ibis Styles", "Park Hyatt Hotels", 
-            "Alila Hotels", "Ascend Hotel Collection"
+            "kimpton hotels & restaurants", "registry collection hotels", 
+            "mercure hotels", "ibis styles", "park hyatt hotels", 
+            "alila hotels", "ascend hotel collection"
         ],
         
         "Класичний і традиційний": [
-            "The Ritz-Carlton", "Marriott Hotels", "Sheraton", 
-            "Waldorf Astoria Hotels & Resorts", "Hilton Hotels & Resorts", 
-            "InterContinental Hotels & Resorts", "Holiday Inn Hotels & Resorts", 
-            "Wyndham", "Fairmont Hotels", "Raffles Hotels & Resorts", 
-            "Ascend Hotel Collection"
+            "the ritz-carlton", "marriott hotels", "sheraton", 
+            "waldorf astoria hotels & resorts", "hilton hotels & resorts", 
+            "intercontinental hotels & resorts", "holiday inn hotels & resorts", 
+            "wyndham", "fairmont hotels", "raffles hotels & resorts", 
+            "ascend hotel collection"
         ],
         
         "Сучасний і дизайнерський": [
-            "Conrad Hotels & Resorts", "Kimpton Hotels & Restaurants", 
-            "Crowne Plaza", "Wyndham Grand", "Novotel Hotels", 
-            "Ibis Hotels", "ibis Styles", "Cambria Hotels", 
-            "Park Hyatt Hotels", "Grand Hyatt", "Hyatt Place"
+            "conrad hotels & resorts", "kimpton hotels & restaurants", 
+            "crowne plaza", "wyndham grand", "novotel hotels", 
+            "ibis hotels", "ibis styles", "cambria hotels", 
+            "park hyatt hotels", "grand hyatt", "hyatt place"
         ],
         
         "Затишний і сімейний": [
-            "Fairfield Inn & Suites", "DoubleTree by Hilton", 
-            "Hampton by Hilton", "Holiday Inn Hotels & Resorts", 
-            "Candlewood Suites", "Wyndham", "Days Inn by Wyndham", 
-            "Mercure Hotels", "Novotel Hotels", "Quality Inn Hotels", 
-            "Comfort Inn Hotels", "Hyatt House"
+            "fairfield inn & suites", "doubletree by hilton", 
+            "hampton by hilton", "holiday inn hotels & resorts", 
+            "candlewood suites", "wyndham", "days inn by wyndham", 
+            "mercure hotels", "novotel hotels", "quality inn hotels", 
+            "comfort inn hotels", "hyatt house"
         ],
         
         "Практичний і економічний": [
-            "Fairfield Inn & Suites", "Courtyard by Marriott", 
-            "Hampton by Hilton", "Hilton Garden Inn", 
-            "Holiday Inn Hotels & Resorts", "Holiday Inn Express", 
-            "Candlewood Suites", "Wingate by Wyndham", 
-            "Super 8 by Wyndham", "Days Inn by Wyndham", 
-            "Ibis Hotels", "ibis Styles", "Quality Inn Hotels", 
-            "Comfort Inn Hotels", "Econo Lodge Hotels", 
-            "Rodeway Inn Hotels", "Hyatt Place", "Hyatt House"
+            "fairfield inn & suites", "courtyard by marriott", 
+            "hampton by hilton", "hilton garden inn", 
+            "holiday inn hotels & resorts", "holiday inn express", 
+            "candlewood suites", "wingate by wyndham", 
+            "super 8 by wyndham", "days inn by wyndham", 
+            "ibis hotels", "ibis styles", "quality inn hotels", 
+            "comfort inn hotels", "econo lodge hotels", 
+            "rodeway inn hotels", "hyatt place", "hyatt house"
+        ],
+        
+        # Англійські стилі
+        "Luxurious and refined": [
+            "jw marriott", "the ritz-carlton", "conrad hotels & resorts", 
+            "waldorf astoria hotels & resorts", "intercontinental hotels & resorts", 
+            "wyndham grand", "registry collection hotels", "fairmont hotels", 
+            "raffles hotels & resorts", "park hyatt hotels", "alila hotels", 
+            "hyatt regency", "grand hyatt", "ascend hotel collection"
+        ],
+        
+        "Boutique and unique": [
+            "kimpton hotels & restaurants", "registry collection hotels", 
+            "mercure hotels", "ibis styles", "park hyatt hotels", 
+            "alila hotels", "ascend hotel collection"
+        ],
+        
+        "Classic and traditional": [
+            "the ritz-carlton", "marriott hotels", "sheraton", 
+            "waldorf astoria hotels & resorts", "hilton hotels & resorts", 
+            "intercontinental hotels & resorts", "holiday inn hotels & resorts", 
+            "wyndham", "fairmont hotels", "raffles hotels & resorts", 
+            "ascend hotel collection"
+        ],
+        
+        "Modern and designer": [
+            "conrad hotels & resorts", "kimpton hotels & restaurants", 
+            "crowne plaza", "wyndham grand", "novotel hotels", 
+            "ibis hotels", "ibis styles", "cambria hotels", 
+            "park hyatt hotels", "grand hyatt", "hyatt place"
+        ],
+        
+        "Cozy and family-friendly": [
+            "fairfield inn & suites", "doubletree by hilton", 
+            "hampton by hilton", "holiday inn hotels & resorts", 
+            "candlewood suites", "wyndham", "days inn by wyndham", 
+            "mercure hotels", "novotel hotels", "quality inn hotels", 
+            "comfort inn hotels", "hyatt house"
+        ],
+        
+        "Practical and economical": [
+            "fairfield inn & suites", "courtyard by marriott", 
+            "hampton by hilton", "hilton garden inn", 
+            "holiday inn hotels & resorts", "holiday inn express", 
+            "candlewood suites", "wingate by wyndham", 
+            "super 8 by wyndham", "days inn by wyndham", 
+            "ibis hotels", "ibis styles", "quality inn hotels", 
+            "comfort inn hotels", "econo lodge hotels", 
+            "rodeway inn hotels", "hyatt place", "hyatt house"
         ]
     }
     
-    # Додаємо англійські ключі для стилів
-    style_mapping_en = {
-        "Luxurious and refined": style_mapping["Розкішний і вишуканий"],
-        "Boutique and unique": style_mapping["Бутік і унікальний"],
-        "Classic and traditional": style_mapping["Класичний і традиційний"],
-        "Modern and designer": style_mapping["Сучасний і дизайнерський"],
-        "Cozy and family-friendly": style_mapping["Затишний і сімейний"],
-        "Practical and economical": style_mapping["Практичний і економічний"]
-    }
-    
-    # Об'єднуємо словники
-    combined_mapping = {**style_mapping, **style_mapping_en}
-    
     result = {}
-    for style, brands in combined_mapping.items():
+    for style, brands in style_mapping.items():
         # Більш гнучке порівняння назв брендів
         is_match = False
         for brand in brands:
             brand_lower = brand.lower()
             # Перевіряємо, чи містить бренд готелю назву бренду зі списку
-            if brand_lower in hotel_brand:
+            if brand_lower in hotel_brand or hotel_brand in brand_lower:
                 is_match = True
                 break
         result[style] = is_match
@@ -1016,13 +1047,7 @@ def map_hotel_style(hotel_brand):
 
 def map_hotel_purpose(hotel_brand):
     """
-    Зіставляє бренд готелю з метою подорожі
-    
-    Args:
-        hotel_brand: бренд готелю (один рядок, не список)
-    
-    Returns:
-        Словник цілей із відповідними значеннями True/False
+    Зіставляє бренд готелю з метою подорожі з покращеною обробкою
     """
     # Переконуємося, що hotel_brand є рядком
     if not isinstance(hotel_brand, str):
@@ -1031,54 +1056,159 @@ def map_hotel_purpose(hotel_brand):
     hotel_brand = hotel_brand.lower()
     
     purpose_mapping = {
-        "Бізнес-подорожі / відрядження": ["Marriott Hotels", "InterContinental Hotels & Resorts", "Crowne Plaza", 
-                                      "Hyatt Regency", "Grand Hyatt", "Courtyard by Marriott", "Hilton Garden Inn", 
-                                      "Sheraton", "DoubleTree by Hilton", "Novotel Hotels", "Cambria Hotels", 
-                                      "Fairfield Inn & Suites", "Holiday Inn Express", "Wingate by Wyndham", 
-                                      "Quality Inn Hotels", "ibis Hotels", "Econo Lodge Hotels", "Hyatt Place", "Rodeway Inn Hotels"],
+        # Українські цілі
+        "Бізнес-подорожі / відрядження": [
+            "marriott hotels", "intercontinental hotels & resorts", "crowne plaza", 
+            "hyatt regency", "grand hyatt", "courtyard by marriott", "hilton garden inn", 
+            "sheraton", "doubletree by hilton", "novotel hotels", "cambria hotels", 
+            "fairfield inn & suites", "holiday inn express", "wingate by wyndham", 
+            "quality inn hotels", "ibis hotels", "econo lodge hotels", "hyatt place", "rodeway inn hotels"
+        ],
         
-        "Відпустка / релакс": ["The Ritz-Carlton", "JW Marriott", "Waldorf Astoria Hotels & Resorts", 
-                             "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
-                             "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
-                             "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
-                             "Ascend Hotel Collection", "Hilton Hotels & Resorts", "Wyndham Grand", "Grand Hyatt"],
+        "Відпустка / релакс": [
+            "the ritz-carlton", "jw marriott", "waldorf astoria hotels & resorts", 
+            "conrad hotels & resorts", "park hyatt hotels", "fairmont hotels", 
+            "raffles hotels & resorts", "intercontinental hotels & resorts", 
+            "kimpton hotels & restaurants", "alila hotels", "registry collection hotels", 
+            "ascend hotel collection", "hilton hotels & resorts", "wyndham grand", "grand hyatt"
+        ],
         
-        "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
-                              "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
-                              "Comfort Inn Hotels", "Hampton by Hilton", "Holiday Inn Express", 
-                              "Days Inn by Wyndham", "Super 8 by Wyndham", "Hilton Hotels & Resorts", "Wyndham Grand", "Marriott Hotels", 
-                              "Courtyard by Marriott", "Crowne Plaza", "The Ritz-Carlton"],
+        "Сімейний відпочинок": [
+            "jw marriott", "hyatt regency", "sheraton", "holiday inn hotels & resorts", 
+            "doubletree by hilton", "wyndham", "mercure hotels", "novotel hotels", 
+            "comfort inn hotels", "hampton by hilton", "holiday inn express", 
+            "days inn by wyndham", "super 8 by wyndham", "hilton hotels & resorts", "wyndham grand", "marriott hotels", 
+            "courtyard by marriott", "crowne plaza", "the ritz-carlton"
+        ],
         
-        "Довготривале проживання": ["Hyatt House", "Candlewood Suites", "ibis Styles"]
+        "Довготривале проживання": ["hyatt house", "candlewood suites", "ibis styles"],
+        
+        # Англійські цілі
+        "Business travel": [
+            "marriott hotels", "intercontinental hotels & resorts", "crowne plaza", 
+            "hyatt regency", "grand hyatt", "courtyard by marriott", "hilton garden inn", 
+            "sheraton", "doubletree by hilton", "novotel hotels", "cambria hotels", 
+            "fairfield inn & suites", "holiday inn express", "wingate by wyndham", 
+            "quality inn hotels", "ibis hotels", "econo lodge hotels", "hyatt place", "rodeway inn hotels"
+        ],
+        
+        "Vacation / relaxation": [
+            "the ritz-carlton", "jw marriott", "waldorf astoria hotels & resorts", 
+            "conrad hotels & resorts", "park hyatt hotels", "fairmont hotels", 
+            "raffles hotels & resorts", "intercontinental hotels & resorts", 
+            "kimpton hotels & restaurants", "alila hotels", "registry collection hotels", 
+            "ascend hotel collection", "hilton hotels & resorts", "wyndham grand", "grand hyatt"
+        ],
+        
+        "Family vacation": [
+            "jw marriott", "hyatt regency", "sheraton", "holiday inn hotels & resorts", 
+            "doubletree by hilton", "wyndham", "mercure hotels", "novotel hotels", 
+            "comfort inn hotels", "hampton by hilton", "holiday inn express", 
+            "days inn by wyndham", "super 8 by wyndham", "hilton hotels & resorts", "wyndham grand", "marriott hotels", 
+            "courtyard by marriott", "crowne plaza", "the ritz-carlton"
+        ],
+        
+        "Long-term stay": ["hyatt house", "candlewood suites", "ibis styles"]
     }
-    
-    # Переклад для англійської мови
-    purpose_mapping_en = {
-        "Business travel": purpose_mapping["Бізнес-подорожі / відрядження"],
-        "Vacation / relaxation": purpose_mapping["Відпустка / релакс"],
-        "Family vacation": purpose_mapping["Сімейний відпочинок"],
-        "Long-term stay": purpose_mapping["Довготривале проживання"]
-    }
-    
-    # Об'єднуємо обидва словники
-    combined_mapping = {**purpose_mapping, **purpose_mapping_en}
     
     result = {}
-    for purpose, brands in combined_mapping.items():
+    for purpose, brands in purpose_mapping.items():
         # Більш гнучке порівняння назв брендів
         is_match = False
         for brand in brands:
             brand_lower = brand.lower()
             # Перевіряємо, чи бренд готелю містить назву бренду зі списку
-            if brand_lower in hotel_brand:
+            if brand_lower in hotel_brand or hotel_brand in brand_lower:
                 is_match = True
                 break
         result[purpose] = is_match
     
     return result
 
+# ВИПРАВЛЕНІ ФУНКЦІЇ ФІЛЬТРАЦІЇ
+
+def filter_hotels_by_style(df, styles):
+    """Фільтрує готелі за стилем з покращеною обробкою українських/англійських назв"""
+    if not styles or len(styles) == 0:
+        return df
+    
+    logger.info(f"Фільтрація за стилями: {styles}")
+    
+    style_mask = pd.Series(False, index=df.index)
+    
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            hotel_styles = map_hotel_style(hotel_brand)
+            
+            # Перевіряємо кожен стиль користувача
+            for user_style in styles:
+                # Перевіряємо як точні відповідності, так і часткові
+                for hotel_style, matches in hotel_styles.items():
+                    if matches:
+                        # Точна відповідність
+                        if user_style == hotel_style:
+                            style_mask.loc[idx] = True
+                            break
+                        # Часткова відповідність (регістронезалежна)
+                        elif user_style.lower() == hotel_style.lower():
+                            style_mask.loc[idx] = True
+                            break
+                        # Якщо один містить інший
+                        elif (user_style.lower() in hotel_style.lower() or 
+                              hotel_style.lower() in user_style.lower()):
+                            style_mask.loc[idx] = True
+                            break
+                if style_mask.loc[idx]:  # Якщо вже знайшли відповідність, виходимо
+                    break
+    
+    filtered_df = df[style_mask]
+    logger.info(f"Готелів після фільтрації за стилем: {len(filtered_df)}")
+    
+    return filtered_df
+
+def filter_hotels_by_purpose(df, purposes):
+    """Фільтрує готелі за метою подорожі з покращеною обробкою українських/англійських назв"""
+    if not purposes or len(purposes) == 0:
+        return df
+    
+    logger.info(f"Фільтрація за метою: {purposes}")
+    
+    purpose_mask = pd.Series(False, index=df.index)
+    
+    for idx, row in df.iterrows():
+        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
+            hotel_brand = row['Hotel Brand']
+            hotel_purposes = map_hotel_purpose(hotel_brand)
+            
+            # Перевіряємо кожну мету користувача
+            for user_purpose in purposes:
+                # Перевіряємо як точні відповідності, так і часткові
+                for hotel_purpose, matches in hotel_purposes.items():
+                    if matches:
+                        # Точна відповідність
+                        if user_purpose == hotel_purpose:
+                            purpose_mask.loc[idx] = True
+                            break
+                        # Часткова відповідність (регістронезалежна)
+                        elif user_purpose.lower() == hotel_purpose.lower():
+                            purpose_mask.loc[idx] = True
+                            break
+                        # Якщо один містить інший
+                        elif (user_purpose.lower() in hotel_purpose.lower() or 
+                              hotel_purpose.lower() in user_purpose.lower()):
+                            purpose_mask.loc[idx] = True
+                            break
+                if purpose_mask.loc[idx]:  # Якщо вже знайшли відповідність, виходимо
+                    break
+    
+    filtered_df = df[purpose_mask]
+    logger.info(f"Готелів після фільтрації за метою: {len(filtered_df)}")
+    
+    return filtered_df
+
 # ===============================
-# ЧАСТИНА 10: НОВА ЛОГІКА ПІДРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
+# ЧАСТИНА 10: ДОПОМІЖНІ ФУНКЦІЇ ФІЛЬТРАЦІЇ
 # ===============================
 
 # Функції фільтрації готелів
@@ -1114,62 +1244,6 @@ def filter_hotels_by_category(df, category):
     
     return df
 
-def filter_hotels_by_style(df, styles):
-    """Фільтрує готелі за стилем"""
-    if not styles or len(styles) == 0:
-        return df
-    
-    logger.info(f"Фільтрація за стилями: {styles}")
-    
-    style_mask = pd.Series(False, index=df.index)
-    
-    for idx, row in df.iterrows():
-        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
-            hotel_brand = row['Hotel Brand']
-            hotel_styles = map_hotel_style(hotel_brand)
-            
-            for style in styles:
-                style_lower = style.lower()
-                for hotel_style, matches in hotel_styles.items():
-                    if matches and (hotel_style.lower() == style_lower or 
-                                    style_lower in hotel_style.lower() or
-                                    hotel_style.lower() in style_lower):
-                        style_mask.loc[idx] = True
-                        break
-    
-    filtered_df = df[style_mask]
-    logger.info(f"Готелів після фільтрації за стилем: {len(filtered_df)}")
-    
-    return filtered_df
-
-def filter_hotels_by_purpose(df, purposes):
-    """Фільтрує готелі за метою подорожі"""
-    if not purposes or len(purposes) == 0:
-        return df
-    
-    logger.info(f"Фільтрація за метою: {purposes}")
-    
-    purpose_mask = pd.Series(False, index=df.index)
-    
-    for idx, row in df.iterrows():
-        if 'Hotel Brand' in df.columns and pd.notna(row['Hotel Brand']):
-            hotel_brand = row['Hotel Brand']
-            hotel_purposes = map_hotel_purpose(hotel_brand)
-            
-            for purpose in purposes:
-                purpose_lower = purpose.lower()
-                for hotel_purpose, matches in hotel_purposes.items():
-                    if matches and (hotel_purpose.lower() == purpose_lower or 
-                                    purpose_lower in hotel_purpose.lower() or
-                                    hotel_purpose.lower() in purpose_lower):
-                        purpose_mask.loc[idx] = True
-                        break
-    
-    filtered_df = df[purpose_mask]
-    logger.info(f"Готелів після фільтрації за метою: {len(filtered_df)}")
-    
-    return filtered_df
-
 def get_adjacent_categories(category):
     """Повертає суміжні категорії"""
     adjacent_mapping = {
@@ -1179,16 +1253,13 @@ def get_adjacent_categories(category):
     }
     return adjacent_mapping.get(category, [])
 
+# ===============================
+# ЧАСТИНА 10: ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
+# ===============================
+
 def distribute_scores_with_ties(counts_dict, score_values):
     """
     Універсальна функція для розподілу балів з урахуванням однакових значень
-    
-    Args:
-        counts_dict: словник {програма: кількість готелів}
-        score_values: список балів [21, 18, 15, 12, 9, 6, 3] або [7, 6, 5, 4, 3, 2, 1]
-    
-    Returns:
-        словник {програма: бали}
     """
     if not counts_dict or not score_values:
         return {program: 0.0 for program in counts_dict.keys()}
@@ -1219,7 +1290,6 @@ def distribute_scores_with_ties(counts_dict, score_values):
         
         # Перевіряємо, чи ще є доступні бали
         if current_position >= len(score_values):
-            # Всі наступні програми отримують 0 балів
             break
         
         # Беремо бал для поточної позиції
@@ -1279,46 +1349,8 @@ def get_region_score(df, regions=None, countries=None):
     
     return region_scores
 
-def get_detailed_category_scores(filtered_by_region, program, category):
-    """Розраховує детальні бали для категорій з правильним розподілом при ties"""
-    scores = {'main': {'hotels': 0, 'points': 0.0}, 'adjacent': {}}
-    
-    if not category:
-        return scores
-    
-    # Основна категорія
-    main_filtered = filter_hotels_by_category(filtered_by_region, category)
-    main_program_hotels = len(main_filtered[main_filtered['loyalty_program'] == program])
-    scores['main']['hotels'] = main_program_hotels
-    
-    # Розраховуємо бали для основної категорії з правильним розподілом при ties
-    if main_program_hotels > 0:
-        main_counts = main_filtered.groupby('loyalty_program').size().to_dict()
-        main_score_values = [21, 18, 15, 12, 9, 6, 3]
-        main_scores = distribute_scores_with_ties(main_counts, main_score_values)
-        scores['main']['points'] = main_scores.get(program, 0.0)
-    
-    # Суміжні категорії
-    adjacent_categories = get_adjacent_categories(category)
-    for adj_cat in adjacent_categories:
-        adj_filtered = filter_hotels_by_category(filtered_by_region, adj_cat)
-        adj_program_hotels = len(adj_filtered[adj_filtered['loyalty_program'] == program])
-        
-        adj_score = 0.0
-        if adj_program_hotels > 0:
-            adj_counts = adj_filtered.groupby('loyalty_program').size().to_dict()
-            adj_score_values = [7, 6, 5, 4, 3, 2, 1]
-            adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
-            adj_score = adj_scores.get(program, 0.0)
-        
-        scores['adjacent'][adj_cat] = {'hotels': adj_program_hotels, 'points': adj_score}
-    
-    return scores
-
 def calculate_style_scores_new_logic(filtered_by_region, loyalty_programs, category, styles):
-    """
-    НОВА ЛОГІКА розрахунку балів за стилем з правильним розподілом при ties
-    """
+    """НОВА ЛОГІКА розрахунку балів за стилем з правильним розподілом при ties"""
     if not styles or len(styles) == 0:
         return {program: 0.0 for program in loyalty_programs}, {program: 0 for program in loyalty_programs}
     
@@ -1401,9 +1433,7 @@ def calculate_style_scores_new_logic(filtered_by_region, loyalty_programs, categ
     return final_style_scores, main_style_counts
 
 def calculate_purpose_scores_new_logic(filtered_by_region, loyalty_programs, category, purposes):
-    """
-    НОВА ЛОГІКА розрахунку балів за метою з правильним розподілом при ties
-    """
+    """НОВА ЛОГІКА розрахунку балів за метою з правильним розподілом при ties"""
     if not purposes or len(purposes) == 0:
         return {program: 0.0 for program in loyalty_programs}, {program: 0 for program in loyalty_programs}
     
@@ -1486,9 +1516,7 @@ def calculate_purpose_scores_new_logic(filtered_by_region, loyalty_programs, cat
     return final_purpose_scores, main_purpose_counts
 
 def calculate_scores(user_data, hotel_data):
-    """
-    ОНОВЛЕНА функція розрахунку балів з правильним розподілом при ties
-    """
+    """ОНОВЛЕНА функція розрахунку балів з правильним розподілом при ties"""
     logger.info(f"=== STARTING SCORE CALCULATION WITH TIES HANDLING ===")
     logger.info(f"User data: {user_data}")
     
@@ -1616,110 +1644,6 @@ def calculate_scores(user_data, hotel_data):
     
     return scores_df
 
-def get_detailed_style_scores(filtered_by_region, program, category, styles):
-    """Розраховує детальні бали для стилів з правильним розподілом при ties"""
-    scores = {'main': {}, 'adjacent': {}}
-    
-    if not styles or not category:
-        return scores
-    
-    # Основна категорія
-    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-    main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
-    main_counts = main_style_filtered.groupby('loyalty_program').size().to_dict()
-    
-    # Використовуємо нову функцію розподілу балів
-    main_score_values = [21, 18, 15, 12, 9, 6, 3]
-    main_scores = distribute_scores_with_ties(main_counts, main_score_values)
-    main_total_score = main_scores.get(program, 0.0)
-    
-    # Нормалізуємо, якщо кілька стилів
-    if len(styles) > 1:
-        main_total_score = main_total_score / len(styles)
-    
-    for style in styles:
-        main_program_hotels = len(filter_hotels_by_style(main_category_hotels[main_category_hotels['loyalty_program'] == program], [style]))
-        scores['main'][style] = {'hotels': main_program_hotels, 'points': main_total_score}
-    
-    # Суміжні категорії
-    adjacent_categories = get_adjacent_categories(category)
-    max_adj_score = 0.0
-    
-    for adj_cat in adjacent_categories:
-        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-        adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
-        adj_counts = adj_style_filtered.groupby('loyalty_program').size().to_dict()
-        
-        # Використовуємо нову функцію розподілу балів
-        adj_score_values = [7, 6, 5, 4, 3, 2, 1]
-        adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
-        adj_score = adj_scores.get(program, 0.0)
-        
-        # Нормалізуємо, якщо кілька стилів
-        if len(styles) > 1:
-            adj_score = adj_score / len(styles)
-        
-        max_adj_score = max(max_adj_score, adj_score)
-        
-        scores['adjacent'][adj_cat] = {}
-        for style in styles:
-            adj_program_hotels = len(filter_hotels_by_style(adj_category_hotels[adj_category_hotels['loyalty_program'] == program], [style]))
-            scores['adjacent'][adj_cat][style] = {'hotels': adj_program_hotels, 'points': adj_score}
-    
-    return scores
-
-def get_detailed_purpose_scores(filtered_by_region, program, category, purposes):
-    """Розраховує детальні бали для цілей з правильним розподілом при ties"""
-    scores = {'main': {}, 'adjacent': {}}
-    
-    if not purposes or not category:
-        return scores
-    
-    # Основна категорія
-    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-    main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
-    main_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
-    
-    # Використовуємо нову функцію розподілу балів
-    main_score_values = [21, 18, 15, 12, 9, 6, 3]
-    main_scores = distribute_scores_with_ties(main_counts, main_score_values)
-    main_total_score = main_scores.get(program, 0.0)
-    
-    # Нормалізуємо, якщо кілька цілей
-    if len(purposes) > 1:
-        main_total_score = main_total_score / len(purposes)
-    
-    for purpose in purposes:
-        main_program_hotels = len(filter_hotels_by_purpose(main_category_hotels[main_category_hotels['loyalty_program'] == program], [purpose]))
-        scores['main'][purpose] = {'hotels': main_program_hotels, 'points': main_total_score}
-    
-    # Суміжні категорії
-    adjacent_categories = get_adjacent_categories(category)
-    max_adj_score = 0.0
-    
-    for adj_cat in adjacent_categories:
-        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-        adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, purposes)
-        adj_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
-        
-        # Використовуємо нову функцію розподілу балів
-        adj_score_values = [7, 6, 5, 4, 3, 2, 1]
-        adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
-        adj_score = adj_scores.get(program, 0.0)
-        
-        # Нормалізуємо, якщо кілька цілей
-        if len(purposes) > 1:
-            adj_score = adj_score / len(purposes)
-        
-        max_adj_score = max(max_adj_score, adj_score)
-        
-        scores['adjacent'][adj_cat] = {}
-        for purpose in purposes:
-            adj_program_hotels = len(filter_hotels_by_purpose(adj_category_hotels[adj_category_hotels['loyalty_program'] == program], [purpose]))
-            scores['adjacent'][adj_cat][purpose] = {'hotels': adj_program_hotels, 'points': adj_score}
-    
-    return scores
-
 def format_detailed_results(user_data, scores_df, lang='en'):
     """Форматує ДЕТАЛЬНІ результати з правильним розрахунком балів за ties"""
     results = ""
@@ -1759,129 +1683,32 @@ def format_detailed_results(user_data, scores_df, lang='en'):
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"   {row['region_hotels']} hotels in {region_str}\n\n"
         
-        # КАТЕГОРІЯ - використовуємо правильний розрахунок з ties
+        # КАТЕГОРІЯ 
         if category:
-            # Розраховуємо кількість готелів для основної категорії
-            main_filtered = filter_hotels_by_category(filtered_by_region, category)
-            main_program_hotels = len(main_filtered[main_filtered['loyalty_program'] == program])
-            
-            # Розраховуємо бали для основної категорії з правильним розподілом при ties
-            main_counts = main_filtered.groupby('loyalty_program').size().to_dict()
-            main_score_values = [21, 18, 15, 12, 9, 6, 3]
-            main_scores = distribute_scores_with_ties(main_counts, main_score_values)
-            main_category_score = main_scores.get(program, 0.0)
-            
-            # Розраховуємо кількість готелів для суміжних категорій
-            adjacent_categories = get_adjacent_categories(category)
-            adjacent_hotels_data = {}
-            adjacent_scores_data = {}
-            
-            for adj_cat in adjacent_categories:
-                adj_filtered = filter_hotels_by_category(filtered_by_region, adj_cat)
-                adj_program_hotels = len(adj_filtered[adj_filtered['loyalty_program'] == program])
-                adjacent_hotels_data[adj_cat] = adj_program_hotels
-                
-                # Розраховуємо бали для цієї суміжної категорії з правильним розподілом при ties
-                adj_counts = adj_filtered.groupby('loyalty_program').size().to_dict()
-                adj_score = 0.0
-                if adj_counts:
-                    adj_score_values = [7, 6, 5, 4, 3, 2, 1]
-                    adj_scores = distribute_scores_with_ties(adj_counts, adj_score_values)
-                    adj_score = adj_scores.get(program, 0.0)
-                adjacent_scores_data[adj_cat] = adj_score
-            
             if lang == 'uk':
                 results += f"🏨 CATEGORY: {row['category_score']:.1f} балів\n"
-                results += f"   (основна) {category} – {main_program_hotels} готелів – {main_category_score:.1f} балів\n"
-                
-                for adj_cat in adjacent_categories:
-                    adj_hotels = adjacent_hotels_data[adj_cat]
-                    adj_score = adjacent_scores_data[adj_cat]
-                    results += f"   (суміжна) {adj_cat} – {adj_hotels} готелів – {adj_score:.1f} балів\n"
-                results += "\n"
+                results += f"   {category} – {row['category_hotels']} готелів\n\n"
             else:
                 results += f"🏨 CATEGORY: {row['category_score']:.1f} points\n"
-                results += f"   (main) {category} – {main_program_hotels} hotels – {main_category_score:.1f} points\n"
-                
-                for adj_cat in adjacent_categories:
-                    adj_hotels = adjacent_hotels_data[adj_cat]
-                    adj_score = adjacent_scores_data[adj_cat]
-                    results += f"   (adjacent) {adj_cat} – {adj_hotels} hotels – {adj_score:.1f} points\n"
-                results += "\n"
+                results += f"   {category} – {row['category_hotels']} hotels\n\n"
         
         # СТИЛЬ
         if styles:
-            style_scores = get_detailed_style_scores(filtered_by_region, program, category, styles)
-            
             if lang == 'uk':
                 results += f"🎨 STYLE: {row['style_score']:.1f} балів\n"
-                
-                # Основна категорія
-                for style in styles:
-                    if style in style_scores['main']:
-                        data = style_scores['main'][style]
-                        results += f"   {style} в {category.lower()} {data['hotels']} готелів – {data['points']:.1f} балів\n"
-                
-                # Суміжні категорії - показуємо всі, навіть з 0 готелів
-                for adj_cat, adj_styles in style_scores['adjacent'].items():
-                    for style in styles:
-                        if style in adj_styles:
-                            data = adj_styles[style]
-                            results += f"   {style} в {adj_cat.lower()} (суміжний сегмент) {data['hotels']} готелів – {data['points']:.1f} балів\n"
-                results += "\n"
+                results += f"   {', '.join(styles)} – {row['style_hotels']} готелів\n\n"
             else:
                 results += f"🎨 STYLE: {row['style_score']:.1f} points\n"
-                
-                # Основна категорія
-                for style in styles:
-                    if style in style_scores['main']:
-                        data = style_scores['main'][style]
-                        results += f"   {style} in {category.lower()} {data['hotels']} hotels – {data['points']:.1f} points\n"
-                
-                # Суміжні категорії - показуємо всі, навіть з 0 готелів
-                for adj_cat, adj_styles in style_scores['adjacent'].items():
-                    for style in styles:
-                        if style in adj_styles:
-                            data = adj_styles[style]
-                            results += f"   {style} in {adj_cat.lower()} (adjacent segment) {data['hotels']} hotels – {data['points']:.1f} points\n"
-                results += "\n"
+                results += f"   {', '.join(styles)} – {row['style_hotels']} hotels\n\n"
         
         # МЕТА
         if purposes:
-            purpose_scores = get_detailed_purpose_scores(filtered_by_region, program, category, purposes)
-            
             if lang == 'uk':
                 results += f"🎯 PURPOSE: {row['purpose_score']:.1f} балів\n"
-                
-                # Основна категорія
-                for purpose in purposes:
-                    if purpose in purpose_scores['main']:
-                        data = purpose_scores['main'][purpose]
-                        results += f"   {purpose} в {category.lower()} {data['hotels']} готелів – {data['points']:.1f} балів\n"
-                
-                # Суміжні категорії - показуємо всі, навіть з 0 готелів
-                for adj_cat, adj_purposes in purpose_scores['adjacent'].items():
-                    for purpose in purposes:
-                        if purpose in adj_purposes:
-                            data = adj_purposes[purpose]
-                            results += f"   {purpose} в {adj_cat.lower()} (суміжний сегмент) {data['hotels']} готелів – {data['points']:.1f} балів\n"
-                results += "\n"
+                results += f"   {', '.join(purposes)} – {row['purpose_hotels']} готелів\n\n"
             else:
                 results += f"🎯 PURPOSE: {row['purpose_score']:.1f} points\n"
-                
-                # Основна категорія
-                for purpose in purposes:
-                    if purpose in purpose_scores['main']:
-                        data = purpose_scores['main'][purpose]
-                        results += f"   {purpose} in {category.lower()} {data['hotels']} hotels – {data['points']:.1f} points\n"
-                
-                # Суміжні категорії - показуємо всі, навіть з 0 готелів
-                for adj_cat, adj_purposes in purpose_scores['adjacent'].items():
-                    for purpose in purposes:
-                        if purpose in adj_purposes:
-                            data = adj_purposes[purpose]
-                            results += f"   {purpose} in {adj_cat.lower()} (adjacent segment) {data['hotels']} hotels – {data['points']:.1f} points\n"
-                results += "\n"
+                results += f"   {', '.join(purposes)} – {row['purpose_hotels']} hotels\n\n"
         
         # ПІДСУМОК
         if lang == 'uk':
