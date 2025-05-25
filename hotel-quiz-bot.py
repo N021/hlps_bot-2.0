@@ -1217,6 +1217,10 @@ def map_hotel_purpose(hotel_brand):
 # ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
 # ===============================
 
+# ===============================
+# ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
+# ===============================
+
 ## Функції фільтрації готелів (залишаються без змін)
 def filter_hotels_by_region(df, regions=None, countries=None):
     """Фільтрує готелі за регіоном або країною"""
@@ -1493,22 +1497,22 @@ def calculate_scores_fixed(user_data, hotel_data):
             adj_counts = adj_filtered.groupby('loyalty_program').size().to_dict()
             adj_scores = distribute_scores_with_ties(adj_counts, ADJACENT_CATEGORY_POINTS)
             
-            # Беремо МАКСИМУМ серед adjacent категорій
+            # ✅ ВИПРАВЛЕНО: ДОДАЄМО всі суміжні бали замість max()
             for program in loyalty_programs:
                 score = adj_scores.get(program, 0.0)
-                adjacent_scores[program] = max(adjacent_scores[program], score)
+                adjacent_scores[program] += score  # ЗМІНЕНО: += замість max()
         
         # ВИПРАВЛЕНО: правильне підсумовування
         for index, row in scores_df.iterrows():
             program = row['loyalty_program']
             main_score = main_scores.get(program, 0.0)
             adj_score = adjacent_scores.get(program, 0.0)
-            total_category_score = main_score + adj_score
+            total_category_score = main_score + adj_score  # СУМА замість main + max(adj)
             
             scores_df.at[index, 'category_score'] = total_category_score
             scores_df.at[index, 'category_hotels'] = main_counts.get(program, 0)
             
-            debug_log(f"{program} category: main={main_score:.1f} + adj={adj_score:.1f} = {total_category_score:.1f}")
+            debug_log(f"{program} category: main={main_score:.1f} + adj_total={adj_score:.1f} = {total_category_score:.1f}")
     
     # Крок 3: ВИПРАВЛЕНИЙ розрахунок балів за стилем
     if english_styles and len(english_styles) > 0:
@@ -1601,7 +1605,7 @@ def calculate_style_scores_fixed(filtered_by_region, loyalty_programs, category,
                 final_style_scores[program] += main_scores.get(program, 0.0)
         
         # ADJACENT категорії для ОДНОГО стилю
-        max_adj_score_for_style = {program: 0.0 for program in loyalty_programs}
+        adj_score_for_style = {program: 0.0 for program in loyalty_programs}
         
         for adj_cat in adjacent_categories:
             adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
@@ -1617,13 +1621,14 @@ def calculate_style_scores_fixed(filtered_by_region, loyalty_programs, category,
             # ВИПРАВЛЕНО: бали тільки якщо є готелі
             adj_scores = distribute_scores_with_ties(adj_counts_for_style, ADJACENT_CATEGORY_POINTS)
             
+            # ✅ ВИПРАВЛЕНО: ДОДАЄМО всі суміжні бали для цього стилю
             for program in loyalty_programs:
                 score = adj_scores.get(program, 0.0)
-                max_adj_score_for_style[program] = max(max_adj_score_for_style[program], score)
+                adj_score_for_style[program] += score  # ДОДАЄМО замість max()
         
-        # Додаємо найкращий adjacent бал для цього стилю
+        # Додаємо всі adjacent бали для цього стилю
         for program in loyalty_programs:
-            final_style_scores[program] += max_adj_score_for_style[program]
+            final_style_scores[program] += adj_score_for_style[program]
     
     # ВИПРАВЛЕНО: правильна нормалізація
     if len(styles) > 1:
@@ -1674,7 +1679,7 @@ def calculate_purpose_scores_fixed(filtered_by_region, loyalty_programs, categor
                 final_purpose_scores[program] += main_scores.get(program, 0.0)
         
         # ADJACENT категорії для ОДНІЄЇ мети
-        max_adj_score_for_purpose = {program: 0.0 for program in loyalty_programs}
+        adj_score_for_purpose = {program: 0.0 for program in loyalty_programs}
         
         for adj_cat in adjacent_categories:
             adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
@@ -1690,13 +1695,14 @@ def calculate_purpose_scores_fixed(filtered_by_region, loyalty_programs, categor
             # ВИПРАВЛЕНО: бали тільки якщо є готелі
             adj_scores = distribute_scores_with_ties(adj_counts_for_purpose, ADJACENT_CATEGORY_POINTS)
             
+            # ✅ ВИПРАВЛЕНО: ДОДАЄМО всі суміжні бали для цієї мети
             for program in loyalty_programs:
                 score = adj_scores.get(program, 0.0)
-                max_adj_score_for_purpose[program] = max(max_adj_score_for_purpose[program], score)
+                adj_score_for_purpose[program] += score  # ДОДАЄМО замість max()
         
-        # Додаємо найкращий adjacent бал для цієї мети
+        # Додаємо всі adjacent бали для цієї мети
         for program in loyalty_programs:
-            final_purpose_scores[program] += max_adj_score_for_purpose[program]
+            final_purpose_scores[program] += adj_score_for_purpose[program]
     
     # ВИПРАВЛЕНО: правильна нормалізація
     if len(purposes) > 1:
@@ -1731,7 +1737,7 @@ def get_detailed_category_scores_fixed(filtered_by_region, program, category):
     
     # Суміжні категорії
     adjacent_categories = get_adjacent_categories(category)
-    max_adjacent_score = 0.0
+    total_adjacent_score = 0.0  # ✅ ВИПРАВЛЕНО: сумуємо, а не шукаємо max
     
     for adj_cat in adjacent_categories:
         adj_filtered = filter_hotels_by_category(filtered_by_region, adj_cat)
@@ -1745,10 +1751,10 @@ def get_detailed_category_scores_fixed(filtered_by_region, program, category):
             adj_score = adj_scores.get(program, 0.0)
         
         scores['adjacent'][adj_cat] = {'hotels': adj_program_hotels, 'points': adj_score}
-        max_adjacent_score = max(max_adjacent_score, adj_score)
+        total_adjacent_score += adj_score  # ✅ ВИПРАВЛЕНО: додаємо всі бали
     
     # ВИПРАВЛЕНО: додаємо правильний загальний бал за категорію
-    scores['total_calculated'] = scores['main']['points'] + max_adjacent_score
+    scores['total_calculated'] = scores['main']['points'] + total_adjacent_score  # ✅ ВИПРАВЛЕНО
     
     return scores
 
@@ -1777,7 +1783,6 @@ def get_detailed_style_scores_fixed(filtered_by_region, program, category, style
         
         # Суміжні категорії
         adjacent_categories = get_adjacent_categories(category)
-        max_adj_score = 0.0
         
         for adj_cat in adjacent_categories:
             if adj_cat not in scores['adjacent']:
@@ -1795,7 +1800,6 @@ def get_detailed_style_scores_fixed(filtered_by_region, program, category, style
                 adj_score = adj_scores.get(program, 0.0) / len(styles)  # Нормалізація
             
             scores['adjacent'][adj_cat][style] = {'hotels': adj_program_hotels, 'points': adj_score}
-            max_adj_score = max(max_adj_score, adj_score)
     
     return scores
 
@@ -1824,7 +1828,6 @@ def get_detailed_purpose_scores_fixed(filtered_by_region, program, category, pur
         
         # Суміжні категорії
         adjacent_categories = get_adjacent_categories(category)
-        max_adj_score = 0.0
         
         for adj_cat in adjacent_categories:
             if adj_cat not in scores['adjacent']:
@@ -1842,7 +1845,6 @@ def get_detailed_purpose_scores_fixed(filtered_by_region, program, category, pur
                 adj_score = adj_scores.get(program, 0.0) / len(purposes)  # Нормалізація
             
             scores['adjacent'][adj_cat][purpose] = {'hotels': adj_program_hotels, 'points': adj_score}
-            max_adj_score = max(max_adj_score, adj_score)
     
     return scores
 
@@ -1895,13 +1897,13 @@ def format_detailed_results_fixed(user_data, scores_df, lang='en'):
         if category:
             detailed_scores = get_detailed_category_scores_fixed(filtered_by_region, program, category)
             
-            # Розраховуємо максимальний бал серед суміжних
-            max_adjacent_score = 0.0
+            # ✅ ВИПРАВЛЕНО: Розраховуємо СУМУ балів серед суміжних
+            total_adjacent_score = 0.0
             if detailed_scores['adjacent']:
-                max_adjacent_score = max(data['points'] for data in detailed_scores['adjacent'].values())
+                total_adjacent_score = sum(data['points'] for data in detailed_scores['adjacent'].values())
             
-            # ПРАВИЛЬНИЙ загальний бал за категорію
-            correct_category_total = detailed_scores['main']['points'] + max_adjacent_score
+            # ✅ ВИПРАВЛЕНО: ПРАВИЛЬНИЙ загальний бал за категорію
+            correct_category_total = detailed_scores['main']['points'] + total_adjacent_score
             
             if lang == 'uk':
                 results += f"🏨 CATEGORY: {correct_category_total:.1f} балів\n"
@@ -1910,10 +1912,10 @@ def format_detailed_results_fixed(user_data, scores_df, lang='en'):
                 for adj_cat, data in detailed_scores['adjacent'].items():
                     results += f"   (суміжна) {adj_cat} – {data['hotels']} готелів – {data['points']:.1f} балів\n"
                 
-                # Показуємо підрахунок
+                # ✅ ВИПРАВЛЕНО: Показуємо правильний підрахунок
                 if detailed_scores['adjacent']:
                     adj_scores_list = [f"{data['points']:.1f}" for data in detailed_scores['adjacent'].values()]
-                    results += f"   Підрахунок: {detailed_scores['main']['points']:.1f} + max({', '.join(adj_scores_list)}) = {correct_category_total:.1f}\n\n"
+                    results += f"   Підрахунок: {detailed_scores['main']['points']:.1f} + ({' + '.join(adj_scores_list)}) = {correct_category_total:.1f}\n\n"
                 else:
                     results += f"   Підрахунок: {detailed_scores['main']['points']:.1f} + 0 = {correct_category_total:.1f}\n\n"
             else:
@@ -1923,10 +1925,10 @@ def format_detailed_results_fixed(user_data, scores_df, lang='en'):
                 for adj_cat, data in detailed_scores['adjacent'].items():
                     results += f"   (adjacent) {adj_cat} – {data['hotels']} hotels – {data['points']:.1f} points\n"
                 
-                # Показуємо підрахунок
+                # ✅ ВИПРАВЛЕНО: Показуємо правильний підрахунок
                 if detailed_scores['adjacent']:
                     adj_scores_list = [f"{data['points']:.1f}" for data in detailed_scores['adjacent'].values()]
-                    results += f"   Calculation: {detailed_scores['main']['points']:.1f} + max({', '.join(adj_scores_list)}) = {correct_category_total:.1f}\n\n"
+                    results += f"   Calculation: {detailed_scores['main']['points']:.1f} + ({' + '.join(adj_scores_list)}) = {correct_category_total:.1f}\n\n"
                 else:
                     results += f"   Calculation: {detailed_scores['main']['points']:.1f} + 0 = {correct_category_total:.1f}\n\n"
         
@@ -2081,24 +2083,26 @@ async def calculate_and_show_results_fixed(update: Update, context: ContextTypes
         if lang == 'uk':
             intro_text = ("🎉 **Аналіз завершено!** \n\n"
                          "Ось топ-5 програм лояльності готелів з детальним розбором балів:\n\n")
-            outro_text = ("\n\n📝 **Пояснення логіки:**\n"
+            outro_text = ("\n\n📝 **Пояснення логіки (ВИПРАВЛЕНО!):**\n"
                          "• **Основна категорія**: бали за вибрану категорію (21,18,15,12,9,6,3)\n"
-                         "• **Суміжні категорії**: максимум з додаткових балів (7,6,5,4,3,2,1)\n"
+                         "• **Суміжні категорії**: СУМА всіх додаткових балів (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: суміжна Comfort\n"
                          "• **Comfort**: суміжні Luxury + Standard\n"
                          "• **Standard**: суміжна Comfort\n"
-                         "• **Готелі = 0**: бали = 0 (виправлено!)\n\n"
+                         "• **Готелі = 0**: бали = 0\n"
+                         "• **Підрахунок**: основна + (суміжна1 + суміжна2)\n\n"
                          "Щоб почати нове опитування, надішліть команду /start.")
         else:
             intro_text = ("🎉 **Analysis completed!** \n\n"
                          "Here are the top 5 hotel loyalty programs with detailed score breakdown:\n\n")
-            outro_text = ("\n\n📝 **Logic explanation:**\n"
+            outro_text = ("\n\n📝 **Logic explanation (FIXED!):**\n"
                          "• **Main category**: points for selected category (21,18,15,12,9,6,3)\n"
-                         "• **Adjacent categories**: maximum of additional points (7,6,5,4,3,2,1)\n"
+                         "• **Adjacent categories**: SUM of all additional points (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: adjacent Comfort\n"
                          "• **Comfort**: adjacent Luxury + Standard\n"
                          "• **Standard**: adjacent Comfort\n"
-                         "• **Hotels = 0**: points = 0 (fixed!)\n\n"
+                         "• **Hotels = 0**: points = 0\n"
+                         "• **Calculation**: main + (adjacent1 + adjacent2)\n\n"
                          "To start a new survey, send the /start command.")
         
         # Відправляємо повний звіт
