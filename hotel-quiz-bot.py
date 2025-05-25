@@ -1028,7 +1028,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             del user_data_global[user_id]['purpose_message_id']
         
         # ВИПРАВЛЕНО: Розрахунок і відображення результатів
-        return await calculate_and_show_results_fixed(update, context)
+        return await calculate_and_show_results_simple(update, context)
     
     # Якщо це вибір або скасування вибору мети
     else:
