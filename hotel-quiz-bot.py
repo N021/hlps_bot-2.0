@@ -31,7 +31,7 @@ DEBUG_SCORING = os.environ.get("DEBUG_SCORING", "true").lower() == "true"
 VALIDATE_CALCULATIONS = True  # Перевіряти правильність підрахунків
 
 # Етапи розмови
-LANGUAGE, REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING_PURPOSE_SUBMIT = range(6)
+REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING_PURPOSE_SUBMIT = range(6)
 
 # Зберігання даних користувача
 user_data_global = {}
@@ -275,25 +275,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if user_id in user_data_global:
         del user_data_global[user_id]
     
-    # Ініціалізація нових даних
-    user_data_global[user_id] = {}
+    # Ініціалізація нових даних з українською мовою за замовчуванням
+    user_data_global[user_id] = {'language': 'uk'}
     
     # Логування початку нової розмови
     logger.info(f"User {user_id} started a new conversation. Data cleared.")
     
-    # Клавіатура для вибору мови за допомогою InlineKeyboardMarkup
-    keyboard = [
-        [InlineKeyboardButton("Українська (Ukrainian)", callback_data='lang_uk')],
-        [InlineKeyboardButton("English (Англійська)", callback_data='lang_en')]
-    ]
-    
-    await update.message.reply_text(
-        "Please select your preferred language for our conversation\n"
-        "(будь ласка, оберіть мову, якою вам зручніше спілкуватися):",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    
-    return LANGUAGE
+    # Одразу переходимо до першого питання про регіони
+    return await ask_region(update, context)
 
 # Функція обробки вибору мови
 async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -558,7 +547,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         keyboard = [
             [InlineKeyboardButton("1. Luxury (преміум-клас)", callback_data='category_Luxury')],
             [InlineKeyboardButton("2. Comfort (середній клас)", callback_data='category_Comfort')],
-            [InlineKeyboardButton("3. standart (економ-клас)", callback_data='category_standart')]
+            [InlineKeyboardButton("3. Standard (економ-клас)", callback_data='category_Standard')]
         ]
         
         await context.bot.send_message(
@@ -568,7 +557,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "Яку категорію готелів ви зазвичай обираєте?\n\n"
                 "1. Luxury (преміум-клас)\n"
                 "2. Comfort (середній клас)\n"
-                "3. standart (економ-клас)\n"
+                "3. Standard (економ-клас)\n"
             ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -576,7 +565,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         keyboard = [
             [InlineKeyboardButton("1. Luxury (premium class)", callback_data='category_Luxury')],
             [InlineKeyboardButton("2. Comfort (middle class)", callback_data='category_Comfort')],
-            [InlineKeyboardButton("3. standart (economy class)", callback_data='category_standart')]
+            [InlineKeyboardButton("3. Standard (economy class)", callback_data='category_Standard')]
         ]
         
         await context.bot.send_message(
@@ -586,7 +575,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "Which hotel category do you usually choose?\n\n"
                 "1. Luxury (premium class)\n"
                 "2. Comfort (middle class)\n"
-                "3. standart (economy class)\n"
+                "3. Standard (economy class)\n"
             ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -1243,7 +1232,7 @@ def filter_hotels_by_category(df, category):
     category_mapping = {
         "Luxury": ["Luxury"],
         "Comfort": ["Comfort"],
-        "standart": ["standart", "Standart"],
+        "Standard": ["Standard", "Standart"],
     }
     
     if category in category_mapping:
@@ -1313,8 +1302,8 @@ def get_adjacent_categories(category):
     """Повертає суміжні категорії"""
     adjacent_mapping = {
         "Luxury": ["Comfort"],
-        "Comfort": ["Luxury", "standart"],
-        "standart": ["Comfort"],
+        "Comfort": ["Luxury", "Standard"],
+        "Standard": ["Comfort"],
     }
     return adjacent_mapping.get(category, [])
 
@@ -2139,8 +2128,8 @@ async def calculate_and_show_results_simple(update: Update, context: ContextType
                          "• **Основна категорія**: бали за вибрану категорію (21,18,15,12,9,6,3)\n"
                          "• **Суміжні категорії**: СУМА всіх додаткових балів (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: суміжна Comfort\n"
-                         "• **Comfort**: суміжні Luxury + standart\n"
-                         "• **standart**: суміжна Comfort\n"
+                         "• **Comfort**: суміжні Luxury + Standard\n"
+                         "• **Standard**: суміжна Comfort\n"
                          "• **Готелі = 0**: бали = 0\n"
                          "• **Стиль/Мета**: спочатку сума всіх балів, потім ділення на кількість\n"
                          "• **Підрахунок**: основна + (суміжна1 + суміжна2)\n\n"
@@ -2152,8 +2141,8 @@ async def calculate_and_show_results_simple(update: Update, context: ContextType
                          "• **Main category**: points for selected category (21,18,15,12,9,6,3)\n"
                          "• **Adjacent categories**: SUM of all additional points (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: adjacent Comfort\n"
-                         "• **Comfort**: adjacent Luxury + standart\n"
-                         "• **standart**: adjacent Comfort\n"
+                         "• **Comfort**: adjacent Luxury + Standard\n"
+                         "• **Standard**: adjacent Comfort\n"
                          "• **Hotels = 0**: points = 0\n"
                          "• **Style/Purpose**: first sum all points, then divide by quantity\n"
                          "• **Calculation**: main + (adjacent1 + adjacent2)\n\n"
@@ -2250,10 +2239,10 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     application = app.build()
     
     # Налаштування обробників
+
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            LANGUAGE: [CallbackQueryHandler(language_choice)],
             WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
             CATEGORY: [CallbackQueryHandler(category_choice)],
             WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
@@ -2264,13 +2253,14 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
             CommandHandler("start", start)  # Додаємо /start як fallback
         ]
     )
+
     
     application.add_handler(conv_handler)
     
     # ВИПРАВЛЕНО: Отримуємо порт з змінних середовища
     port = int(os.environ.get("PORT", "10000"))
     
-    # ВИПРАВЛЕНО: Логування налаштуваньstandart
+    # ВИПРАВЛЕНО: Логування налаштувань
     logger.info(f"Port from environment: {port}")
     logger.info(f"Webhook URL: {webhook_url}")
     logger.info(f"Webhook path: {webhook_path}")
