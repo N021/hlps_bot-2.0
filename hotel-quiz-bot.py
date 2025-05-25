@@ -1216,9 +1216,8 @@ def map_hotel_purpose(hotel_brand):
 # ===============================
 # ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
 # ===============================
-
 # ===============================
-# ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
+# ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ (ПРОСТА ЛОГІКА)
 # ===============================
 
 ## Функції фільтрації готелів (залишаються без змін)
@@ -1514,9 +1513,9 @@ def calculate_scores_fixed(user_data, hotel_data):
             
             debug_log(f"{program} category: main={main_score:.1f} + adj_total={adj_score:.1f} = {total_category_score:.1f}")
     
-    # Крок 3: ВИПРАВЛЕНИЙ розрахунок балів за стилем
+    # Крок 3: ПРОСТА ЛОГІКА розрахунку балів за стилем
     if english_styles and len(english_styles) > 0:
-        style_scores, style_counts = calculate_style_scores_fixed(
+        style_scores, style_counts = calculate_style_scores_simple(
             filtered_by_region, loyalty_programs, category, english_styles
         )
         
@@ -1525,9 +1524,9 @@ def calculate_scores_fixed(user_data, hotel_data):
             scores_df.at[index, 'style_score'] = style_scores.get(program, 0.0)
             scores_df.at[index, 'style_hotels'] = style_counts.get(program, 0)
     
-    # Крок 4: ВИПРАВЛЕНИЙ розрахунок балів за метою
+    # Крок 4: ПРОСТА ЛОГІКА розрахунку балів за метою
     if english_purposes and len(english_purposes) > 0:
-        purpose_scores, purpose_counts = calculate_purpose_scores_fixed(
+        purpose_scores, purpose_counts = calculate_purpose_scores_simple(
             filtered_by_region, loyalty_programs, category, english_purposes
         )
         
@@ -1567,21 +1566,28 @@ def calculate_scores_fixed(user_data, hotel_data):
     
     return scores_df
 
-def calculate_style_scores_fixed(filtered_by_region, loyalty_programs, category, styles):
+# ===============================
+# НОВІ ПРОСТІ ФУНКЦІЇ ДЛЯ СТИЛЮ ТА МЕТИ
+# ===============================
+
+def calculate_style_scores_simple(filtered_by_region, loyalty_programs, category, styles):
     """
-    ВИПРАВЛЕНА логіка розрахунку балів за стилем
+    ПРОСТА логіка розрахунку балів за стилем:
+    1. Рахуємо всі бали БЕЗ нормалізації
+    2. Сумуємо
+    3. Ділимо на кількість стилів
     """
     if not styles or len(styles) == 0:
         return {program: 0.0 for program in loyalty_programs}, {program: 0 for program in loyalty_programs}
     
-    debug_log(f"=== FIXED STYLE CALCULATION ===")
+    debug_log(f"=== SIMPLE STYLE CALCULATION ===")
     debug_log(f"Category: {category}, Styles: {styles}")
     
     adjacent_categories = get_adjacent_categories(category) if category else []
-    final_style_scores = {program: 0.0 for program in loyalty_programs}
+    raw_style_scores = {program: 0.0 for program in loyalty_programs}  # БЕЗ нормалізації
     main_style_counts = {program: 0 for program in loyalty_programs}
     
-    # Для кожного стилю окремо розраховуємо бали
+    # Для кожного стилю окремо розраховуємо бали БЕЗ нормалізації
     for style in styles:
         debug_log(f"Processing style: {style}")
         
@@ -1598,11 +1604,11 @@ def calculate_style_scores_fixed(filtered_by_region, loyalty_programs, category,
             
             debug_log(f"Main category ({category}) for style '{style}': {main_counts_for_style}")
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # БЕЗ нормалізації - повні бали
             main_scores = distribute_scores_with_ties(main_counts_for_style, MAIN_CATEGORY_POINTS)
             
             for program in loyalty_programs:
-                final_style_scores[program] += main_scores.get(program, 0.0)
+                raw_style_scores[program] += main_scores.get(program, 0.0)
         
         # ADJACENT категорії для ОДНОГО стилю
         adj_score_for_style = {program: 0.0 for program in loyalty_programs}
@@ -1618,44 +1624,52 @@ def calculate_style_scores_fixed(filtered_by_region, loyalty_programs, category,
             
             debug_log(f"Adjacent category ({adj_cat}) for style '{style}': {adj_counts_for_style}")
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # БЕЗ нормалізації - повні бали
             adj_scores = distribute_scores_with_ties(adj_counts_for_style, ADJACENT_CATEGORY_POINTS)
             
-            # ✅ ВИПРАВЛЕНО: ДОДАЄМО всі суміжні бали для цього стилю
+            # ДОДАЄМО всі суміжні бали для цього стилю
             for program in loyalty_programs:
                 score = adj_scores.get(program, 0.0)
-                adj_score_for_style[program] += score  # ДОДАЄМО замість max()
+                adj_score_for_style[program] += score
         
         # Додаємо всі adjacent бали для цього стилю
         for program in loyalty_programs:
-            final_style_scores[program] += adj_score_for_style[program]
+            raw_style_scores[program] += adj_score_for_style[program]
     
-    # ВИПРАВЛЕНО: правильна нормалізація
-    if len(styles) > 1:
-        normalization_factor = len(styles)
-        final_style_scores = {program: score / normalization_factor 
-                             for program, score in final_style_scores.items()}
-        debug_log(f"Applied normalization factor: {normalization_factor}")
+    # НОРМАЛІЗАЦІЯ ТІЛЬКИ В КІНЦІ
+    final_style_scores = {}
+    normalization_factor = len(styles)
     
+    for program in loyalty_programs:
+        if normalization_factor > 1:
+            final_style_scores[program] = raw_style_scores[program] / normalization_factor
+        else:
+            final_style_scores[program] = raw_style_scores[program]
+    
+    debug_log(f"Raw total scores: {raw_style_scores}")
+    debug_log(f"Applied normalization factor: {normalization_factor}")
     debug_log(f"Final style scores: {final_style_scores}")
     
     return final_style_scores, main_style_counts
 
-def calculate_purpose_scores_fixed(filtered_by_region, loyalty_programs, category, purposes):
+def calculate_purpose_scores_simple(filtered_by_region, loyalty_programs, category, purposes):
     """
-    ВИПРАВЛЕНА логіка розрахунку балів за метою
+    ПРОСТА логіка розрахунку балів за метою:
+    1. Рахуємо всі бали БЕЗ нормалізації
+    2. Сумуємо
+    3. Ділимо на кількість цілей
     """
     if not purposes or len(purposes) == 0:
         return {program: 0.0 for program in loyalty_programs}, {program: 0 for program in loyalty_programs}
     
-    debug_log(f"=== FIXED PURPOSE CALCULATION ===")
+    debug_log(f"=== SIMPLE PURPOSE CALCULATION ===")
     debug_log(f"Category: {category}, Purposes: {purposes}")
     
     adjacent_categories = get_adjacent_categories(category) if category else []
-    final_purpose_scores = {program: 0.0 for program in loyalty_programs}
+    raw_purpose_scores = {program: 0.0 for program in loyalty_programs}  # БЕЗ нормалізації
     main_purpose_counts = {program: 0 for program in loyalty_programs}
     
-    # Для кожної мети окремо
+    # Для кожної мети окремо розраховуємо бали БЕЗ нормалізації
     for purpose in purposes:
         debug_log(f"Processing purpose: {purpose}")
         
@@ -1672,11 +1686,11 @@ def calculate_purpose_scores_fixed(filtered_by_region, loyalty_programs, categor
             
             debug_log(f"Main category ({category}) for purpose '{purpose}': {main_counts_for_purpose}")
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # БЕЗ нормалізації - повні бали
             main_scores = distribute_scores_with_ties(main_counts_for_purpose, MAIN_CATEGORY_POINTS)
             
             for program in loyalty_programs:
-                final_purpose_scores[program] += main_scores.get(program, 0.0)
+                raw_purpose_scores[program] += main_scores.get(program, 0.0)
         
         # ADJACENT категорії для ОДНІЄЇ мети
         adj_score_for_purpose = {program: 0.0 for program in loyalty_programs}
@@ -1692,28 +1706,37 @@ def calculate_purpose_scores_fixed(filtered_by_region, loyalty_programs, categor
             
             debug_log(f"Adjacent category ({adj_cat}) for purpose '{purpose}': {adj_counts_for_purpose}")
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # БЕЗ нормалізації - повні бали
             adj_scores = distribute_scores_with_ties(adj_counts_for_purpose, ADJACENT_CATEGORY_POINTS)
             
-            # ✅ ВИПРАВЛЕНО: ДОДАЄМО всі суміжні бали для цієї мети
+            # ДОДАЄМО всі суміжні бали для цієї мети
             for program in loyalty_programs:
                 score = adj_scores.get(program, 0.0)
-                adj_score_for_purpose[program] += score  # ДОДАЄМО замість max()
+                adj_score_for_purpose[program] += score
         
         # Додаємо всі adjacent бали для цієї мети
         for program in loyalty_programs:
-            final_purpose_scores[program] += adj_score_for_purpose[program]
+            raw_purpose_scores[program] += adj_score_for_purpose[program]
     
-    # ВИПРАВЛЕНО: правильна нормалізація
-    if len(purposes) > 1:
-        normalization_factor = len(purposes)
-        final_purpose_scores = {program: score / normalization_factor 
-                               for program, score in final_purpose_scores.items()}
-        debug_log(f"Applied normalization factor: {normalization_factor}")
+    # НОРМАЛІЗАЦІЯ ТІЛЬКИ В КІНЦІ
+    final_purpose_scores = {}
+    normalization_factor = len(purposes)
     
+    for program in loyalty_programs:
+        if normalization_factor > 1:
+            final_purpose_scores[program] = raw_purpose_scores[program] / normalization_factor
+        else:
+            final_purpose_scores[program] = raw_purpose_scores[program]
+    
+    debug_log(f"Raw total scores: {raw_purpose_scores}")
+    debug_log(f"Applied normalization factor: {normalization_factor}")
     debug_log(f"Final purpose scores: {final_purpose_scores}")
     
     return final_purpose_scores, main_purpose_counts
+
+# ===============================
+# НОВІ ПРОСТІ ФУНКЦІЇ ДЛЯ ДЕТАЛЬНОГО ВІДОБРАЖЕННЯ
+# ===============================
 
 def get_detailed_category_scores_fixed(filtered_by_region, program, category):
     """ВИПРАВЛЕНА функція розрахунку детальних балів за категорією"""
@@ -1758,28 +1781,31 @@ def get_detailed_category_scores_fixed(filtered_by_region, program, category):
     
     return scores
 
-def get_detailed_style_scores_fixed(filtered_by_region, program, category, styles):
-    """ВИПРАВЛЕНА функція для детального відображення балів за стилем"""
-    scores = {'main': {}, 'adjacent': {}}
+def get_detailed_style_scores_simple(filtered_by_region, program, category, styles):
+    """ПРОСТА функція для детального відображення балів за стилем БЕЗ ПЕРЕДЧАСНОЇ НОРМАЛІЗАЦІЇ"""
+    scores = {'main': {}, 'adjacent': {}, 'raw_total': 0.0, 'normalization_factor': len(styles)}
     
     if not styles or not category:
         return scores
     
-    # Для кожного стилю окремо
+    raw_total = 0.0
+    
+    # Для кожного стилю окремо - показуємо ПОВНІ бали
     for style in styles:
         # Основна категорія
         main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
         main_style_filtered = filter_hotels_by_style(main_category_hotels, [style])
         main_program_hotels = len(main_style_filtered[main_style_filtered['loyalty_program'] == program])
         
-        # ВИПРАВЛЕНО: бали тільки якщо є готелі
+        # ПОВНІ бали без нормалізації
         main_score = 0.0
         if main_program_hotels > 0:
             main_counts = main_style_filtered.groupby('loyalty_program').size().to_dict()
             main_scores = distribute_scores_with_ties(main_counts, MAIN_CATEGORY_POINTS)
-            main_score = main_scores.get(program, 0.0) / len(styles)  # Нормалізація
+            main_score = main_scores.get(program, 0.0)  # БЕЗ ділення на len(styles)
         
         scores['main'][style] = {'hotels': main_program_hotels, 'points': main_score}
+        raw_total += main_score
         
         # Суміжні категорії
         adjacent_categories = get_adjacent_categories(category)
@@ -1792,39 +1818,44 @@ def get_detailed_style_scores_fixed(filtered_by_region, program, category, style
             adj_style_filtered = filter_hotels_by_style(adj_category_hotels, [style])
             adj_program_hotels = len(adj_style_filtered[adj_style_filtered['loyalty_program'] == program])
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # ПОВНІ бали без нормалізації
             adj_score = 0.0
             if adj_program_hotels > 0:
                 adj_counts = adj_style_filtered.groupby('loyalty_program').size().to_dict()
                 adj_scores = distribute_scores_with_ties(adj_counts, ADJACENT_CATEGORY_POINTS)
-                adj_score = adj_scores.get(program, 0.0) / len(styles)  # Нормалізація
+                adj_score = adj_scores.get(program, 0.0)  # БЕЗ ділення на len(styles)
             
             scores['adjacent'][adj_cat][style] = {'hotels': adj_program_hotels, 'points': adj_score}
+            raw_total += adj_score
     
+    scores['raw_total'] = raw_total
     return scores
 
-def get_detailed_purpose_scores_fixed(filtered_by_region, program, category, purposes):
-    """ВИПРАВЛЕНА функція для детального відображення балів за метою"""
-    scores = {'main': {}, 'adjacent': {}}
+def get_detailed_purpose_scores_simple(filtered_by_region, program, category, purposes):
+    """ПРОСТА функція для детального відображення балів за метою БЕЗ ПЕРЕДЧАСНОЇ НОРМАЛІЗАЦІЇ"""
+    scores = {'main': {}, 'adjacent': {}, 'raw_total': 0.0, 'normalization_factor': len(purposes)}
     
     if not purposes or not category:
         return scores
     
-    # Для кожної мети окремо
+    raw_total = 0.0
+    
+    # Для кожної мети окремо - показуємо ПОВНІ бали
     for purpose in purposes:
         # Основна категорія
         main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
         main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, [purpose])
         main_program_hotels = len(main_purpose_filtered[main_purpose_filtered['loyalty_program'] == program])
         
-        # ВИПРАВЛЕНО: бали тільки якщо є готелі
+        # ПОВНІ бали без нормалізації
         main_score = 0.0
         if main_program_hotels > 0:
             main_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
             main_scores = distribute_scores_with_ties(main_counts, MAIN_CATEGORY_POINTS)
-            main_score = main_scores.get(program, 0.0) / len(purposes)  # Нормалізація
+            main_score = main_scores.get(program, 0.0)  # БЕЗ ділення на len(purposes)
         
         scores['main'][purpose] = {'hotels': main_program_hotels, 'points': main_score}
+        raw_total += main_score
         
         # Суміжні категорії
         adjacent_categories = get_adjacent_categories(category)
@@ -1837,19 +1868,21 @@ def get_detailed_purpose_scores_fixed(filtered_by_region, program, category, pur
             adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, [purpose])
             adj_program_hotels = len(adj_purpose_filtered[adj_purpose_filtered['loyalty_program'] == program])
             
-            # ВИПРАВЛЕНО: бали тільки якщо є готелі
+            # ПОВНІ бали без нормалізації
             adj_score = 0.0
             if adj_program_hotels > 0:
                 adj_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
                 adj_scores = distribute_scores_with_ties(adj_counts, ADJACENT_CATEGORY_POINTS)
-                adj_score = adj_scores.get(program, 0.0) / len(purposes)  # Нормалізація
+                adj_score = adj_scores.get(program, 0.0)  # БЕЗ ділення на len(purposes)
             
             scores['adjacent'][adj_cat][purpose] = {'hotels': adj_program_hotels, 'points': adj_score}
+            raw_total += adj_score
     
+    scores['raw_total'] = raw_total
     return scores
 
-def format_detailed_results_fixed(user_data, scores_df, lang='en'):
-    """ВИПРАВЛЕНА функція форматування результатів з правильними підрахунками"""
+def format_detailed_results_simple(user_data, scores_df, lang='en'):
+    """ПРОСТА функція форматування результатів з зрозумілими підрахунками"""
     results = ""
     
     max_programs = min(5, len(scores_df))
@@ -1932,83 +1965,102 @@ def format_detailed_results_fixed(user_data, scores_df, lang='en'):
                 else:
                     results += f"   Calculation: {detailed_scores['main']['points']:.1f} + 0 = {correct_category_total:.1f}\n\n"
         
-        # СТИЛЬ - ВИПРАВЛЕНО!
+        # СТИЛЬ - ПРОСТА ЛОГІКА!
         if styles:
-            style_scores = get_detailed_style_scores_fixed(filtered_by_region, program, category, english_styles)
+            style_scores = get_detailed_style_scores_simple(filtered_by_region, program, category, english_styles)
             
             if lang == 'uk':
                 results += f"🎨 STYLE: {row['style_score']:.1f} балів\n"
                 
-                # Основна категорія - показуємо оригінальні українські назви
+                # Показуємо ПОВНІ бали без нормалізації - оригінальні українські назви
                 for i_style, style in enumerate(styles):
                     english_style = english_styles[i_style] if i_style < len(english_styles) else style
                     if english_style in style_scores['main']:
                         data = style_scores['main'][english_style]
-                        # ВИПРАВЛЕНО: показуємо бали тільки якщо є готелі
                         results += f"   {style} в {category.lower()} – {data['hotels']} готелів – {data['points']:.1f} балів\n"
                 
-                # Суміжні категорії
+                # Суміжні категорії - ПОВНІ бали
                 for adj_cat, adj_styles in style_scores['adjacent'].items():
                     for i_style, style in enumerate(styles):
                         english_style = english_styles[i_style] if i_style < len(english_styles) else style
                         if english_style in adj_styles:
                             data = adj_styles[english_style]
                             results += f"   {style} в {adj_cat.lower()} (суміжний) – {data['hotels']} готелів – {data['points']:.1f} балів\n"
+                
+                # ✅ ПРОСТА ЛОГІКА: показуємо сума ÷ кількість
+                results += f"   Сума: {style_scores['raw_total']:.1f} балів\n"
+                if style_scores['normalization_factor'] > 1:
+                    results += f"   Нормалізація: {style_scores['raw_total']:.1f} ÷ {style_scores['normalization_factor']} стилі = {row['style_score']:.1f} балів\n"
                 results += "\n"
             else:
                 results += f"🎨 STYLE: {row['style_score']:.1f} points\n"
                 
-                # Основна категорія
+                # Показуємо ПОВНІ бали без нормалізації
                 for style in english_styles:
                     if style in style_scores['main']:
                         data = style_scores['main'][style]
                         results += f"   {style} in {category.lower()} – {data['hotels']} hotels – {data['points']:.1f} points\n"
                 
-                # Суміжні категорії
+                # Суміжні категорії - ПОВНІ бали
                 for adj_cat, adj_styles in style_scores['adjacent'].items():
                     for style in english_styles:
                         if style in adj_styles:
                             data = adj_styles[style]
                             results += f"   {style} in {adj_cat.lower()} (adjacent) – {data['hotels']} hotels – {data['points']:.1f} points\n"
+                
+                # ✅ ПРОСТА ЛОГІКА: показуємо сума ÷ кількість
+                results += f"   Sum: {style_scores['raw_total']:.1f} points\n"
+                if style_scores['normalization_factor'] > 1:
+                    results += f"   Normalization: {style_scores['raw_total']:.1f} ÷ {style_scores['normalization_factor']} styles = {row['style_score']:.1f} points\n"
                 results += "\n"
         
-        # МЕТА - ВИПРАВЛЕНО!
+        # МЕТА - ПРОСТА ЛОГІКА!
         if purposes:
-            purpose_scores = get_detailed_purpose_scores_fixed(filtered_by_region, program, category, english_purposes)
+            purpose_scores = get_detailed_purpose_scores_simple(filtered_by_region, program, category, english_purposes)
             
             if lang == 'uk':
                 results += f"🎯 PURPOSE: {row['purpose_score']:.1f} балів\n"
                 
-                # Основна категорія - показуємо оригінальні українські назви
+                # Показуємо ПОВНІ бали без нормалізації - оригінальні українські назви
                 for i_purpose, purpose in enumerate(purposes):
                     english_purpose = english_purposes[i_purpose] if i_purpose < len(english_purposes) else purpose
                     if english_purpose in purpose_scores['main']:
                         data = purpose_scores['main'][english_purpose]
                         results += f"   {purpose} в {category.lower()} – {data['hotels']} готелів – {data['points']:.1f} балів\n"
                 
-                # Суміжні категорії
+                # Суміжні категорії - ПОВНІ бали
                 for adj_cat, adj_purposes in purpose_scores['adjacent'].items():
                     for i_purpose, purpose in enumerate(purposes):
                         english_purpose = english_purposes[i_purpose] if i_purpose < len(english_purposes) else purpose
                         if english_purpose in adj_purposes:
                             data = adj_purposes[english_purpose]
                             results += f"   {purpose} в {adj_cat.lower()} (суміжний) – {data['hotels']} готелів – {data['points']:.1f} балів\n"
+                
+                # ✅ ПРОСТА ЛОГІКА: показуємо сума ÷ кількість
+                results += f"   Сума: {purpose_scores['raw_total']:.1f} балів\n"
+                if purpose_scores['normalization_factor'] > 1:
+                    results += f"   Нормалізація: {purpose_scores['raw_total']:.1f} ÷ {purpose_scores['normalization_factor']} цілі = {row['purpose_score']:.1f} балів\n"
                 results += "\n"
             else:
                 results += f"🎯 PURPOSE: {row['purpose_score']:.1f} points\n"
                 
-                # Основна категорія
+                # Показуємо ПОВНІ бали без нормалізації
                 for purpose in english_purposes:
                     if purpose in purpose_scores['main']:
                         data = purpose_scores['main'][purpose]
                         results += f"   {purpose} in {category.lower()} – {data['hotels']} hotels – {data['points']:.1f} points\n"
                 
-                # Суміжні категорії
+                # Суміжні категорії - ПОВНІ бали
                 for adj_cat, adj_purposes in purpose_scores['adjacent'].items():
                     for purpose in english_purposes:
                         if purpose in adj_purposes:
                             data = adj_purposes[purpose]
                             results += f"   {purpose} in {adj_cat.lower()} (adjacent) – {data['hotels']} hotels – {data['points']:.1f} points\n"
+                
+                # ✅ ПРОСТА ЛОГІКА: показуємо сума ÷ кількість
+                results += f"   Sum: {purpose_scores['raw_total']:.1f} points\n"
+                if purpose_scores['normalization_factor'] > 1:
+                    results += f"   Normalization: {purpose_scores['raw_total']:.1f} ÷ {purpose_scores['normalization_factor']} purposes = {row['purpose_score']:.1f} points\n"
                 results += "\n"
         
         # ПІДСУМОК - ВИПРАВЛЕНО!
@@ -2034,8 +2086,8 @@ def format_detailed_results_fixed(user_data, scores_df, lang='en'):
     
     return results
 
-async def calculate_and_show_results_fixed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """ВИПРАВЛЕНА функція обчислення та відображення результатів"""
+async def calculate_and_show_results_simple(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ПРОСТА функція обчислення та відображення результатів"""
     
     user_id = update.effective_user.id
     user_data = user_data_global[user_id]
@@ -2076,32 +2128,34 @@ async def calculate_and_show_results_fixed(update: Update, context: ContextTypes
                 )
             return ConversationHandler.END
         
-        # ВИПРАВЛЕНО: використовуємо нову функцію форматування
-        results = format_detailed_results_fixed(user_data, scores_df, lang)
+        # ВИПРАВЛЕНО: використовуємо ПРОСТУ функцію форматування
+        results = format_detailed_results_simple(user_data, scores_df, lang)
         
         # Відправляємо результати користувачеві
         if lang == 'uk':
             intro_text = ("🎉 **Аналіз завершено!** \n\n"
                          "Ось топ-5 програм лояльності готелів з детальним розбором балів:\n\n")
-            outro_text = ("\n\n📝 **Пояснення логіки (ВИПРАВЛЕНО!):**\n"
+            outro_text = ("\n\n📝 **Пояснення ПРОСТОЇ логіки:**\n"
                          "• **Основна категорія**: бали за вибрану категорію (21,18,15,12,9,6,3)\n"
                          "• **Суміжні категорії**: СУМА всіх додаткових балів (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: суміжна Comfort\n"
                          "• **Comfort**: суміжні Luxury + Standard\n"
                          "• **Standard**: суміжна Comfort\n"
                          "• **Готелі = 0**: бали = 0\n"
+                         "• **Стиль/Мета**: спочатку сума всіх балів, потім ділення на кількість\n"
                          "• **Підрахунок**: основна + (суміжна1 + суміжна2)\n\n"
                          "Щоб почати нове опитування, надішліть команду /start.")
         else:
             intro_text = ("🎉 **Analysis completed!** \n\n"
                          "Here are the top 5 hotel loyalty programs with detailed score breakdown:\n\n")
-            outro_text = ("\n\n📝 **Logic explanation (FIXED!):**\n"
+            outro_text = ("\n\n📝 **SIMPLE logic explanation:**\n"
                          "• **Main category**: points for selected category (21,18,15,12,9,6,3)\n"
                          "• **Adjacent categories**: SUM of all additional points (7,6,5,4,3,2,1)\n"
                          "• **Luxury**: adjacent Comfort\n"
                          "• **Comfort**: adjacent Luxury + Standard\n"
                          "• **Standard**: adjacent Comfort\n"
                          "• **Hotels = 0**: points = 0\n"
+                         "• **Style/Purpose**: first sum all points, then divide by quantity\n"
                          "• **Calculation**: main + (adjacent1 + adjacent2)\n\n"
                          "To start a new survey, send the /start command.")
         
