@@ -82,92 +82,70 @@ def validate_score_calculation(calculated_total, detailed_breakdown, program_nam
 # ЧАСТИНА 2.5: ФУНКЦІЇ ПЕРЕКЛАДУ
 # ===============================
 
-def translate_regions_to_english(regions):
-    """Переводить список регіонів з української на англійську"""
-    translation_map = {
-        "Європа": "Europe",
-        "Північна Америка": "North America", 
-        "Азія": "Asia",
-        "Близький Схід": "Middle East",
-        "Африка": "Africa",
-        "Південна Америка": "South America",
-        "Карибський басейн": "Caribbean",
-        "Океанія": "Oceania"
-    }
-    
-    if not regions:
-        return []
-    
-    translated = []
-    for region in regions:
-        # Якщо регіон вже англійською, залишаємо як є
-        if region in translation_map.values():
-            translated.append(region)
-        # Якщо українською, перекладаємо
-        elif region in translation_map:
-            translated.append(translation_map[region])
-        else:
-            # Якщо не знайдено переклад, залишаємо оригінал
-            translated.append(region)
-            logger.warning(f"Не знайдено переклад для регіону: {region}")
-    
-    return translated
+# ===============================
+# ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
+# ===============================
 
-def translate_styles_to_english(styles):
-    """Переводить список стилів з української на англійську"""
-    translation_map = {
-        "Розкішний і вишуканий": "Luxurious and refined",
-        "Бутік і унікальний": "Boutique and unique", 
-        "Класичний і традиційний": "Classic and traditional",
-        "Сучасний і дизайнерський": "Modern and designer",
-        "Затишний і сімейний": "Cozy and family-friendly",
-        "Практичний і економічний": "Practical and economical"
-    }
-    
-    if not styles:
-        return []
-    
-    translated = []
-    for style in styles:
-        # Якщо стиль вже англійською, залишаємо як є
-        if style in translation_map.values():
-            translated.append(style)
-        # Якщо українською, перекладаємо
-        elif style in translation_map:
-            translated.append(translation_map[style])
-        else:
-            # Якщо не знайдено переклад, залишаємо оригінал
-            translated.append(style)
-            logger.warning(f"Не знайдено переклад для стилю: {style}")
-    
-    return translated
+# Налаштування порту
+PORT = int(os.environ.get("PORT", "10000"))
 
-def translate_purposes_to_english(purposes):
-    """Переводить список цілей з української на англійську"""
-    translation_map = {
-        "Бізнес-подорожі / відрядження": "Business travel",
-        "Відпустка / релакс": "Vacation / relaxation",
-        "Сімейний відпочинок": "Family vacation", 
-        "Довготривале проживання": "Long-term stay"
-    }
+# Налаштування логування
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# ДОДАНО: Налаштування для детального дебагу розрахунків
+DEBUG_SCORING = os.environ.get("DEBUG_SCORING", "true").lower() == "true"
+VALIDATE_CALCULATIONS = True  # Перевіряти правильність підрахунків
+
+# Етапи розмови
+LANGUAGE, REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING_PURPOSE_SUBMIT = range(6)
+
+# Зберігання даних користувача
+user_data_global = {}
+hotel_data = None  # Глобальна змінна для даних готелів
+
+# ДОДАНО: Константи для системи балів (для легшого налаштування)
+MAIN_CATEGORY_POINTS = [21, 18, 15, 12, 9, 6, 3]
+ADJACENT_CATEGORY_POINTS = [7, 6, 5, 4, 3, 2, 1]
+REGION_POINTS = [21, 18, 15, 12, 9, 6, 3]
+
+# ДОДАНО: Функція для логування дебагу (якщо потрібно)
+def debug_log(message):
+    """Логування для дебагу розрахунків"""
+    if DEBUG_SCORING:
+        logger.info(f"[DEBUG] {message}")
+
+# ВИПРАВЛЕНО: Функція для валідації розрахунків
+def validate_score_calculation(calculated_total, detailed_breakdown, program_name="Unknown"):
+    """
+    Перевіряє, чи сума детальних балів дорівнює загальному балу
     
-    if not purposes:
-        return []
+    Args:
+        calculated_total: загальний розрахований бал
+        detailed_breakdown: словник з детальними балами {'region': X, 'category': Y, ...}
+        program_name: назва програми для логування
     
-    translated = []
-    for purpose in purposes:
-        # Якщо мета вже англійською, залишаємо як є
-        if purpose in translation_map.values():
-            translated.append(purpose)
-        # Якщо українською, перекладаємо
-        elif purpose in translation_map:
-            translated.append(translation_map[purpose])
-        else:
-            # Якщо не знайдено переклад, залишаємо оригінал
-            translated.append(purpose)
-            logger.warning(f"Не знайдено переклад для мети: {purpose}")
+    Returns:
+        bool: True якщо розрахунки правильні
+    """
+    if not VALIDATE_CALCULATIONS:
+        return True
     
-    return translated
+    detailed_sum = sum(detailed_breakdown.values())
+    difference = abs(calculated_total - detailed_sum)
+    
+    if difference > 0.01:  # Допускаємо невелику похибку через округлення
+        logger.warning(
+            f"VALIDATION ERROR for {program_name}: "
+            f"Total={calculated_total:.2f}, Detailed sum={detailed_sum:.2f}, "
+            f"Difference={difference:.2f}, Breakdown={detailed_breakdown}"
+        )
+        return False
+    
+    debug_log(f"Validation OK for {program_name}: {calculated_total:.2f} = {detailed_breakdown}")
+    return True
 
 # ===============================
 # ЧАСТИНА 3: ФУНКЦІЇ АНАЛІЗУ CSV ТА ЗАВАНТАЖЕННЯ ДАНИХ
