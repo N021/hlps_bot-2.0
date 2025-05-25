@@ -31,7 +31,7 @@ DEBUG_SCORING = os.environ.get("DEBUG_SCORING", "true").lower() == "true"
 VALIDATE_CALCULATIONS = True  # Перевіряти правильність підрахунків
 
 # Етапи розмови
-REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING_PURPOSE_SUBMIT = range(6)
+REGION, WAITING_REGION_SUBMIT, CATEGORY, WAITING_STYLE_SUBMIT, WAITING_PURPOSE_SUBMIT = range(5)
 
 # Зберігання даних користувача
 user_data_global = {}
