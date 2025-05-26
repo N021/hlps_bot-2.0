@@ -118,6 +118,100 @@ def calculate_rating_coefficient(program_rating):
     """
     return program_rating / 5.0
 
+
+# ===============================
+# ЧАСТИНА 2.5: ФУНКЦІЇ ПЕРЕКЛАДУ
+# ===============================
+
+def translate_regions_to_english(regions):
+    """Переводить список регіонів з української на англійську"""
+    translation_map = {
+        "Європа": "Europe",
+        "Північна Америка": "North America", 
+        "Азія": "Asia",
+        "Близький Схід": "Middle East",
+        "Африка": "Africa",
+        "Південна Америка": "South America",
+        "Карибський басейн": "Caribbean",
+        "Океанія": "Oceania"
+    }
+    
+    if not regions:
+        return []
+    
+    translated = []
+    for region in regions:
+        # Якщо регіон вже англійською, залишаємо як є
+        if region in translation_map.values():
+            translated.append(region)
+        # Якщо українською, перекладаємо
+        elif region in translation_map:
+            translated.append(translation_map[region])
+        else:
+            # Якщо не знайдено переклад, залишаємо оригінал
+            translated.append(region)
+            logger.warning(f"Не знайдено переклад для регіону: {region}")
+    
+    return translated
+
+def translate_styles_to_english(styles):
+    """Переводить список стилів з української на англійську"""
+    translation_map = {
+        "Розкішний і вишуканий": "Luxurious and refined",
+        "Бутік і унікальний": "Boutique and unique", 
+        "Класичний і традиційний": "Classic and traditional",
+        "Сучасний і дизайнерський": "Modern and designer",
+        "Затишний і сімейний": "Cozy and family-friendly",
+        "Практичний і економічний": "Practical and economical"
+    }
+    
+    if not styles:
+        return []
+    
+    translated = []
+    for style in styles:
+        # Якщо стиль вже англійською, залишаємо як є
+        if style in translation_map.values():
+            translated.append(style)
+        # Якщо українською, перекладаємо
+        elif style in translation_map:
+            translated.append(translation_map[style])
+        else:
+            # Якщо не знайдено переклад, залишаємо оригінал
+            translated.append(style)
+            logger.warning(f"Не знайдено переклад для стилю: {style}")
+    
+    return translated
+
+def translate_purposes_to_english(purposes):
+    """Переводить список цілей з української на англійську"""
+    translation_map = {
+        "Бізнес-подорожі / відрядження": "Business travel",
+        "Відпустка / релакс": "Vacation / relaxation",
+        "Сімейний відпочинок": "Family vacation", 
+        "Довготривале проживання": "Long-term stay"
+    }
+    
+    if not purposes:
+        return []
+    
+    translated = []
+    for purpose in purposes:
+        # Якщо мета вже англійською, залишаємо як є
+        if purpose in translation_map.values():
+            translated.append(purpose)
+        # Якщо українською, перекладаємо
+        elif purpose in translation_map:
+            translated.append(translation_map[purpose])
+        else:
+            # Якщо не знайдено переклад, залишаємо оригінал
+            translated.append(purpose)
+            logger.warning(f"Не знайдено переклад для мети: {purpose}")
+    
+    return translated
+
+
+
 # ===============================
 # ЧАСТИНА 3: ФУНКЦІЇ АНАЛІЗУ CSV ТА ЗАВАНТАЖЕННЯ ДАНИХ
 # ===============================
