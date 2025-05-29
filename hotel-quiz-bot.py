@@ -2030,7 +2030,7 @@ async def send_long_message_to_chat(context, chat_id, text, max_length=4000):
             await asyncio.sleep(0.5)
 
 # ===============================
-# НОВІ ФУНКЦІЇ ФОРМАТУВАННЯ РЕЗУЛЬТАТІВ
+# МОДЕРНІЗОВАНІ ФУНКЦІЇ ФОРМАТУВАННЯ РЕЗУЛЬТАТІВ
 # ===============================
 
 def get_style_counts_for_program_by_category(program, category_hotels, styles):
@@ -2063,7 +2063,7 @@ def get_purpose_counts_for_program_by_category(program, category_hotels, purpose
 
 def format_simple_results(user_data, scores_df, lang='uk'):
     """
-    ВИПРАВЛЕНА функція для детального звіту - показує ВСІ обрані стилі та цілі
+    МОДЕРНІЗОВАНА функція для звичайного звіту - нова структура виведення
     """
     results = ""
     
@@ -2093,156 +2093,145 @@ def format_simple_results(user_data, scores_df, lang='uk'):
         emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉"
         
         if lang == 'uk':
-            results += f"{emoji} **{i+1}. {program}**\n"
-            results += f"**Фінальний бал: {row['total_score']:.2f}** ⭐\n"
-            results += f"**Середній рейтинг готелів, що входять до програми**\n"
-            results += f"**(на основі відгуків з Google Maps): {row['program_rating']:.2f}★**\n"
+            results += f"{emoji} {i+1}. {program}\n"
+            results += f"Фінальний бал: {row['total_score']:.2f} ⭐\n"
+            results += f"Середній рейтинг готелів, що входять до програми\n"
+            results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}★\n"
         else:
-            results += f"{emoji} **{i+1}. {program}**\n"
-            results += f"**Final score: {row['total_score']:.2f}** ⭐\n"
-            results += f"**Average rating of hotels in the program**\n"
-            results += f"**(based on Google Maps reviews): {row['program_rating']:.2f}★**\n"
+            results += f"{emoji} {i+1}. {program}\n"
+            results += f"Final score: {row['total_score']:.2f} ⭐\n"
+            results += f"Average rating of hotels in the program\n"
+            results += f"(based on Google Maps reviews): {row['program_rating']:.2f}★\n"
         
         # РЕГІОН
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
-            results += f"📍 **REGION:**\n"
-            results += f"** • {row['region_hotels']} готелів у {region_str}**\n"
+            results += f"📍 REGION:\n"
+            results += f" • {row['region_hotels']} готелів у {region_str}\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
-            results += f"📍 **REGION:**\n"
-            results += f"** • {row['region_hotels']} hotels in {region_str}**\n"
+            results += f"📍 REGION:\n"
+            results += f" • {row['region_hotels']} hotels in {region_str}\n"
         
-        # КАТЕГОРІЯ з детальним розбором
+        # КАТЕГОРІЯ - НОВА СТРУКТУРА
         if category:
+            # Отримуємо дані для основної категорії
+            main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+            main_count = len(main_category_hotels[main_category_hotels['loyalty_program'] == program])
+            
+            # Отримуємо дані для суміжних категорій
+            adjacent_categories = get_adjacent_categories(category)
+            adjacent_total = 0
+            adjacent_details = []
+            
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_count = len(adj_category_hotels[adj_category_hotels['loyalty_program'] == program])
+                adjacent_total += adj_count
+                if adj_count > 0:
+                    adjacent_details.append(adj_cat)
+            
             if lang == 'uk':
-                results += f"🏨 **CATEGORY:**\n"
-                
-                # Основна категорія
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_count = len(main_category_hotels[main_category_hotels['loyalty_program'] == program])
-                results += f"** • {main_count} готелів в категорії {category}**\n"
-                
-                # Суміжні категорії
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_count = len(adj_category_hotels[adj_category_hotels['loyalty_program'] == program])
-                    if adj_count > 0:
-                        results += f"** • {adj_count} готелів в категорії {adj_cat} (суміжна категорія)**\n"
+                results += f"🏨 CATEGORY:\n"
+                results += f" • {main_count} готелів в категорії {category} (обрана категорія)\n"
+                if adjacent_total > 0:
+                    adj_cats_str = ' і '.join(adjacent_details) if adjacent_details else 'суміжні категорії'
+                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжні категорії до обраної)\n"
             else:
-                results += f"🏨 **CATEGORY:**\n"
-                
-                # Основна категорія
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_count = len(main_category_hotels[main_category_hotels['loyalty_program'] == program])
-                results += f"** • {main_count} hotels in {category} category**\n"
-                
-                # Суміжні категорії
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_count = len(adj_category_hotels[adj_category_hotels['loyalty_program'] == program])
-                    if adj_count > 0:
-                        results += f"** • {adj_count} hotels in {adj_cat} category (adjacent)**\n"
+                results += f"🏨 CATEGORY:\n"
+                results += f" • {main_count} hotels in {category} category (selected category)\n"
+                if adjacent_total > 0:
+                    adj_cats_str = ' and '.join(adjacent_details) if adjacent_details else 'adjacent categories'
+                    results += f" • {adjacent_total} hotels in {adj_cats_str} categories (adjacent to selected)\n"
         
-        # СТИЛЬ з детальним розбором - ВИПРАВЛЕНО!
+        # СТИЛЬ - НОВА СТРУКТУРА
         if styles:
             if lang == 'uk':
-                results += f"🎨 **STYLE: в {category.lower()} –**\n"
-                
-                # Основна категорія - показуємо ВСІ обрані стилі
-                results += f"** • {category} сегмент:**\n"
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_style_counts = get_style_counts_for_program_by_category(program, main_category_hotels, styles)
-                
-                for style in styles:
-                    count = main_style_counts.get(style, 0)
-                    results += f"**  - {count} готелів в стилі {style}**\n"
-                
-                # Суміжні категорії - показуємо ВСІ обрані стилі
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_style_counts = get_style_counts_for_program_by_category(program, adj_category_hotels, styles)
-                    
-                    # ВИПРАВЛЕНО: Завжди показуємо всі стилі, навіть з 0 готелями
-                    results += f"** • {adj_cat} сегмент (суміжний):**\n"
-                    for style in styles:
-                        count = adj_style_counts.get(style, 0)
-                        results += f"**  - {count} готелів в стилі {style}**\n"
+                results += f"🎨 STYLE:\n"
             else:
-                results += f"🎨 **STYLE: in {category.lower()} –**\n"
+                results += f"🎨 STYLE:\n"
+            
+            for style in styles:
+                if lang == 'uk':
+                    results += f"{style}:\n"
+                else:
+                    results += f"{style}:\n"
                 
-                # Основна категорія - показуємо ВСІ обрані стилі
-                results += f"** • {category} segment:**\n"
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_style_counts = get_style_counts_for_program_by_category(program, main_category_hotels, styles)
-                
-                for style in styles:
-                    count = main_style_counts.get(style, 0)
-                    results += f"**  - {count} hotels in {style} style**\n"
-                
-                # Суміжні категорії - показуємо ВСІ обрані стилі
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_style_counts = get_style_counts_for_program_by_category(program, adj_category_hotels, styles)
+                # Основна категорія для цього стилю
+                if category:
+                    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+                    main_style_filtered = filter_hotels_by_style(main_category_hotels, [style])
+                    main_style_count = len(main_style_filtered[main_style_filtered['loyalty_program'] == program])
                     
-                    # ВИПРАВЛЕНО: Завжди показуємо всі стилі, навіть з 0 готелями
-                    results += f"** • {adj_cat} segment (adjacent):**\n"
-                    for style in styles:
-                        count = adj_style_counts.get(style, 0)
-                        results += f"**  - {count} hotels in {style} style**\n"
+                    if lang == 'uk':
+                        results += f"  - {main_style_count} готелів в стилі {style} в категорії {category}\n"
+                    else:
+                        results += f"  - {main_style_count} hotels in {style} style in {category} category\n"
+                    
+                    # Суміжні категорії для цього стилю
+                    adjacent_categories = get_adjacent_categories(category)
+                    adjacent_style_total = 0
+                    adjacent_style_details = []
+                    
+                    for adj_cat in adjacent_categories:
+                        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                        adj_style_filtered = filter_hotels_by_style(adj_category_hotels, [style])
+                        adj_style_count = len(adj_style_filtered[adj_style_filtered['loyalty_program'] == program])
+                        adjacent_style_total += adj_style_count
+                        if adj_style_count > 0:
+                            adjacent_style_details.append(adj_cat)
+                    
+                    if adjacent_style_total > 0:
+                        if lang == 'uk':
+                            adj_cats_str = ' і '.join(adjacent_style_details) if adjacent_style_details else 'суміжні категорії'
+                            results += f"  - {adjacent_style_total} готелів в стилі {style} в суміжних категоріях ({adj_cats_str})\n"
+                        else:
+                            adj_cats_str = ' and '.join(adjacent_style_details) if adjacent_style_details else 'adjacent categories'
+                            results += f"  - {adjacent_style_total} hotels in {style} style in adjacent categories ({adj_cats_str})\n"
         
-        # МЕТА з детальним розбором - ВИПРАВЛЕНО!
+        # МЕТА - НОВА СТРУКТУРА
         if purposes:
             if lang == 'uk':
-                results += f"🎯 **PURPOSE: в {category.lower()} –**\n"
-                
-                # Основна категорія - показуємо ВСІ обрані цілі
-                results += f"** • {category} сегмент:**\n"
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_purpose_counts = get_purpose_counts_for_program_by_category(program, main_category_hotels, purposes)
-                
-                for purpose in purposes:
-                    count = main_purpose_counts.get(purpose, 0)
-                    results += f"**  - {count} готелів для мети {purpose}**\n"
-                
-                # Суміжні категорії - показуємо ВСІ обрані цілі
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_purpose_counts = get_purpose_counts_for_program_by_category(program, adj_category_hotels, purposes)
-                    
-                    # ВИПРАВЛЕНО: Завжди показуємо всі цілі, навіть з 0 готелями
-                    results += f"** • {adj_cat} сегмент (суміжний):**\n"
-                    for purpose in purposes:
-                        count = adj_purpose_counts.get(purpose, 0)
-                        results += f"**  - {count} готелів для мети {purpose}**\n"
+                results += f"🎯 PURPOSE:\n"
             else:
-                results += f"🎯 **PURPOSE: in {category.lower()} –**\n"
+                results += f"🎯 PURPOSE:\n"
+            
+            for purpose in purposes:
+                if lang == 'uk':
+                    results += f"{purpose}:\n"
+                else:
+                    results += f"{purpose}:\n"
                 
-                # Основна категорія - показуємо ВСІ обрані цілі
-                results += f"** • {category} segment:**\n"
-                main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                main_purpose_counts = get_purpose_counts_for_program_by_category(program, main_category_hotels, purposes)
-                
-                for purpose in purposes:
-                    count = main_purpose_counts.get(purpose, 0)
-                    results += f"**  - {count} hotels for {purpose} purpose**\n"
-                
-                # Суміжні категорії - показуємо ВСІ обрані цілі
-                adjacent_categories = get_adjacent_categories(category)
-                for adj_cat in adjacent_categories:
-                    adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                    adj_purpose_counts = get_purpose_counts_for_program_by_category(program, adj_category_hotels, purposes)
+                # Основна категорія для цієї мети
+                if category:
+                    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+                    main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, [purpose])
+                    main_purpose_count = len(main_purpose_filtered[main_purpose_filtered['loyalty_program'] == program])
                     
-                    # ВИПРАВЛЕНО: Завжди показуємо всі цілі, навіть з 0 готелями
-                    results += f"** • {adj_cat} segment (adjacent):**\n"
-                    for purpose in purposes:
-                        count = adj_purpose_counts.get(purpose, 0)
-                        results += f"**  - {count} hotels for {purpose} purpose**\n"
+                    if lang == 'uk':
+                        results += f"  - {main_purpose_count} готелів для мети {purpose} в категорії {category} (обрана категорія)\n"
+                    else:
+                        results += f"  - {main_purpose_count} hotels for {purpose} purpose in {category} category (selected category)\n"
+                    
+                    # Суміжні категорії для цієї мети
+                    adjacent_categories = get_adjacent_categories(category)
+                    adjacent_purpose_total = 0
+                    adjacent_purpose_details = []
+                    
+                    for adj_cat in adjacent_categories:
+                        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                        adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, [purpose])
+                        adj_purpose_count = len(adj_purpose_filtered[adj_purpose_filtered['loyalty_program'] == program])
+                        adjacent_purpose_total += adj_purpose_count
+                        if adj_purpose_count > 0:
+                            adjacent_purpose_details.append(adj_cat)
+                    
+                    if lang == 'uk':
+                        adj_cats_str = ' і '.join(adjacent_purpose_details) if adjacent_purpose_details else 'суміжні категорії'
+                        results += f"  - {adjacent_purpose_total} готелів для мети {purpose} в суміжних категоріях ({adj_cats_str})\n"
+                    else:
+                        adj_cats_str = ' and '.join(adjacent_purpose_details) if adjacent_purpose_details else 'adjacent categories'
+                        results += f"  - {adjacent_purpose_total} hotels for {purpose} purpose in adjacent categories ({adj_cats_str})\n"
         
         if i < 2:  # Додаємо роздільник між програмами (крім останньої)
             results += "\n" + "=" * 50 + "\n\n"
@@ -2251,100 +2240,255 @@ def format_simple_results(user_data, scores_df, lang='uk'):
 
 def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
     """
-    НОВА функція для детального звіту з рейтингами - показує повний розбір балів топ-3 програм
+    МОДЕРНІЗОВАНА функція для детального звіту /more з повним розбором балів
     """
     results = ""
     
-    # Беремо тільки топ-3 програми
-    top_programs = scores_df.head(3)
+    # Беремо всі програми для режиму /more (не тільки топ-3)
+    all_programs = scores_df.head(7)  # Всі 7 програм лояльності
     
-    # Отримуємо детальну інформацію
+    # Отримуємо дані користувача
     regions = user_data.get('regions', []) or []
     countries = user_data.get('countries', []) or []
     category = user_data.get('category')
     styles = user_data.get('styles', []) or []
     purposes = user_data.get('purposes', []) or []
     
-    # Переводимо для обробки, але показуємо оригінальні назви
+    # Переводимо для обробки
     english_regions = translate_regions_to_english(regions)
     english_countries = translate_regions_to_english(countries)
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    # Фільтруємо дані за регіоном для детального аналізу
+    # Фільтруємо дані за регіоном
     filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
     
-    for i, (index, row) in enumerate(top_programs.iterrows()):
+    for i, (index, row) in enumerate(all_programs.iterrows()):
         program = row['loyalty_program']
         
         # Визначаємо емодзі для позиції
         emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉"
         
         if lang == 'uk':
-            results += f"{emoji} **{i+1}. {program}**\n"
-            results += f"**Фінальний бал: {row['total_score']:.2f}**\n"
-            results += f"**Рейтинг готелів програми (Google Maps): {row['program_rating']:.2f}★**\n"
-            results += "**Детальний розрахунок:**\n"
+            results += f"{emoji} {i+1}. {program}\n"
+            results += f"Загальний бал: {row['total_score']:.2f}\n"
+            results += f"------------------------------\n"
         else:
-            results += f"{emoji} **{i+1}. {program}**\n"
-            results += f"**Final score: {row['total_score']:.2f}**\n"
-            results += f"**Program hotels rating (Google Maps): {row['program_rating']:.2f}★**\n"
-            results += "**Detailed calculation:**\n"
+            results += f"{emoji} {i+1}. {program}\n"
+            results += f"Total score: {row['total_score']:.2f}\n"
+            results += f"------------------------------\n"
         
-        # РЕГІОН (показуємо оригінальні назви користувача)
+        # РЕГІОН З БАЛАМИ
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
-            results += f"📍 **REGION:** {row['region_hotels']} готелів у {region_str}\n"
+            results += f"📍 REGION: {row['region_score']:.1f} балів\n"
+            results += f"{row['region_hotels']} готелів у {region_str}\n\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
-            results += f"📍 **REGION:** {row['region_hotels']} hotels in {region_str}\n"
+            results += f"📍 REGION: {row['region_score']:.1f} points\n"
+            results += f"{row['region_hotels']} hotels in {region_str}\n\n"
         
-        # КАТЕГОРІЯ - СПРОЩЕНО!
+        # КАТЕГОРІЯ З ДЕТАЛЬНИМ РОЗБОРОМ БАЛІВ
         if category:
+            # Розраховуємо бали для основної категорії
+            main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+            main_counts = main_category_hotels.groupby('loyalty_program').size().to_dict()
+            main_scores = distribute_scores_with_ties(main_counts, MAIN_CATEGORY_POINTS)
+            main_score = main_scores.get(program, 0.0)
+            main_count = main_counts.get(program, 0)
+            
+            # Розраховуємо бали для суміжних категорій
+            adjacent_categories = get_adjacent_categories(category)
+            adjacent_total_score = 0.0
+            adjacent_details = []
+            
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                adj_counts = adj_category_hotels.groupby('loyalty_program').size().to_dict()
+                adj_scores = distribute_scores_with_ties(adj_counts, ADJACENT_CATEGORY_POINTS)
+                adj_score = adj_scores.get(program, 0.0)
+                adj_count = adj_counts.get(program, 0)
+                
+                if adj_count > 0:
+                    adjacent_total_score += adj_score
+                    if lang == 'uk':
+                        adjacent_details.append(f"(суміжна) {adj_cat} – {adj_count} готелів – {adj_score:.1f} балів")
+                    else:
+                        adjacent_details.append(f"(adjacent) {adj_cat} – {adj_count} hotels – {adj_score:.1f} points")
+            
+            total_category_score = main_score + adjacent_total_score
+            
             if lang == 'uk':
-                results += f"🏨 **CATEGORY:** {category}\n"
-                results += f"   * {row['category_hotels']} готелів в категорії {category}\n"
+                results += f"🏨 CATEGORY: {total_category_score:.1f} балів\n"
+                results += f"(основна) {category} – {main_count} готелів – {main_score:.1f} балів\n"
+                for detail in adjacent_details:
+                    results += f"{detail}\n"
+                results += f"Підрахунок: {main_score:.1f} + ({adjacent_total_score:.1f}) = {total_category_score:.1f}\n\n"
             else:
-                results += f"🏨 **CATEGORY:** {category}\n"
-                results += f"   * {row['category_hotels']} hotels in {category} category\n"
+                results += f"🏨 CATEGORY: {total_category_score:.1f} points\n"
+                results += f"(main) {category} – {main_count} hotels – {main_score:.1f} points\n"
+                for detail in adjacent_details:
+                    results += f"{detail}\n"
+                results += f"Calculation: {main_score:.1f} + ({adjacent_total_score:.1f}) = {total_category_score:.1f}\n\n"
         
-        # СТИЛЬ - СПРОЩЕНО!
+        # СТИЛЬ З ДЕТАЛЬНИМ РОЗБОРОМ БАЛІВ
         if styles:
             if lang == 'uk':
-                results += f"🎨 **STYLE:** {', '.join(styles)}\n"
-                results += f"   * {row['style_hotels']} готелів відповідають вашим стилям\n"
+                results += f"🎨 STYLE: {row['style_score']:.1f} балів\n"
             else:
-                results += f"🎨 **STYLE:** {', '.join(styles)}\n"
-                results += f"   * {row['style_hotels']} hotels match your styles\n"
+                results += f"🎨 STYLE: {row['style_score']:.1f} points\n"
+            
+            total_raw_style_score = 0.0
+            
+            for style in styles:
+                if lang == 'uk':
+                    results += f"{style}:\n"
+                else:
+                    results += f"{style}:\n"
+                
+                style_raw_score = 0.0
+                
+                # Основна категорія для стилю
+                if category:
+                    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+                    main_style_filtered = filter_hotels_by_style(main_category_hotels, [style])
+                    main_style_counts = main_style_filtered.groupby('loyalty_program').size().to_dict()
+                    main_style_scores = distribute_scores_with_ties(main_style_counts, MAIN_CATEGORY_POINTS)
+                    main_style_score = main_style_scores.get(program, 0.0)
+                    main_style_count = main_style_counts.get(program, 0)
+                    
+                    style_raw_score += main_style_score
+                    
+                    if lang == 'uk':
+                        results += f"{style} в {category.lower()} – {main_style_count} готелів – {main_style_score:.1f} балів\n"
+                    else:
+                        results += f"{style} in {category.lower()} – {main_style_count} hotels – {main_style_score:.1f} points\n"
+                    
+                    # Суміжні категорії для стилю
+                    adjacent_categories = get_adjacent_categories(category)
+                    for adj_cat in adjacent_categories:
+                        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                        adj_style_filtered = filter_hotels_by_style(adj_category_hotels, [style])
+                        adj_style_counts = adj_style_filtered.groupby('loyalty_program').size().to_dict()
+                        adj_style_scores = distribute_scores_with_ties(adj_style_counts, ADJACENT_CATEGORY_POINTS)
+                        adj_style_score = adj_style_scores.get(program, 0.0)
+                        adj_style_count = adj_style_counts.get(program, 0)
+                        
+                        style_raw_score += adj_style_score
+                        
+                        if lang == 'uk':
+                            results += f"{style} в {adj_cat.lower()} (суміжна) – {adj_style_count} готелів – {adj_style_score:.1f} балів\n"
+                        else:
+                            results += f"{style} in {adj_cat.lower()} (adjacent) – {adj_style_count} hotels – {adj_style_score:.1f} points\n"
+                
+                total_raw_style_score += style_raw_score
+            
+            # Нормалізація
+            normalization_factor = len(styles)
+            final_style_score = total_raw_style_score / normalization_factor if normalization_factor > 1 else total_raw_style_score
+            
+            if lang == 'uk':
+                results += f"Сума: {total_raw_style_score:.1f} балів\n"
+                if normalization_factor > 1:
+                    results += f"Нормалізація: {total_raw_style_score:.1f} ÷ {normalization_factor} стилі = {final_style_score:.1f} балів\n\n"
+                else:
+                    results += f"Фінальний результат: {final_style_score:.1f} балів\n\n"
+            else:
+                results += f"Sum: {total_raw_style_score:.1f} points\n"
+                if normalization_factor > 1:
+                    results += f"Normalization: {total_raw_style_score:.1f} ÷ {normalization_factor} styles = {final_style_score:.1f} points\n\n"
+                else:
+                    results += f"Final result: {final_style_score:.1f} points\n\n"
         
-        # МЕТА - СПРОЩЕНО!
+        # МЕТА З ДЕТАЛЬНИМ РОЗБОРОМ БАЛІВ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 **PURPOSE:** {', '.join(purposes)}\n"
-                results += f"   * {row['purpose_hotels']} готелів підходять для ваших цілей\n"
+                results += f"🎯 PURPOSE: {row['purpose_score']:.1f} балів\n"
             else:
-                results += f"🎯 **PURPOSE:** {', '.join(purposes)}\n"
-                results += f"   * {row['purpose_hotels']} hotels suit your purposes\n"
+                results += f"🎯 PURPOSE: {row['purpose_score']:.1f} points\n"
+            
+            total_raw_purpose_score = 0.0
+            
+            for purpose in purposes:
+                if lang == 'uk':
+                    results += f"{purpose}:\n"
+                else:
+                    results += f"{purpose}:\n"
+                
+                purpose_raw_score = 0.0
+                
+                # Основна категорія для мети
+                if category:
+                    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+                    main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, [purpose])
+                    main_purpose_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
+                    main_purpose_scores = distribute_scores_with_ties(main_purpose_counts, MAIN_CATEGORY_POINTS)
+                    main_purpose_score = main_purpose_scores.get(program, 0.0)
+                    main_purpose_count = main_purpose_counts.get(program, 0)
+                    
+                    purpose_raw_score += main_purpose_score
+                    
+                    if lang == 'uk':
+                        results += f"{purpose} в {category.lower()} – {main_purpose_count} готелів – {main_purpose_score:.1f} балів\n"
+                    else:
+                        results += f"{purpose} in {category.lower()} – {main_purpose_count} hotels – {main_purpose_score:.1f} points\n"
+                    
+                    # Суміжні категорії для мети
+                    adjacent_categories = get_adjacent_categories(category)
+                    for adj_cat in adjacent_categories:
+                        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                        adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, [purpose])
+                        adj_purpose_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
+                        adj_purpose_scores = distribute_scores_with_ties(adj_purpose_counts, ADJACENT_CATEGORY_POINTS)
+                        adj_purpose_score = adj_purpose_scores.get(program, 0.0)
+                        adj_purpose_count = adj_purpose_counts.get(program, 0)
+                        
+                        purpose_raw_score += adj_purpose_score
+                        
+                        if lang == 'uk':
+                            results += f"{purpose} в {adj_cat.lower()} (суміжна) – {adj_purpose_count} готелів – {adj_purpose_score:.1f} балів\n"
+                        else:
+                            results += f"{purpose} in {adj_cat.lower()} (adjacent) – {adj_purpose_count} hotels – {adj_purpose_score:.1f} points\n"
+                
+                total_raw_purpose_score += purpose_raw_score
+            
+            # Нормалізація
+            normalization_factor = len(purposes)
+            final_purpose_score = total_raw_purpose_score / normalization_factor if normalization_factor > 1 else total_raw_purpose_score
+            
+            if lang == 'uk':
+                results += f"Сума: {total_raw_purpose_score:.1f} балів\n"
+                if normalization_factor > 1:
+                    results += f"Нормалізація: {total_raw_purpose_score:.1f} ÷ {normalization_factor} цілі = {final_purpose_score:.1f} балів\n\n"
+                else:
+                    results += f"Фінальний результат: {final_purpose_score:.1f} балів\n\n"
+            else:
+                results += f"Sum: {total_raw_purpose_score:.1f} points\n"
+                if normalization_factor > 1:
+                    results += f"Normalization: {total_raw_purpose_score:.1f} ÷ {normalization_factor} purposes = {final_purpose_score:.1f} points\n\n"
+                else:
+                    results += f"Final result: {final_purpose_score:.1f} points\n\n"
         
-        # РОЗРАХУНОК ФІНАЛЬНОГО БАЛУ З РЕЙТИНГОМ
+        # ПІДСУМОК З РЕЙТИНГОМ
+        base_total = row['region_score'] + row['category_score'] + row['style_score'] + row['purpose_score']
+        
         if lang == 'uk':
-            results += f"➕ **РОЗРАХУНОК ФІНАЛЬНОГО БАЛУ:**\n"
-            results += f"   Базовий бал: {row['base_score']:.2f}\n"
-            results += f"   Рейтинг програми: {row['program_rating']:.2f}★\n"
-            results += f"   Рейтинг-коефіцієнт: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
-            results += f"   **Фінальний результат:** {row['base_score']:.2f} × {row['rating_coefficient']:.3f} = **{row['total_score']:.2f} балів**\n"
+            results += f"➕ ПІДСУМОК:\n"
+            results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} балів\n"
+            results += f"Рейтинг програми: {row['program_rating']:.2f}★\n"
+            results += f"Рейтинг-коефіцієнт: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
+            results += f"Фінальний результат: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} балів\n"
         else:
-            results += f"➕ **FINAL SCORE CALCULATION:**\n"
-            results += f"   Base score: {row['base_score']:.2f}\n"
-            results += f"   Program rating: {row['program_rating']:.2f}★\n"
-            results += f"   Rating coefficient: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
-            results += f"   **Final result:** {row['base_score']:.2f} × {row['rating_coefficient']:.3f} = **{row['total_score']:.2f} points**\n"
+            results += f"➕ SUMMARY:\n"
+            results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} points\n"
+            results += f"Program rating: {row['program_rating']:.2f}★\n"
+            results += f"Rating coefficient: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
+            results += f"Final result: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} points\n"
         
-        if i < 2:  # Додаємо роздільник між програмами (крім останньої)
+        if i < len(all_programs) - 1:  # Додаємо роздільник між програмами (крім останньої)
             results += "\n" + "=" * 50 + "\n\n"
     
     return results
-
 # ===============================
 # ФУНКЦІЯ MAIN ТА ЗАПУСК БОТА
 # ===============================
