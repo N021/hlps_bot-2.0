@@ -1026,9 +1026,6 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
 # ===============================
 
-# ===============================
-# ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
-# ===============================
 
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про мету подорожі з чекбоксами та детальними описами"""
@@ -1935,222 +1932,222 @@ def format_scoring_breakdown(user_data, scores_df, lang='uk'):
                     results += f"{purpose}:\n"
                 
                 purpose_raw_score = 0.0
-
-# Основна категорія для кожної мети
-               if category:
-                   main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
-                   main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, [purpose])
-                   main_purpose_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
-                   main_purpose_scores = distribute_scores_with_ties(main_purpose_counts, MAIN_CATEGORY_POINTS)
-                   main_purpose_score = main_purpose_scores.get(program, 0.0)
-                   main_purpose_count = main_purpose_counts.get(program, 0)
-                   
-                   purpose_raw_score += main_purpose_score
-                   
-                   if lang == 'uk':
-                       results += f"{purpose} в {category.lower()} – {main_purpose_count} готелів – {main_purpose_score:.1f} балів\n"
-                   else:
-                       results += f"{purpose} in {category.lower()} – {main_purpose_count} hotels – {main_purpose_score:.1f} points\n"
-                   
-                   # Суміжні категорії для кожної мети
-                   adjacent_categories = get_adjacent_categories(category)
-                   for adj_cat in adjacent_categories:
-                       adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
-                       adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, [purpose])
-                       adj_purpose_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
-                       adj_purpose_scores = distribute_scores_with_ties(adj_purpose_counts, ADJACENT_CATEGORY_POINTS)
-                       adj_purpose_score = adj_purpose_scores.get(program, 0.0)
-                       adj_purpose_count = adj_purpose_counts.get(program, 0)
-                       
-                       purpose_raw_score += adj_purpose_score
-                       
-                       if lang == 'uk':
-                           results += f"{purpose} в {adj_cat.lower()} (суміжна) – {adj_purpose_count} готелів – {adj_purpose_score:.1f} балів\n"
-                       else:
-                           results += f"{purpose} in {adj_cat.lower()} (adjacent) – {adj_purpose_count} hotels – {adj_purpose_score:.1f} points\n"
-               
-               total_raw_purpose_score += purpose_raw_score
-           
-           # Нормалізація цілей
-           normalization_factor = len(purposes)
-           final_purpose_score = total_raw_purpose_score / normalization_factor if normalization_factor > 1 else total_raw_purpose_score
-           
-           if lang == 'uk':
-               results += f"Сума: {total_raw_purpose_score:.1f} балів\n"
-               if normalization_factor > 1:
-                   results += f"Нормалізація: {total_raw_purpose_score:.1f} ÷ {normalization_factor} цілі = {final_purpose_score:.1f} балів\n\n"
-               else:
-                   results += f"Фінальний результат: {final_purpose_score:.1f} балів\n\n"
-           else:
-               results += f"Sum: {total_raw_purpose_score:.1f} points\n"
-               if normalization_factor > 1:
-                   results += f"Normalization: {total_raw_purpose_score:.1f} ÷ {normalization_factor} purposes = {final_purpose_score:.1f} points\n\n"
-               else:
-                   results += f"Final result: {final_purpose_score:.1f} points\n\n"
-       
-       # ПІДСУМОК З РЕЙТИНГОМ (як в документі)
-       base_total = row['region_score'] + row['category_score'] + row['style_score'] + row['purpose_score']
-       
-       if lang == 'uk':
-           results += f"➕ ПІДСУМОК:\n"
-           results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} балів\n"
-           results += f"Рейтинг програми: {row['program_rating']:.2f}★\n"
-           results += f"Рейтинг-коефіцієнт: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
-           results += f"Фінальний результат: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} балів\n"
-       else:
-           results += f"➕ SUMMARY:\n"
-           results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} points\n"
-           results += f"Program rating: {row['program_rating']:.2f}★\n"
-           results += f"Rating coefficient: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
-           results += f"Final result: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} points\n"
-       
-       if i < len(all_programs) - 1:  # Додаємо роздільник між програмами (крім останньої)
-           results += "\n" + "=" * 50 + "\n\n"
-   
-   return results
+                
+                # Основна категорія для кожної мети
+                if category:
+                    main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
+                    main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, [purpose])
+                    main_purpose_counts = main_purpose_filtered.groupby('loyalty_program').size().to_dict()
+                    main_purpose_scores = distribute_scores_with_ties(main_purpose_counts, MAIN_CATEGORY_POINTS)
+                    main_purpose_score = main_purpose_scores.get(program, 0.0)
+                    main_purpose_count = main_purpose_counts.get(program, 0)
+                    
+                    purpose_raw_score += main_purpose_score
+                    
+                    if lang == 'uk':
+                        results += f"{purpose} в {category.lower()} – {main_purpose_count} готелів – {main_purpose_score:.1f} балів\n"
+                    else:
+                        results += f"{purpose} in {category.lower()} – {main_purpose_count} hotels – {main_purpose_score:.1f} points\n"
+                    
+                    # Суміжні категорії для кожної мети
+                    adjacent_categories = get_adjacent_categories(category)
+                    for adj_cat in adjacent_categories:
+                        adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
+                        adj_purpose_filtered = filter_hotels_by_purpose(adj_category_hotels, [purpose])
+                        adj_purpose_counts = adj_purpose_filtered.groupby('loyalty_program').size().to_dict()
+                        adj_purpose_scores = distribute_scores_with_ties(adj_purpose_counts, ADJACENT_CATEGORY_POINTS)
+                        adj_purpose_score = adj_purpose_scores.get(program, 0.0)
+                        adj_purpose_count = adj_purpose_counts.get(program, 0)
+                        
+                        purpose_raw_score += adj_purpose_score
+                        
+                        if lang == 'uk':
+                            results += f"{purpose} в {adj_cat.lower()} (суміжна) – {adj_purpose_count} готелів – {adj_purpose_score:.1f} балів\n"
+                        else:
+                            results += f"{purpose} in {adj_cat.lower()} (adjacent) – {adj_purpose_count} hotels – {adj_purpose_score:.1f} points\n"
+                
+                total_raw_purpose_score += purpose_raw_score
+            
+            # Нормалізація цілей
+            normalization_factor = len(purposes)
+            final_purpose_score = total_raw_purpose_score / normalization_factor if normalization_factor > 1 else total_raw_purpose_score
+            
+            if lang == 'uk':
+                results += f"Сума: {total_raw_purpose_score:.1f} балів\n"
+                if normalization_factor > 1:
+                    results += f"Нормалізація: {total_raw_purpose_score:.1f} ÷ {normalization_factor} цілі = {final_purpose_score:.1f} балів\n\n"
+                else:
+                    results += f"Фінальний результат: {final_purpose_score:.1f} балів\n\n"
+            else:
+                results += f"Sum: {total_raw_purpose_score:.1f} points\n"
+                if normalization_factor > 1:
+                    results += f"Normalization: {total_raw_purpose_score:.1f} ÷ {normalization_factor} purposes = {final_purpose_score:.1f} points\n\n"
+                else:
+                    results += f"Final result: {final_purpose_score:.1f} points\n\n"
+        
+        # ПІДСУМОК З РЕЙТИНГОМ (як в документі)
+        base_total = row['region_score'] + row['category_score'] + row['style_score'] + row['purpose_score']
+        
+        if lang == 'uk':
+            results += f"➕ ПІДСУМОК:\n"
+            results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} балів\n"
+            results += f"Рейтинг програми: {row['program_rating']:.2f}★\n"
+            results += f"Рейтинг-коефіцієнт: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
+            results += f"Фінальний результат: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} балів\n"
+        else:
+            results += f"➕ SUMMARY:\n"
+            results += f"{row['region_score']:.1f} + {row['category_score']:.1f} + {row['style_score']:.1f} + {row['purpose_score']:.1f} = {base_total:.2f} points\n"
+            results += f"Program rating: {row['program_rating']:.2f}★\n"
+            results += f"Rating coefficient: {row['program_rating']:.2f} ÷ 5.0 = {row['rating_coefficient']:.3f}\n"
+            results += f"Final result: {base_total:.2f} × {row['rating_coefficient']:.3f} = {row['total_score']:.2f} points\n"
+        
+        if i < len(all_programs) - 1:  # Додаємо роздільник між програмами (крім останньої)
+            results += "\n" + "=" * 50 + "\n\n"
+    
+    return results
 
 # ОНОВЛЕНА: Функція main з додаванням команди /scoring
 def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
-   """Головна функція запуску бота з підтримкою webhook"""
-   # Завантаження даних
-   global hotel_data
-   hotel_data = load_hotel_data(csv_path)
-   
-   if hotel_data is None:
-       logger.error("Не вдалося завантажити дані. Бот не запущено.")
-       return
-   
-   # Додаткова перевірка наявності необхідних колонок
-   required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
-   missing_required = [col for col in required_columns if col not in hotel_data.columns]
-   
-   if missing_required:
-       logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
-       return
-   
-   # Переконуємося, що є колонка 'segment'
-   if 'segment' not in hotel_data.columns:
-       logger.error("Відсутня колонка 'segment'. Бот не запущено.")
-       return
-   
-   # ДОДАНО: Логування успішного завантаження даних та рейтингів
-   logger.info(f"Успішно завантажено дані готелів: {len(hotel_data)} записів")
-   logger.info(f"Доступні програми лояльності з рейтингами: {list(LOYALTY_PROGRAM_RATINGS.keys())}")
-   
-   # Створення застосунку
-   app = Application.builder().token(token)
-   
-   # Побудова застосунку
-   application = app.build()
-   
-   # ОНОВЛЕНО: Налаштування обробників з додаванням команди /scoring
-   conv_handler = ConversationHandler(
-       entry_points=[CommandHandler("start", start)],
-       states={
-           WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-           CATEGORY: [CallbackQueryHandler(category_choice)],
-           WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-           WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
-       },
-       fallbacks=[
-           CommandHandler("cancel", cancel),
-           CommandHandler("start", start)  # Додаємо /start як fallback
-       ]
-   )
-   
-   # Додаємо основний обробник розмови
-   application.add_handler(conv_handler)
-   
-   # ДОДАНО: Обробник команди /more для детального розбору всіх програм
-   application.add_handler(CommandHandler("more", show_more_details))
-   
-   # НОВЕ: Обробник команди /scoring для детального розбору балів
-   application.add_handler(CommandHandler("scoring", show_scoring_details))
-   
-   # ОНОВЛЕНО: Логування доступних команд
-   logger.info("Зареєстровані команди бота:")
-   logger.info("  /start - початок опитування")
-   logger.info("  /cancel - скасування розмови")
-   logger.info("  /more - детальний розбір всіх 7 програм лояльності")
-   logger.info("  /scoring - детальний розбір нарахування балів для всіх 7 програм")
-   
-   # ВИПРАВЛЕНО: Отримуємо порт з змінних середовища
-   port = int(os.environ.get("PORT", "10000"))
-   
-   # ВИПРАВЛЕНО: Логування налаштувань
-   logger.info(f"Port from environment: {port}")
-   logger.info(f"Webhook URL: {webhook_url}")
-   logger.info(f"Webhook path: {webhook_path}")
-   
-   if webhook_url and webhook_path:
-       webhook_info = f"{webhook_url}{webhook_path}"
-       logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
-       
-       try:
-           application.run_webhook(
-               listen="0.0.0.0",  # ВАЖЛИВО: слухати на всіх інтерфейсах
-               port=port,
-               url_path=webhook_path,
-               webhook_url=webhook_info,
-               allowed_updates=Update.ALL_TYPES
-           )
-       except Exception as e:
-           logger.error(f"Помилка запуску webhook: {e}")
-           logger.info("Перехід на polling режим...")
-           application.run_polling(allowed_updates=Update.ALL_TYPES)
-   else:
-       logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
-       application.run_polling(allowed_updates=Update.ALL_TYPES)
-   
-   logger.info("Бот успішно запущено з підтримкою рейтингових розрахунків та трьох типів звітів")
+    """Головна функція запуску бота з підтримкою webhook"""
+    # Завантаження даних
+    global hotel_data
+    hotel_data = load_hotel_data(csv_path)
+    
+    if hotel_data is None:
+        logger.error("Не вдалося завантажити дані. Бот не запущено.")
+        return
+    
+    # Додаткова перевірка наявності необхідних колонок
+    required_columns = ['loyalty_program', 'region', 'country', 'Hotel Brand']
+    missing_required = [col for col in required_columns if col not in hotel_data.columns]
+    
+    if missing_required:
+        logger.error(f"Відсутні критично важливі колонки: {missing_required}. Бот не запущено.")
+        return
+    
+    # Переконуємося, що є колонка 'segment'
+    if 'segment' not in hotel_data.columns:
+        logger.error("Відсутня колонка 'segment'. Бот не запущено.")
+        return
+    
+    # ДОДАНО: Логування успішного завантаження даних та рейтингів
+    logger.info(f"Успішно завантажено дані готелів: {len(hotel_data)} записів")
+    logger.info(f"Доступні програми лояльності з рейтингами: {list(LOYALTY_PROGRAM_RATINGS.keys())}")
+    
+    # Створення застосунку
+    app = Application.builder().token(token)
+    
+    # Побудова застосунку
+    application = app.build()
+    
+    # ОНОВЛЕНО: Налаштування обробників з додаванням команди /scoring
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
+            CATEGORY: [CallbackQueryHandler(category_choice)],
+            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
+            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start)  # Додаємо /start як fallback
+        ]
+    )
+    
+    # Додаємо основний обробник розмови
+    application.add_handler(conv_handler)
+    
+    # ДОДАНО: Обробник команди /more для детального розбору всіх програм
+    application.add_handler(CommandHandler("more", show_more_details))
+    
+    # НОВЕ: Обробник команди /scoring для детального розбору балів
+    application.add_handler(CommandHandler("scoring", show_scoring_details))
+    
+    # ОНОВЛЕНО: Логування доступних команд
+    logger.info("Зареєстровані команди бота:")
+    logger.info("  /start - початок опитування")
+    logger.info("  /cancel - скасування розмови")
+    logger.info("  /more - детальний розбір всіх 7 програм лояльності")
+    logger.info("  /scoring - детальний розбір нарахування балів для всіх 7 програм")
+    
+    # ВИПРАВЛЕНО: Отримуємо порт з змінних середовища
+    port = int(os.environ.get("PORT", "10000"))
+    
+    # ВИПРАВЛЕНО: Логування налаштувань
+    logger.info(f"Port from environment: {port}")
+    logger.info(f"Webhook URL: {webhook_url}")
+    logger.info(f"Webhook path: {webhook_path}")
+    
+    if webhook_url and webhook_path:
+        webhook_info = f"{webhook_url}{webhook_path}"
+        logger.info(f"Запуск бота в режимі webhook на {webhook_info}")
+        
+        try:
+            application.run_webhook(
+                listen="0.0.0.0",  # ВАЖЛИВО: слухати на всіх інтерфейсах
+                port=port,
+                url_path=webhook_path,
+                webhook_url=webhook_info,
+                allowed_updates=Update.ALL_TYPES
+            )
+        except Exception as e:
+            logger.error(f"Помилка запуску webhook: {e}")
+            logger.info("Перехід на polling режим...")
+            application.run_polling(allowed_updates=Update.ALL_TYPES)
+    else:
+        logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    logger.info("Бот успішно запущено з підтримкою рейтингових розрахунків та трьох типів звітів")
 
 if __name__ == "__main__":
-   # Використовуємо змінні середовища або значення за замовчуванням
-   TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-   CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
+    # Використовуємо змінні середовища або значення за замовчуванням
+    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+    CSV_PATH = os.environ.get("CSV_PATH", "hotel_data.csv")
 
-   if not CSV_PATH:
-       logger.error("CSV_PATH не задано. Завершення запуску.")
-       exit(1)
-   logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
-   
-   # Параметри для webhook (опціонально)
-   WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
-   WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
-   
-   # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
-   WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
-   
-   # Перевіряємо наявність токена
-   if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
-       logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
-   
-   # ДОДАНО: Логування версії бота
-   logger.info("="*60)
-   logger.info("🤖 HOTEL LOYALTY PROGRAM BOT v3.0 (WITH 3 REPORT TYPES)")
-   logger.info("="*60)
-   
-   # ВИПРАВЛЕНО: Додаткове логування для діагностики
-   logger.info(f"Starting bot with TOKEN: {TOKEN[:10]}...")
-   logger.info(f"CSV_PATH: {CSV_PATH}")
-   logger.info(f"WEBHOOK_HOST: {WEBHOOK_HOST}")
-   logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
-   logger.info(f"PORT: {os.environ.get('PORT', '10000')}")
-   
-   # ДОДАНО: Логування налаштувань рейтингів
-   logger.info(f"Loyalty program ratings loaded: {len(LOYALTY_PROGRAM_RATINGS)} programs")
-   logger.info("Available ratings:")
-   for program, rating in LOYALTY_PROGRAM_RATINGS.items():
-       logger.info(f"  {program}: {rating}★")
-   
-   # ОНОВЛЕНО: Логування доступних звітів
-   logger.info("Available report types:")
-   logger.info("  1. Simple report (/start) - Top 3 programs, compact format")
-   logger.info("  2. Detailed report (/more) - All 7 programs, extended info")
-   logger.info("  3. Scoring breakdown (/scoring) - All 7 programs, detailed calculations")
-   
-   # Запускаємо бота з підтримкою webhook або polling
-   main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
+    if not CSV_PATH:
+        logger.error("CSV_PATH не задано. Завершення запуску.")
+        exit(1)
+    logger.info(f"Використовується шлях до CSV: {CSV_PATH}")
+    
+    # Параметри для webhook (опціонально)
+    WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "").replace("https://", "")  # Очистити https://, якщо є
+    WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", f"/webhook/{TOKEN}")
+    
+    # Формуємо повну URL для webhook, якщо вказано WEBHOOK_HOST
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}" if WEBHOOK_HOST else None
+    
+    # Перевіряємо наявність токена
+    if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+        logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
+    
+    # ДОДАНО: Логування версії бота
+    logger.info("="*60)
+    logger.info("🤖 HOTEL LOYALTY PROGRAM BOT v3.0 (WITH 3 REPORT TYPES)")
+    logger.info("="*60)
+    
+    # ВИПРАВЛЕНО: Додаткове логування для діагностики
+    logger.info(f"Starting bot with TOKEN: {TOKEN[:10]}...")
+    logger.info(f"CSV_PATH: {CSV_PATH}")
+    logger.info(f"WEBHOOK_HOST: {WEBHOOK_HOST}")
+    logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
+    logger.info(f"PORT: {os.environ.get('PORT', '10000')}")
+    
+    # ДОДАНО: Логування налаштувань рейтингів
+    logger.info(f"Loyalty program ratings loaded: {len(LOYALTY_PROGRAM_RATINGS)} programs")
+    logger.info("Available ratings:")
+    for program, rating in LOYALTY_PROGRAM_RATINGS.items():
+        logger.info(f"  {program}: {rating}★")
+    
+    # ОНОВЛЕНО: Логування доступних звітів
+    logger.info("Available report types:")
+    logger.info("  1. Simple report (/start) - Top 3 programs, compact format")
+    logger.info("  2. Detailed report (/more) - All 7 programs, extended info")
+    logger.info("  3. Scoring breakdown (/scoring) - All 7 programs, detailed calculations")
+    
+    # Запускаємо бота з підтримкою webhook або polling
+    main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
 
 # ===============================
 # ФУНКЦІЯ MAIN ТА ЗАПУСК БОТА
