@@ -2166,14 +2166,11 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
                     adj_style_counts = get_style_counts_for_program_by_category(program, adj_category_hotels, styles)
                     
-                    # Перевіряємо, чи є хоча б один готель в цій суміжній категорії
-                    total_adj_hotels = sum(adj_style_counts.values())
-                    if total_adj_hotels > 0:
-                        results += f"** • {adj_cat} сегмент (суміжний):**\n"
-                        for style in styles:
-                            count = adj_style_counts.get(style, 0)
-                            if count > 0:
-                                results += f"**  - {count} готелів в стилі {style}**\n"
+                    # ВИПРАВЛЕНО: Завжди показуємо всі стилі, навіть з 0 готелями
+                    results += f"** • {adj_cat} сегмент (суміжний):**\n"
+                    for style in styles:
+                        count = adj_style_counts.get(style, 0)
+                        results += f"**  - {count} готелів в стилі {style}**\n"
             else:
                 results += f"🎨 **STYLE: in {category.lower()} –**\n"
                 
@@ -2192,14 +2189,11 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
                     adj_style_counts = get_style_counts_for_program_by_category(program, adj_category_hotels, styles)
                     
-                    # Перевіряємо, чи є хоча б один готель в цій суміжній категорії
-                    total_adj_hotels = sum(adj_style_counts.values())
-                    if total_adj_hotels > 0:
-                        results += f"** • {adj_cat} segment (adjacent):**\n"
-                        for style in styles:
-                            count = adj_style_counts.get(style, 0)
-                            if count > 0:
-                                results += f"**  - {count} hotels in {style} style**\n"
+                    # ВИПРАВЛЕНО: Завжди показуємо всі стилі, навіть з 0 готелями
+                    results += f"** • {adj_cat} segment (adjacent):**\n"
+                    for style in styles:
+                        count = adj_style_counts.get(style, 0)
+                        results += f"**  - {count} hotels in {style} style**\n"
         
         # МЕТА з детальним розбором - ВИПРАВЛЕНО!
         if purposes:
@@ -2221,14 +2215,11 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
                     adj_purpose_counts = get_purpose_counts_for_program_by_category(program, adj_category_hotels, purposes)
                     
-                    # Перевіряємо, чи є хоча б один готель в цій суміжній категорії
-                    total_adj_hotels = sum(adj_purpose_counts.values())
-                    if total_adj_hotels > 0:
-                        results += f"** • {adj_cat} сегмент (суміжний):**\n"
-                        for purpose in purposes:
-                            count = adj_purpose_counts.get(purpose, 0)
-                            if count > 0:
-                                results += f"**  - {count} готелів для мети {purpose}**\n"
+                    # ВИПРАВЛЕНО: Завжди показуємо всі цілі, навіть з 0 готелями
+                    results += f"** • {adj_cat} сегмент (суміжний):**\n"
+                    for purpose in purposes:
+                        count = adj_purpose_counts.get(purpose, 0)
+                        results += f"**  - {count} готелів для мети {purpose}**\n"
             else:
                 results += f"🎯 **PURPOSE: in {category.lower()} –**\n"
                 
@@ -2247,14 +2238,11 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adj_category_hotels = filter_hotels_by_category(filtered_by_region, adj_cat)
                     adj_purpose_counts = get_purpose_counts_for_program_by_category(program, adj_category_hotels, purposes)
                     
-                    # Перевіряємо, чи є хоча б один готель в цій суміжній категорії
-                    total_adj_hotels = sum(adj_purpose_counts.values())
-                    if total_adj_hotels > 0:
-                        results += f"** • {adj_cat} segment (adjacent):**\n"
-                        for purpose in purposes:
-                            count = adj_purpose_counts.get(purpose, 0)
-                            if count > 0:
-                                results += f"**  - {count} hotels for {purpose} purpose**\n"
+                    # ВИПРАВЛЕНО: Завжди показуємо всі цілі, навіть з 0 готелями
+                    results += f"** • {adj_cat} segment (adjacent):**\n"
+                    for purpose in purposes:
+                        count = adj_purpose_counts.get(purpose, 0)
+                        results += f"**  - {count} hotels for {purpose} purpose**\n"
         
         if i < 2:  # Додаємо роздільник між програмами (крім останньої)
             results += "\n" + "=" * 50 + "\n\n"
