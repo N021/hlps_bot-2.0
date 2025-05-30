@@ -47,7 +47,7 @@ LOYALTY_PROGRAM_RATINGS = {
     "ALL - Accor Live Limitless": 4.11,
     "Choice Privileges": 3.68,
     "Hilton Honors": 4.19,
-    "IHG One Rewards": 4.19,
+    "IHG One Rewards": 4.15,
     "Marriott Bonvoy": 4.22,
     "World of Hyatt": 4.28,
     "Wyndham Rewards": 3.17
@@ -2089,6 +2089,12 @@ def format_simple_results(user_data, scores_df, lang='uk'):
     for i, (index, row) in enumerate(top_programs.iterrows()):
         program = row['loyalty_program']
         
+        # Замінюємо назву програми для відображення
+        if program == "IHG One Rewards":
+            display_program_name = "InterContinental Hotels One Rewards"
+        else:
+            display_program_name = program
+        
         # Визначаємо емодзі та назву позиції
         if i == 0:
             emoji = "🥇"
@@ -2101,11 +2107,11 @@ def format_simple_results(user_data, scores_df, lang='uk'):
             position_text = "Топ 3" if lang == 'uk' else "Top 3"
         
         if lang == 'uk':
-            results += f"{emoji} {position_text} – {program}\n"
+            results += f"{emoji} {position_text} – {display_program_name}\n"
             results += f"⭐{row['program_rating']:.2f} – середній рейтинг готелів, що входять до програми\n"
             results += f"(на основі відгуків з Google Maps):\n"
         else:
-            results += f"{emoji} {position_text} – {program}\n"
+            results += f"{emoji} {position_text} – {display_program_name}\n"
             results += f"⭐{row['program_rating']:.2f} – average rating of hotels in the program\n"
             results += f"(based on Google Maps reviews):\n"
         
@@ -2261,15 +2267,21 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
     for i, (index, row) in enumerate(all_programs.iterrows()):
         program = row['loyalty_program']
         
+        # Замінюємо назву програми для відображення
+        if program == "IHG One Rewards":
+            display_program_name = "InterContinental Hotels One Rewards"
+        else:
+            display_program_name = program
+        
         # Визначаємо емодзі для позиції
         emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉"
         
         if lang == 'uk':
-            results += f"{emoji} {i+1}. {program}\n"
+            results += f"{emoji} {i+1}. {display_program_name}\n"
             results += f"Загальний бал: {row['total_score']:.2f}\n"
             results += f"------------------------------\n"
         else:
-            results += f"{emoji} {i+1}. {program}\n"
+            results += f"{emoji} {i+1}. {display_program_name}\n"
             results += f"Total score: {row['total_score']:.2f}\n"
             results += f"------------------------------\n"
         
