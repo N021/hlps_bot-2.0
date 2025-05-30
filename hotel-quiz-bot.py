@@ -2075,7 +2075,7 @@ def get_purpose_counts_for_program_by_category(program, category_hotels, purpose
 
 def format_simple_results(user_data, scores_df, lang='uk'):
     """
-    ОНОВЛЕНА функція для звичайного звіту - новий компактний формат
+    ОНОВЛЕНА функція для звичайного звіту - новий компактний формат з абзацами
     """
     results = ""
     
@@ -2118,24 +2118,28 @@ def format_simple_results(user_data, scores_df, lang='uk'):
             emoji = "🥉"
             position_text = "Топ 3" if lang == 'uk' else "Top 3"
         
+        # ДОДАНО: Порожній рядок перед кожною програмою (крім першої)
+        if i > 0:
+            results += "\n"
+        
         if lang == 'uk':
-            results += f"{emoji} {position_text} – {display_program_name}\n"
+            results += f"{emoji} {position_text} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
             results += f"⭐{row['program_rating']:.2f} – середній рейтинг готелів, що входять до програми\n"
-            results += f"(на основі відгуків з Google Maps):\n"
+            results += f"(на основі відгуків з Google Maps):\n\n"  # ДОДАНО: \n\n замість \n
         else:
-            results += f"{emoji} {position_text} – {display_program_name}\n"
+            results += f"{emoji} {position_text} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
             results += f"⭐{row['program_rating']:.2f} – average rating of hotels in the program\n"
-            results += f"(based on Google Maps reviews):\n"
+            results += f"(based on Google Maps reviews):\n\n"  # ДОДАНО: \n\n замість \n
         
         # РЕГІОН
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон:\n"
-            results += f" • {row['region_hotels']} готелів у {region_str}\n"
+            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"  # ДОДАНО: \n\n замість \n
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region:\n"
-            results += f" • {row['region_hotels']} hotels in {region_str}\n"
+            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"  # ДОДАНО: \n\n замість \n
         
         # КАТЕГОРІЯ - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if category:
@@ -2160,13 +2164,17 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 results += f"Обраний – {category} – {main_count} готелів\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f"Cуміжні – {adj_cats_str} – {adjacent_total} готелів\n"
+                    results += f"Cуміжні – {adj_cats_str} – {adjacent_total} готелів\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
             else:
                 results += f"🏨 Segment:\n"
                 results += f"Selected – {category} – {main_count} hotels\n"
                 if adjacent_details:
                     adj_cats_str = ' and '.join(adjacent_details)
-                    results += f"Adjacent – {adj_cats_str} – {adjacent_total} hotels\n"
+                    results += f"Adjacent – {adj_cats_str} – {adjacent_total} hotels\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
         
         # СТИЛЬ - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if styles:
@@ -2200,12 +2208,16 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 results += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
                 if adjacent_style_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n"
+                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
             else:
                 results += f"  - {main_style_total} hotels in selected styles, in {category} category\n"
                 if adjacent_style_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' and '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n"
+                    results += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
         
         # МЕТА - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if purposes:
@@ -2240,14 +2252,16 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
                     results += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
+                # ВИДАЛЕНО додатковий \n\n тут, оскільки це останній блок
             else:
                 results += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' and '.join(adjacent_categories_list)
                     results += f"  - {adjacent_purpose_total} hotels for selected purposes, in adjacent categories ({adj_cats_str})\n"
+                # ВИДАЛЕНО додатковий \n\n тут, оскільки це останній блок
         
         if i < 2:  # Додаємо роздільник між програмами (крім останньої)
-            results += "=" * 50 + "\n\n"
+            results += "\n" + "=" * 50 + "\n"  # ЗМІНЕНО: додано \n перед роздільником
     
     return results
 
