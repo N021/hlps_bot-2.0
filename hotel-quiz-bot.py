@@ -2267,7 +2267,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
 
 def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
     """
-    НОВИЙ ПРОСТИЙ формат детального звіту /more без складних розрахунків
+    НОВИЙ ПРОСТИЙ формат детального звіту /more без складних розрахунків - з абзацами
     """
     results = ""
     
@@ -2302,24 +2302,28 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # Визначаємо емодзі для позиції
         emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉"
         
+        # ДОДАНО: Порожній рядок перед кожною програмою (крім першої)
+        if i > 0:
+            results += "\n"
+        
         if lang == 'uk':
-            results += f"{emoji} Топ {i+1} – {display_program_name}\n"
+            results += f"{emoji} Топ {i+1} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
             results += f"Середній рейтинг готелів, що входять до програми\n"
-            results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}⭐\n"
+            results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}⭐\n\n"  # ДОДАНО: \n\n замість \n
         else:
-            results += f"{emoji} Top {i+1} – {display_program_name}\n"
+            results += f"{emoji} Top {i+1} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
             results += f"Average rating of hotels in the program\n"
-            results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n"
+            results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n\n"  # ДОДАНО: \n\n замість \n
         
         # РЕГІОН
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон:\n"
-            results += f" • {row['region_hotels']} готелів у {region_str}\n"
+            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"  # ДОДАНО: \n\n замість \n
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region:\n"
-            results += f" • {row['region_hotels']} hotels in {region_str}\n"
+            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"  # ДОДАНО: \n\n замість \n
         
         # СЕГМЕНТ
         if category:
@@ -2343,22 +2347,26 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                 results += f" • {main_count} готелів в категорії {category} (обраний сегмент)\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n"
+                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
             else:
                 results += f"🏨 Segment:\n"
                 results += f" • {main_count} hotels in {category} category (selected segment)\n"
                 if adjacent_details:
                     adj_cats_str = ' and '.join(adjacent_details)
-                    results += f" • {adjacent_total} hotels in {adj_cats_str} categories (adjacent segment to selected)\n"
+                    results += f" • {adjacent_total} hotels in {adj_cats_str} categories (adjacent segment to selected)\n\n"  # ДОДАНО: \n\n замість \n
+                else:
+                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
         
         # СТИЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНОМУ СТИЛЮ
         if styles:
             if lang == 'uk':
-                results += f"🎨 Стиль, позиціонування:\n"
+                results += f"🎨 Стиль, позиціонування:\n\n"  # ДОДАНО: \n\n замість \n
             else:
-                results += f"🎨 Style, positioning:\n"
+                results += f"🎨 Style, positioning:\n\n"  # ДОДАНО: \n\n замість \n
             
-            for style in styles:
+            for j, style in enumerate(styles):
                 results += f"{style}:\n"
                 
                 # Основна категорія для цього стилю
@@ -2385,20 +2393,29 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                     if adjacent_style_details:
                         adj_cats_str = ' i '.join(adjacent_style_details)
                         results += f"  - {adjacent_style_total} готелів в стилі «{style}» в суміжних категоріях ({adj_cats_str})\n"
+                    # ДОДАНО: абзац після кожного стилю (крім останнього)
+                    if j < len(styles) - 1:
+                        results += "\n"
                 else:
                     results += f"  - {main_style_total} hotels in «{style}» style in {category} category\n"
                     if adjacent_style_details:
                         adj_cats_str = ' and '.join(adjacent_style_details)
                         results += f"  - {adjacent_style_total} hotels in «{style}» style in adjacent categories ({adj_cats_str})\n"
+                    # ДОДАНО: абзац після кожного стилю (крім останнього)
+                    if j < len(styles) - 1:
+                        results += "\n"
+            
+            # ДОДАНО: абзац після всіх стилів
+            results += "\n"
         
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Ціль подорожі:\n"
+                results += f"🎯 Ціль подорожі:\n\n"  # ДОДАНО: \n\n замість \n
             else:
-                results += f"🎯 Travel purpose:\n"
+                results += f"🎯 Travel purpose:\n\n"  # ДОДАНО: \n\n замість \n
             
-            for purpose in purposes:
+            for j, purpose in enumerate(purposes):
                 results += f"{purpose}:\n"
                 
                 # Основна категорія для цієї мети
@@ -2425,14 +2442,20 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                     if adjacent_purpose_details:
                         adj_cats_str = ' i '.join(adjacent_purpose_details)
                         results += f"  - {adjacent_purpose_total} готелів, що відповідають цілі «{purpose}» в суміжних сегментах ({adj_cats_str})\n"
+                    # ДОДАНО: абзац після кожної мети (крім останньої)
+                    if j < len(purposes) - 1:
+                        results += "\n"
                 else:
                     results += f"  - {main_purpose_total} hotels matching «{purpose}» purpose in {category} category\n"
                     if adjacent_purpose_details:
                         adj_cats_str = ' and '.join(adjacent_purpose_details)
                         results += f"  - {adjacent_purpose_total} hotels matching «{purpose}» purpose in adjacent segments ({adj_cats_str})\n"
+                    # ДОДАНО: абзац після кожної мети (крім останньої)
+                    if j < len(purposes) - 1:
+                        results += "\n"
         
         if i < len(all_programs) - 1:  # Додаємо роздільник між програмами (крім останньої)
-            results += "\n"
+            results += "\n" + "=" * 50 + "\n"  # ЗМІНЕНО: додано \n перед роздільником
     
     return results
 
