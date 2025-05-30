@@ -2256,12 +2256,10 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         
         if lang == 'uk':
             results += f"{emoji} Топ {i+1} – {display_program_name}\n"
-            results += f"Фінальний бал: {row['total_score']:.2f}\n"
             results += f"Середній рейтинг готелів, що входять до програми\n"
             results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}⭐\n"
         else:
             results += f"{emoji} Top {i+1} – {display_program_name}\n"
-            results += f"Final score: {row['total_score']:.2f}\n"
             results += f"Average rating of hotels in the program\n"
             results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n"
         
