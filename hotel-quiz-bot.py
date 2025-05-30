@@ -764,8 +764,51 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ЧАСТИНА 7: ОБРОБНИКИ СТИЛЮ
 # ===============================
 
+def get_styles_for_category(category, lang='uk'):
+    """
+    Повертає список стилів, які відповідають обраній категорії готелю
+    """
+    if lang == 'uk':
+        all_styles = [
+            "Розкішний і вишуканий", 
+            "Бутік і унікальний", 
+            "Класичний і традиційний", 
+            "Сучасний і дизайнерський",
+            "Затишний і сімейний", 
+            "Практичний і економічний"
+        ]
+        
+        if category == "Luxury":
+            # Для Luxury виключаємо "Практичний і економічний"
+            return [style for style in all_styles if style != "Практичний і економічний"]
+        elif category == "Standard":
+            # Для Standard виключаємо "Розкішний і вишуканий" і "Бутік і унікальний"
+            return [style for style in all_styles if style not in ["Розкішний і вишуканий", "Бутік і унікальний"]]
+        else:
+            # Для Comfort залишаємо всі стилі
+            return all_styles
+    else:
+        all_styles = [
+            "Luxurious and refined", 
+            "Boutique and unique",
+            "Classic and traditional", 
+            "Modern and designer",
+            "Cozy and family-friendly", 
+            "Practical and economical"
+        ]
+        
+        if category == "Luxury":
+            # Для Luxury виключаємо "Practical and economical"
+            return [style for style in all_styles if style != "Practical and economical"]
+        elif category == "Standard":
+            # Для Standard виключаємо "Luxurious and refined" і "Boutique and unique"
+            return [style for style in all_styles if style not in ["Luxurious and refined", "Boutique and unique"]]
+        else:
+            # Для Comfort залишаємо всі стилі
+            return all_styles
+
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про стиль готелю з чекбоксами та детальними описами"""
+    """Питання про стиль готелю з чекбоксами та фільтрацією по категорії"""
     
     if update.callback_query:
         query = update.callback_query
@@ -777,56 +820,66 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     lang = user_data_global[user_id]['language']
     
+    # Отримуємо обрану категорію
+    category = user_data_global[user_id].get('category')
+    
     # Ініціалізуємо вибрані стилі, якщо їх ще не обрано
     if 'selected_styles' not in user_data_global[user_id]:
         user_data_global[user_id]['selected_styles'] = []
     
+    # НОВОЕ: Отримуємо фільтровані стилі відповідно до категорії
+    styles = get_styles_for_category(category, lang)
+    
+    # НОВОЕ: Очищуємо вибрані стилі, якщо вони більше не доступні для цієї категорії
+    user_data_global[user_id]['selected_styles'] = [
+        style for style in user_data_global[user_id]['selected_styles'] 
+        if style in styles
+    ]
+    
     # Створюємо InlineKeyboard з чекбоксами для стилів
     if lang == 'uk':
-        styles = [
-            "Розкішний і вишуканий", 
-            "Бутік і унікальний", 
-            "Класичний і традиційний", 
-            "Сучасний і дизайнерський",
-            "Затишний і сімейний", 
-            "Практичний і економічний"
-        ]
-        
         styles_description = (
             "Питання 3/4:\n"
             "Який стиль готелю ви зазвичай обираєте?\n"
             "*(Оберіть до трьох варіантів)*\n\n"
-            "1. **Розкішний і вишуканий** (преміум-матеріали, елегантний дизайн, високий рівень сервісу)\n"
-            "2. **Бутік і унікальний** (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)\n"
-            "3. **Класичний і традиційний** (перевірений часом стиль, консервативність, історичність)\n"
-            "4. **Сучасний і дизайнерський** (модні інтер'єри, мінімалізм, технологічність)\n"
-            "5. **Затишний і сімейний** (тепла атмосфера, комфорт, дружній до дітей)\n"
-            "6. **Практичний і економічний** (без зайвих деталей, функціональний, доступний)"
         )
+        
+        # НОВОЕ: Динамічно генеруємо описи тільки для доступних стилів
+        style_descriptions = {
+            "Розкішний і вишуканий": "**Розкішний і вишуканий** (преміум-матеріали, елегантний дизайн, високий рівень сервісу)",
+            "Бутік і унікальний": "**Бутік і унікальний** (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)",
+            "Класичний і традиційний": "**Класичний і традиційний** (перевірений часом стиль, консервативність, історичність)",
+            "Сучасний і дизайнерський": "**Сучасний і дизайнерський** (модні інтер'єри, мінімалізм, технологічність)",
+            "Затишний і сімейний": "**Затишний і сімейний** (тепла атмосфера, комфорт, дружній до дітей)",
+            "Практичний і економічний": "**Практичний і економічний** (без зайвих деталей, функціональний, доступний)"
+        }
+        
+        # Додаємо описи тільки для доступних стилів
+        for i, style in enumerate(styles):
+            styles_description += f"{i+1}. {style_descriptions[style]}\n"
         
         title_text = styles_description
         submit_text = "Відповісти"
     else:
-        styles = [
-            "Luxurious and refined", 
-            "Boutique and unique",
-            "Classic and traditional", 
-            "Modern and designer",
-            "Cozy and family-friendly", 
-            "Practical and economical"
-        ]
-        
         styles_description = (
             "Question 3/4:\n"
             "What hotel style do you usually choose?\n"
             "*(Choose up to three options)*\n\n"
-            "1. **Luxurious and refined** (premium materials, elegant design, high level of service)\n"
-            "2. **Boutique and unique** (original interior, creative atmosphere, sense of exclusivity)\n"
-            "3. **Classic and traditional** (time-tested style, conservatism, historical ambiance)\n"
-            "4. **Modern and designer** (fashionable interiors, minimalism, technological features)\n"
-            "5. **Cozy and family-friendly** (warm atmosphere, comfort, child-friendly)\n"
-            "6. **Practical and economical** (no unnecessary details, functional, affordable)"
         )
+        
+        # НОВОЕ: Динамічно генеруємо описи тільки для доступних стилів
+        style_descriptions = {
+            "Luxurious and refined": "**Luxurious and refined** (premium materials, elegant design, high level of service)",
+            "Boutique and unique": "**Boutique and unique** (original interior, creative atmosphere, sense of exclusivity)",
+            "Classic and traditional": "**Classic and traditional** (time-tested style, conservatism, historical ambiance)",
+            "Modern and designer": "**Modern and designer** (fashionable interiors, minimalism, technological features)",
+            "Cozy and family-friendly": "**Cozy and family-friendly** (warm atmosphere, comfort, child-friendly)",
+            "Practical and economical": "**Practical and economical** (no unnecessary details, functional, affordable)"
+        }
+        
+        # Додаємо описи тільки для доступних стилів
+        for i, style in enumerate(styles):
+            styles_description += f"{i+1}. {style_descriptions[style]}\n"
         
         title_text = styles_description
         submit_text = "Submit"
@@ -975,10 +1028,6 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         # Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
-
-# ===============================
-# ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
-# ===============================
 
 # ===============================
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
