@@ -12,6 +12,12 @@ import asyncio
 from telegram.ext import ApplicationBuilder
 import ssl
 from aiohttp import web
+import aiohttp
+from urllib.parse import quote
+
+# ===============================
+# ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
+# ===============================
 
 # ===============================
 # ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
@@ -55,6 +61,15 @@ LOYALTY_PROGRAM_RATINGS = {
 
 # ДОДАНО: Глобальна змінна для зберігання останніх результатів користувача (для команди /more)
 user_last_results = {}
+
+# НОВЕ: Google Maps API налаштування
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "AIzaSyAwQgH4NBgBPW03mJ-WzxEQrGaCjXJx5zw")
+ENABLE_PHOTOS = GOOGLE_MAPS_API_KEY != ""  # Вмикаємо фото тільки якщо є API ключ
+MAX_PHOTOS_PER_HOTEL = 3  # Максимум 3 фото на готель
+
+# НОВЕ: Налаштування для Google Maps API
+PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+PLACES_PHOTOS_URL = "https://maps.googleapis.com/maps/api/place/photo"
 
 # ДОДАНО: Функція для логування дебагу (якщо потрібно)
 def debug_log(message):
@@ -407,6 +422,16 @@ async def show_more_details(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         full_message = intro_text + detailed_results + outro_text
         await send_long_message_to_chat(context, update.message.chat_id, full_message)
         
+        # НОВЕ: Додаємо готелі з фото для режиму /more
+        await add_hotels_to_results_with_photos(
+            context, 
+            update.message.chat_id, 
+            user_data, 
+            scores_df, 
+            lang, 
+            admin_mode=False
+        )
+        
     except Exception as e:
         logger.error(f"Помилка при показі детальних результатів: {e}")
         
@@ -449,10 +474,20 @@ async def show_admin_scoring_breakdown(update: Update, context: ContextTypes.DEF
         # ДОДАНО: Додаємо готелі з зваженими рейтингами в адмін-режимі
         enhanced_admin_report = add_hotels_to_results(admin_report, user_data, scores_df, lang, admin_mode=True)
         
-        # Відправляємо адміністративний звіт з готелями
+        # Відправляємо адміністративний звіт
         intro_text = "🎉 Звіт по нарахуванню балів!\n\nОсь 7 програм лояльності готелів з повним розбором балів:\n\n"
         full_message = intro_text + enhanced_admin_report
         await send_long_message_to_chat(context, update.message.chat_id, full_message)
+        
+        # НОВЕ: Додаємо готелі з фото для адмін режиму
+        await add_hotels_to_results_with_photos(
+            context, 
+            update.message.chat_id, 
+            user_data, 
+            scores_df, 
+            lang, 
+            admin_mode=True
+        )
         
     except Exception as e:
         logger.error(f"Помилка при показі адміністративного розбору: {e}")
@@ -1243,7 +1278,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return await ask_purpose(update, context)
 
 # ===============================
-# ЧАСТИНА 9: ФУНКЦІЇ MAPPING ГОТЕЛІВ ЗІ СТИЛЯМИ ТА МЕТОЮ
+# ЧАСТИНА 9: ФУНКЦІЇ MAPPING ГОТЕЛІВ ЗІ СТИЛЯМИ ТА МЕТОЮ + Google Maps API
 # ===============================
 
 def map_hotel_style(hotel_brand):
@@ -1402,6 +1437,322 @@ def map_hotel_purpose(hotel_brand):
         result[purpose] = is_match
     
     return result
+
+# ===============================
+# НОВІ ФУНКЦІЇ GOOGLE MAPS API
+# ===============================
+
+async def get_hotel_photos_and_link(place_id, api_key, max_photos=3):
+    """
+    Отримує фото готелю та посилання через Google Places Details API
+    
+    Args:
+        place_id: Place ID готелю з Google Maps
+        api_key: Google Maps API ключ
+        max_photos: максимальна кількість фото (за замовчуванням 3)
+    
+    Returns:
+        dict: {
+            'photos': [список URL фото],
+            'maps_link': 'посилання на Google Maps',
+            'error': 'опис помилки (якщо є)'
+        }
+    """
+    if not place_id or not api_key:
+        return {'photos': [], 'maps_link': '', 'error': 'Missing place_id or API key'}
+    
+    try:
+        # Налаштування для асинхронного HTTP запиту
+        timeout = aiohttp.ClientTimeout(total=10)  # 10 секунд таймаут
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Запит деталей готелю
+            details_params = {
+                'place_id': place_id,
+                'fields': 'name,photos,url,formatted_address',
+                'key': api_key
+            }
+            
+            debug_log(f"Запит деталей для Place ID: {place_id}")
+            
+            async with session.get(PLACES_DETAILS_URL, params=details_params) as response:
+                if response.status != 200:
+                    error_msg = f"HTTP {response.status} при запиті деталей"
+                    logger.error(error_msg)
+                    return {'photos': [], 'maps_link': '', 'error': error_msg}
+                
+                data = await response.json()
+                
+                # Перевіряємо статус відповіді API
+                if data.get('status') != 'OK':
+                    error_msg = f"API Error: {data.get('status')} - {data.get('error_message', 'Unknown error')}"
+                    logger.error(error_msg)
+                    return {'photos': [], 'maps_link': '', 'error': error_msg}
+                
+                result = data.get('result', {})
+                
+                # Отримуємо посилання на Google Maps
+                maps_link = result.get('url', f"https://maps.google.com/?place_id={place_id}")
+                
+                # Отримуємо список фото
+                photos_info = result.get('photos', [])
+                photo_urls = []
+                
+                # Обмежуємо кількість фото
+                photos_to_process = photos_info[:max_photos]
+                
+                for photo_info in photos_to_process:
+                    photo_reference = photo_info.get('photo_reference')
+                    if photo_reference:
+                        # Формуємо URL для отримання фото
+                        photo_url = f"{PLACES_PHOTOS_URL}?photo_reference={photo_reference}&maxwidth=800&key={api_key}"
+                        photo_urls.append(photo_url)
+                
+                debug_log(f"Отримано {len(photo_urls)} фото для готелю {result.get('name', 'Unknown')}")
+                
+                return {
+                    'photos': photo_urls,
+                    'maps_link': maps_link,
+                    'error': None
+                }
+                
+    except asyncio.TimeoutError:
+        error_msg = "Таймаут при запиті до Google Maps API"
+        logger.error(error_msg)
+        return {'photos': [], 'maps_link': '', 'error': error_msg}
+    except Exception as e:
+        error_msg = f"Помилка при запиті до Google Maps API: {str(e)}"
+        logger.error(error_msg)
+        return {'photos': [], 'maps_link': '', 'error': error_msg}
+
+async def send_hotel_with_photos(context, chat_id, hotel_info, lang='uk', admin_mode=False):
+    """
+    Відправляє інформацію про готель з фото як медіагрупу
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату для відправлення
+        hotel_info: словник з інформацією про готель
+        lang: мова інтерфейсу
+        admin_mode: чи показувати зважений рейтинг
+    """
+    try:
+        place_id = hotel_info.get('place_id', '')
+        hotel_name = hotel_info.get('name', 'N/A')
+        hotel_brand = hotel_info.get('brand', 'N/A')
+        address = hotel_info.get('address', 'N/A')
+        rating = hotel_info.get('rating', 0.0)
+        
+        debug_log(f"Відправка готелю: {hotel_name} (Place ID: {place_id})")
+        
+        # Формуємо базовий опис готелю
+        if admin_mode:
+            # В адмін режимі показуємо зважений рейтинг
+            description = f"🏨 {hotel_name}\n🏢 {hotel_brand}\n📍 {address}\n⭐ {rating:.2f} (зважений рейтинг)"
+        else:
+            # В звичайному режимі без рейтингу
+            description = f"🏨 {hotel_name}\n🏢 {hotel_brand}\n📍 {address}"
+        
+        # Якщо API ключ доступний, намагаємося отримати фото
+        if ENABLE_PHOTOS and place_id:
+            photos_data = await get_hotel_photos_and_link(place_id, GOOGLE_MAPS_API_KEY, MAX_PHOTOS_PER_HOTEL)
+            
+            photos = photos_data.get('photos', [])
+            maps_link = photos_data.get('maps_link', '')
+            error = photos_data.get('error')
+            
+            if error:
+                debug_log(f"Не вдалося отримати фото для {hotel_name}: {error}")
+            
+            # Якщо є фото, відправляємо як медіагрупу
+            if photos:
+                media_group = []
+                
+                for i, photo_url in enumerate(photos):
+                    from telegram import InputMediaPhoto
+                    if i == 0:
+                        # Перше фото з описом
+                        media_group.append(InputMediaPhoto(
+                            media=photo_url,
+                            caption=description
+                        ))
+                    else:
+                        # Решта фото без опису
+                        media_group.append(InputMediaPhoto(media=photo_url))
+                
+                try:
+                    # Відправляємо медіагрупу
+                    await context.bot.send_media_group(chat_id=chat_id, media=media_group)
+                    
+                    # Додаємо посилання на Google Maps окремим повідомленням
+                    if maps_link:
+                        if lang == 'uk':
+                            link_text = f"📍 [Переглянути на Google Maps]({maps_link})"
+                        else:
+                            link_text = f"📍 [View on Google Maps]({maps_link})"
+                        
+                        await context.bot.send_message(
+                            chat_id=chat_id, 
+                            text=link_text, 
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True
+                        )
+                    
+                    debug_log(f"Успішно відправлено {len(photos)} фото для готелю {hotel_name}")
+                    return True
+                    
+                except Exception as e:
+                    logger.error(f"Помилка відправлення медіагрупи: {e}")
+        
+        # Якщо фото немає або сталася помилка, відправляємо текстове повідомлення
+        fallback_text = description
+        
+        # Додаємо посилання на Google Maps, якщо доступне
+        if place_id:
+            maps_link = f"https://maps.google.com/?place_id={place_id}"
+            if lang == 'uk':
+                fallback_text += f"\n📍 [Переглянути на Google Maps]({maps_link})"
+            else:
+                fallback_text += f"\n📍 [View on Google Maps]({maps_link})"
+        
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=fallback_text, 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелю {hotel_info.get('name', 'Unknown')}: {e}")
+        return False
+
+def convert_hotel_dataframe_to_dict(hotel_row):
+    """
+    Конвертує рядок DataFrame готелю в словник для відправлення
+    
+    Args:
+        hotel_row: pandas Series з даними готелю
+    
+    Returns:
+        dict: словник з інформацією про готель
+    """
+    return {
+        'name': str(hotel_row.get('hotel_name', 'N/A')),
+        'brand': str(hotel_row.get('Hotel Brand', 'N/A')),
+        'address': str(hotel_row.get('address', 'N/A')),
+        'place_id': str(hotel_row.get('Place ID', '')),
+        'rating': float(hotel_row.get('Weighted rating of each unique hotel', 0.0))
+    }
+
+async def send_hotels_for_program(context, chat_id, top_hotels, program_name, lang='uk', admin_mode=False):
+    """
+    Відправляє готелі для конкретної програми лояльності
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату
+        top_hotels: DataFrame з готелями
+        program_name: назва програми лояльності
+        lang: мова
+        admin_mode: режим адміністратора
+    """
+    if top_hotels.empty:
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ Не знайдено готелів, що відповідають всім вашим критеріям."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ No hotels found matching all your criteria."
+            )
+        return
+    
+    # Відправляємо заголовок
+    if lang == 'uk':
+        header_text = f"🏆 Ось приклад {len(top_hotels)} кращих готелів програми {program_name}:"
+    else:
+        header_text = f"🏆 Here are the top {len(top_hotels)} hotels from {program_name} program:"
+    
+    await context.bot.send_message(chat_id=chat_id, text=header_text)
+    
+    # Короткочасна пауза перед відправленням готелів
+    await asyncio.sleep(0.5)
+    
+    # Відправляємо кожен готель окремо з фото
+    for i, (index, hotel) in enumerate(top_hotels.iterrows()):
+        hotel_dict = convert_hotel_dataframe_to_dict(hotel)
+        
+        # Додаємо невелику паузу між готелями
+        if i > 0:
+            await asyncio.sleep(1)
+        
+        await send_hotel_with_photos(context, chat_id, hotel_dict, lang, admin_mode)
+
+async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_df, lang='uk', admin_mode=False):
+    """
+    НОВА функція додавання готелів з фото до результатів
+    Відправляє готелі окремими повідомленнями після основного звіту
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату для відправлення
+        user_data: дані користувача
+        scores_df: DataFrame з результатами
+        lang: мова інтерфейсу
+        admin_mode: режим адміністратора (показує всі 7 програм)
+    """
+    try:
+        # Визначаємо кількість програм для показу
+        programs_to_show = 7 if admin_mode else 3
+        top_programs = scores_df.head(programs_to_show)
+        
+        if lang == 'uk':
+            intro_text = f"\n📸 А тепер ось приклади готелів для кожної з топ-{programs_to_show} програм:"
+        else:
+            intro_text = f"\n📸 And now here are hotel examples for each of the top {programs_to_show} programs:"
+        
+        await context.bot.send_message(chat_id=chat_id, text=intro_text)
+        await asyncio.sleep(1)
+        
+        # Обробляємо кожну програму
+        for i, (index, row) in enumerate(top_programs.iterrows()):
+            program_name = row['loyalty_program']
+            
+            # Замінюємо назву програми для відображення
+            display_program_name = "InterContinental Hotels One Rewards" if program_name == "IHG One Rewards" else program_name
+            
+            debug_log(f"Обробка готелів для програми {i+1}: {program_name}")
+            
+            # Знаходимо топ-2 готелі для цієї програми
+            top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
+            
+            # Відправляємо готелі для цієї програми
+            await send_hotels_for_program(context, chat_id, top_hotels, display_program_name, lang, admin_mode)
+            
+            # Пауза між програмами (крім останньої)
+            if i < len(top_programs) - 1:
+                await asyncio.sleep(2)
+        
+        debug_log(f"Завершено відправлення готелів для {len(top_programs)} програм")
+        
+    except Exception as e:
+        logger.error(f"Помилка при додаванні готелів з фото: {e}")
+        
+        # Відправляємо повідомлення про помилку
+        if lang == 'uk':
+            error_text = "На жаль, сталася помилка при завантаженні фото готелів."
+        else:
+            error_text = "Unfortunately, there was an error loading hotel photos."
+        
+        await context.bot.send_message(chat_id=chat_id, text=error_text)
+
+# ===============================
+# ЗАЛИШАЮТЬСЯ БЕЗ ЗМІН: ФУНКЦІЇ АНАЛІЗУ ГОТЕЛІВ
+# ===============================
 
 def convert_rating_column_to_numeric(df):
     """
@@ -2315,9 +2666,19 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
             outro_text = ("\n\n💡 **Want even more details?**\n"
                          "Type /more for extended analysis or /start for a new search")
         
-        # Відправляємо об'єднаний звіт з готелями
+        # Відправляємо об'єднаний звіт
         full_message = intro_text + enhanced_results + outro_text
         await send_long_message_to_chat(context, update.callback_query.message.chat_id, full_message)
+        
+        # НОВЕ: Додаємо готелі з фото
+        await add_hotels_to_results_with_photos(
+            context, 
+            update.callback_query.message.chat_id, 
+            user_data, 
+            scores_df, 
+            lang, 
+            admin_mode=False
+        )
 
     except Exception as e:
         logger.error(f"Помилка при обчисленні результатів з рейтингами: {e}")
