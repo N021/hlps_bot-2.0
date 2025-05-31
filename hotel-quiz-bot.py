@@ -1424,9 +1424,57 @@ def convert_rating_column_to_numeric(df):
     
     return df
 
+def select_diverse_hotels(hotels_df, max_count=3):
+    """
+    Вибирає готелі з різних брендів, максимум 1 готель від одного бренду
+    
+    Args:
+        hotels_df: DataFrame з готелями
+        max_count: максимальна кількість готелів для вибору
+    
+    Returns:
+        DataFrame з обраними готелями
+    """
+    if hotels_df.empty:
+        return hotels_df
+    
+    # Сортуємо за рейтингом (найкращі спочатку)
+    sorted_hotels = hotels_df.sort_values('Weighted rating of each unique hotel', ascending=False)
+    
+    selected_hotels = []
+    used_brands = set()
+    
+    for index, hotel in sorted_hotels.iterrows():
+        hotel_brand = hotel.get('Hotel Brand', 'Unknown')
+        
+        # Якщо бренд ще не використаний і ми не набрали максимум
+        if hotel_brand not in used_brands and len(selected_hotels) < max_count:
+            selected_hotels.append(hotel)
+            used_brands.add(hotel_brand)
+            debug_log(f"Обрано готель: {hotel.get('hotel_name')} (бренд: {hotel_brand})")
+    
+    # Якщо не набрали достатньо готелів, додаємо решту (може бути дублікат брендів)
+    if len(selected_hotels) < max_count:
+        for index, hotel in sorted_hotels.iterrows():
+            if len(selected_hotels) >= max_count:
+                break
+            
+            # Перевіряємо, чи цей готель вже не додано
+            if not any(h.get('hotel_name') == hotel.get('hotel_name') for h in selected_hotels):
+                selected_hotels.append(hotel)
+    
+    # Конвертуємо назад в DataFrame
+    if selected_hotels:
+        result_df = pd.DataFrame(selected_hotels)
+        debug_log(f"Підсумок: обрано {len(result_df)} готелів з {len(used_brands)} різних брендів")
+        return result_df
+    else:
+        return pd.DataFrame()
+
 def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     """
     Знаходить топ-3 готелі для програми лояльності, які відповідають критеріям користувача
+    З диверсифікацією брендів - максимум 1 готель від одного бренду
     
     Args:
         program_name: назва програми лояльності
@@ -1471,11 +1519,15 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     
     debug_log(f"Готелів в основній категорії {category} з усіма критеріями: {len(main_filtered)}")
     
-    # 4. Якщо в основній категорії достатньо готелів (3+)
-    if len(main_filtered) >= 3:
-        top_3 = main_filtered.nlargest(3, 'Weighted rating of each unique hotel')
-        debug_log(f"Обрано 3 готелі з основної категорії")
-        return top_3, "main_category"
+    # 4. ОНОВЛЕНО: Якщо в основній категорії є готелі
+    if len(main_filtered) > 0:
+        # НОВА ЛОГІКА: Диверсифікація брендів
+        top_3 = select_diverse_hotels(main_filtered, 3)
+        if len(top_3) >= 3:
+            debug_log(f"Обрано 3 готелі з основної категорії (різні бренди)")
+            return top_3, "main_category"
+    else:
+        main_filtered = pd.DataFrame()
     
     # 5. ДОПОВНЮЄМО з суміжних категорій
     all_suitable_hotels = main_filtered.copy()
@@ -1491,20 +1543,20 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
         debug_log(f"Готелів в суміжній категорії {adj_category}: {len(adj_filtered)}")
         all_suitable_hotels = pd.concat([all_suitable_hotels, adj_filtered], ignore_index=True)
     
-    # 6. Видаляємо дублікати (якщо є) та беремо топ-3
+    # 6. ОНОВЛЕНО: Видаляємо дублікати та диверсифікуємо бренди
     all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
     
-    if len(all_suitable_hotels) >= 3:
-        top_3 = all_suitable_hotels.nlargest(3, 'Weighted rating of each unique hotel')
-        debug_log(f"Обрано 3 готелі з комбінації основної та суміжних категорій")
+    if len(all_suitable_hotels) > 0:
+        top_3 = select_diverse_hotels(all_suitable_hotels, 3)
+        debug_log(f"Обрано {len(top_3)} готелі з комбінації категорій (різні бренди)")
         return top_3, "mixed"
     else:
-        debug_log(f"Знайдено тільки {len(all_suitable_hotels)} готелів")
-        return all_suitable_hotels.nlargest(min(3, len(all_suitable_hotels)), 'Weighted rating of each unique hotel'), "limited"
+        debug_log(f"Не знайдено готелів для програми {program_name}")
+        return pd.DataFrame(), "no_hotels"
 
 def format_hotel_examples(top_hotels, program_name, lang='uk'):
     """
-    Форматує інформацію про топ-3 готелі для відображення
+    Форматує інформацію про топ-3 готелі для відображення БЕЗ Markdown
     
     Args:
         top_hotels: DataFrame з готелями
@@ -1532,18 +1584,20 @@ def format_hotel_examples(top_hotels, program_name, lang='uk'):
         result = f"🏆 Here are the top {len(top_hotels)} hotels from {display_program_name} that match your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
-        # ВИПРАВЛЕНО: Безпечне отримання даних з екрануванням Markdown
-        hotel_name = str(hotel.get('hotel_name', 'N/A')).replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]')
+        # ВИПРАВЛЕНО: Простий текст БЕЗ Markdown
+        hotel_name = str(hotel.get('hotel_name', 'N/A'))
+        hotel_brand = str(hotel.get('Hotel Brand', 'N/A'))
         rating = float(hotel.get('Weighted rating of each unique hotel', 0))
-        address = str(hotel.get('address', 'N/A')).replace('*', '\\*').replace('_', '\\_')
+        address = str(hotel.get('address', 'N/A'))
         place_id = str(hotel.get('Place ID', ''))
         
-        # ВИПРАВЛЕНО: Показуємо рейтинг тільки якщо він > 0
-        if rating > 0:
-            result += f"{i+1}. {hotel_name} ⭐{rating:.1f}\n"
-        else:
-            result += f"{i+1}. {hotel_name}\n"
+        result += f"{i+1}. {hotel_name}"
         
+        # Показуємо рейтинг тільки якщо він > 0
+        if rating > 0:
+            result += f" ⭐{rating:.1f}"
+        
+        result += f"\n   🏢 {hotel_brand}\n"
         result += f"   📍 {address}\n"
         result += f"   🔗 Place ID: {place_id}\n\n"
     
