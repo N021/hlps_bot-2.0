@@ -423,7 +423,7 @@ async def show_more_details(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     return ConversationHandler.END
 
-# ДОДАНО: Функція для команди /21 (адміністративна)
+# ОНОВЛЕНО: Функція для команди /21 (адміністративна) з підтримкою готелів
 async def show_admin_scoring_breakdown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Показує повний розбір нарахування балів для всіх програм - АДМІНІСТРАТИВНА КОМАНДА"""
     user_id = update.effective_user.id
@@ -440,14 +440,18 @@ async def show_admin_scoring_breakdown(update: Update, context: ContextTypes.DEF
     saved_data = user_last_results[user_id]
     user_data = saved_data['user_data']
     scores_df = saved_data['scores_df']
+    lang = user_data.get('language', 'uk')
     
     try:
         # Генеруємо ПОВНИЙ адміністративний звіт
         admin_report = format_admin_scoring_report(user_data, scores_df)
         
-        # Відправляємо адміністративний звіт
+        # ДОДАНО: Додаємо готелі з зваженими рейтингами в адмін-режимі
+        enhanced_admin_report = add_hotels_to_results(admin_report, user_data, scores_df, lang, admin_mode=True)
+        
+        # Відправляємо адміністративний звіт з готелями
         intro_text = "🎉 Звіт по нарахуванню балів!\n\nОсь 7 програм лояльності готелів з повним розбором балів:\n\n"
-        full_message = intro_text + admin_report
+        full_message = intro_text + enhanced_admin_report
         await send_long_message_to_chat(context, update.message.chat_id, full_message)
         
     except Exception as e:
@@ -458,7 +462,6 @@ async def show_admin_scoring_breakdown(update: Update, context: ContextTypes.DEF
         )
     
     return ConversationHandler.END
-
 
 # Функція скасування
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1556,7 +1559,8 @@ def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
 
 def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
-    Форматує інформацію про топ-2 готелі для інтеграції в основний звіт
+    Форматує інформацію про топ-2 готелі для звичайного режиму та /more
+    БЕЗ зваженого рейтингу
     
     Args:
         top_hotels: DataFrame з готелями
@@ -1578,35 +1582,70 @@ def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
         result = f"\n🏆 Here are the top {len(top_hotels)} hotels from this program that match your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
-        # Простий текст БЕЗ Markdown
+        # Простий текст БЕЗ рейтингу в звичайному режимі
+        hotel_name = str(hotel.get('hotel_name', 'N/A'))
+        hotel_brand = str(hotel.get('Hotel Brand', 'N/A'))
+        address = str(hotel.get('address', 'N/A'))
+        place_id = str(hotel.get('Place ID', ''))
+        
+        result += f"{i+1}. {hotel_name}\n"
+        result += f"   🏢 {hotel_brand}\n"
+        result += f"   📍 {address}\n"
+        result += f"   🔗 Place ID: {place_id}\n\n"
+    
+    return result
+
+def format_hotel_examples_for_admin(top_hotels, program_name, lang='uk'):
+    """
+    Форматує інформацію про топ-2 готелі для АДМІНІСТРАТИВНОГО режиму (/21)
+    З відображенням зваженого рейтингу
+    
+    Args:
+        top_hotels: DataFrame з готелями
+        program_name: назва програми лояльності
+        lang: мова інтерфейсу
+    
+    Returns:
+        str: відформатований текст для адмін-звіту
+    """
+    if top_hotels.empty:
+        if lang == 'uk':
+            return "\n❌ Не знайдено готелів, що відповідають всім вашим критеріям."
+        else:
+            return "\n❌ No hotels found matching all your criteria."
+    
+    if lang == 'uk':
+        result = f"\n🏆 Ось приклад {len(top_hotels)} кращих готелів цієї програми, які відповідають вашому запиту:\n\n"
+    else:
+        result = f"\n🏆 Here are the top {len(top_hotels)} hotels from this program that match your request:\n\n"
+    
+    for i, (index, hotel) in enumerate(top_hotels.iterrows()):
         hotel_name = str(hotel.get('hotel_name', 'N/A'))
         hotel_brand = str(hotel.get('Hotel Brand', 'N/A'))
         rating = float(hotel.get('Weighted rating of each unique hotel', 0))
         address = str(hotel.get('address', 'N/A'))
         place_id = str(hotel.get('Place ID', ''))
         
-        result += f"{i+1}. {hotel_name}"
-        
-        # Показуємо рейтинг тільки якщо він > 0
-        if rating > 0:
-            result += f" ⭐{rating:.1f}"
-        
-        result += f"\n   🏢 {hotel_brand}\n"
+        # АДМІН РЕЖИМ: Показуємо зважений рейтинг з 2 знаками після коми
+        result += f"{i+1}. {hotel_name} ⭐{rating:.2f} (зважений рейтинг)\n"
+        result += f"   🏢 {hotel_brand}\n"
         result += f"   📍 {address}\n"
         result += f"   🔗 Place ID: {place_id}\n\n"
     
     return result
 
-def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
+def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', admin_mode=False):
     """
     Додає готелі до детального звіту для кожної програми
     ВИПРАВЛЕНО: Без додавання зайвих роздільників
+    ДОДАНО: Підтримка адмін-режиму з зваженим рейтингом
     
     Args:
         detailed_results: оригінальний детальний звіт
         user_data: дані користувача
         scores_df: DataFrame з результатами програм
         lang: мова інтерфейсу
+        admin_mode: чи це адміністративний режим (/21)
     
     Returns:
         str: розширений звіт з готелями
@@ -1615,7 +1654,8 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
     sections = detailed_results.split("=" * 50)
     enhanced_sections = []
     
-    top_programs = scores_df.head(3)
+    # В адмін-режимі показуємо всі 7 програм, інакше топ-3
+    top_programs = scores_df.head(7) if admin_mode else scores_df.head(3)
     
     for i, section in enumerate(sections):
         enhanced_sections.append(section)
@@ -1628,8 +1668,11 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
                 # Знаходимо топ-2 готелі для цієї програми
                 top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
                 
-                # Форматуємо готелі для інтеграції
-                hotels_text = format_hotel_examples_for_integration(top_hotels, program_name, lang)
+                # Використовуємо різні функції форматування залежно від режиму
+                if admin_mode:
+                    hotels_text = format_hotel_examples_for_admin(top_hotels, program_name, lang)
+                else:
+                    hotels_text = format_hotel_examples_for_integration(top_hotels, program_name, lang)
                 
                 # Додаємо готелі до секції
                 enhanced_sections.append(hotels_text)
@@ -1643,7 +1686,6 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
         result += section
         
         # Додаємо роздільник ТІЛЬКИ між основними програмами (не перед готелями)
-        # Роздільник додається після парних індексів (0, 2, 4) але не після останньої програми
         if i % 2 == 0 and i < len(enhanced_sections) - 2 and i < (len(top_programs) * 2 - 2):
             result += "\n" + "=" * 50 + "\n"
     
