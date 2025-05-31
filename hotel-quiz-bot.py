@@ -1400,6 +1400,30 @@ def map_hotel_purpose(hotel_brand):
     
     return result
 
+def convert_rating_column_to_numeric(df):
+    """
+    Конвертує колонку рейтингу в числовий формат
+    
+    Args:
+        df: DataFrame з готелями
+    
+    Returns:
+        DataFrame з правильним типом колонки рейтингу
+    """
+    if 'Weighted rating of each unique hotel' in df.columns:
+        # Конвертуємо в числовий формат, некоректні значення стають NaN
+        df['Weighted rating of each unique hotel'] = pd.to_numeric(
+            df['Weighted rating of each unique hotel'], 
+            errors='coerce'
+        )
+        
+        # Заповнюємо NaN нулями
+        df['Weighted rating of each unique hotel'].fillna(0.0, inplace=True)
+        
+        debug_log(f"Converted rating column to numeric. Sample values: {df['Weighted rating of each unique hotel'].head().tolist()}")
+    
+    return df
+
 def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     """
     Знаходить топ-3 готелі для програми лояльності, які відповідають критеріям користувача
@@ -1432,6 +1456,9 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     
     # 2. Фільтруємо за програмою лояльності
     program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
+    
+    # ВИПРАВЛЕННЯ: Конвертуємо рейтинг в числовий формат
+    program_hotels = convert_rating_column_to_numeric(program_hotels)
     
     if program_hotels.empty:
         debug_log(f"Немає готелів для програми {program_name} в регіоні")
