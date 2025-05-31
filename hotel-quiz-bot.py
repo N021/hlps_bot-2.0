@@ -1424,13 +1424,13 @@ def convert_rating_column_to_numeric(df):
     
     return df
 
-def select_diverse_hotels(hotels_df, max_count=3):
+def select_diverse_hotels(hotels_df, max_count=2):
     """
     Вибирає готелі з різних брендів, максимум 1 готель від одного бренду
     
     Args:
         hotels_df: DataFrame з готелями
-        max_count: максимальна кількість готелів для вибору
+        max_count: максимальна кількість готелів для вибору (тепер 2)
     
     Returns:
         DataFrame з обраними готелями
@@ -1471,9 +1471,9 @@ def select_diverse_hotels(hotels_df, max_count=3):
     else:
         return pd.DataFrame()
 
-def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
+def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
     """
-    Знаходить топ-3 готелі для програми лояльності, які відповідають критеріям користувача
+    Знаходить топ-2 готелі для програми лояльності, які відповідають критеріям користувача
     З диверсифікацією брендів - максимум 1 готель від одного бренду
     
     Args:
@@ -1482,7 +1482,7 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
         hotel_data: повні дані готелів
     
     Returns:
-        tuple: (DataFrame з топ-3 готелів, тип вибірки)
+        tuple: (DataFrame з топ-2 готелів, тип вибірки)
     """
     # Переводимо критерії користувача
     regions = user_data.get('regions', []) or []
@@ -1496,7 +1496,7 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    debug_log(f"Пошук топ-3 готелів для програми: {program_name}")
+    debug_log(f"Пошук топ-2 готелів для програми: {program_name}")
     debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
     
     # 1. Фільтруємо за регіоном
@@ -1521,11 +1521,11 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     
     # 4. ОНОВЛЕНО: Якщо в основній категорії є готелі
     if len(main_filtered) > 0:
-        # НОВА ЛОГІКА: Диверсифікація брендів
-        top_3 = select_diverse_hotels(main_filtered, 3)
-        if len(top_3) >= 3:
-            debug_log(f"Обрано 3 готелі з основної категорії (різні бренди)")
-            return top_3, "main_category"
+        # НОВА ЛОГІКА: Диверсифікація брендів (2 готелі)
+        top_2 = select_diverse_hotels(main_filtered, 2)
+        if len(top_2) >= 2:
+            debug_log(f"Обрано 2 готелі з основної категорії (різні бренди)")
+            return top_2, "main_category"
     else:
         main_filtered = pd.DataFrame()
     
@@ -1547,16 +1547,16 @@ def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
     all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
     
     if len(all_suitable_hotels) > 0:
-        top_3 = select_diverse_hotels(all_suitable_hotels, 3)
-        debug_log(f"Обрано {len(top_3)} готелі з комбінації категорій (різні бренди)")
-        return top_3, "mixed"
+        top_2 = select_diverse_hotels(all_suitable_hotels, 2)
+        debug_log(f"Обрано {len(top_2)} готелі з комбінації категорій (різні бренди)")
+        return top_2, "mixed"
     else:
         debug_log(f"Не знайдено готелів для програми {program_name}")
         return pd.DataFrame(), "no_hotels"
 
-def format_hotel_examples(top_hotels, program_name, lang='uk'):
+def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
-    Форматує інформацію про топ-3 готелі для відображення БЕЗ Markdown
+    Форматує інформацію про топ-2 готелі для інтеграції в основний звіт
     
     Args:
         top_hotels: DataFrame з готелями
@@ -1564,27 +1564,21 @@ def format_hotel_examples(top_hotels, program_name, lang='uk'):
         lang: мова інтерфейсу
     
     Returns:
-        str: відформатований текст
+        str: відформатований текст для додавання до звіту
     """
     if top_hotels.empty:
         if lang == 'uk':
-            return "❌ Не знайдено готелів, що відповідають всім вашим критеріям."
+            return "\n❌ Не знайдено готелів, що відповідають всім вашим критеріям."
         else:
-            return "❌ No hotels found matching all your criteria."
-    
-    # Замінюємо назву програми для відображення
-    if program_name == "IHG One Rewards":
-        display_program_name = "InterContinental Hotels One Rewards"
-    else:
-        display_program_name = program_name
+            return "\n❌ No hotels found matching all your criteria."
     
     if lang == 'uk':
-        result = f"🏆 Ось приклад {len(top_hotels)} кращих готелів програми {display_program_name}, які відповідають вашому запиту:\n\n"
+        result = f"\n🏆 Ось приклад {len(top_hotels)} кращих готелів цієї програми, які відповідають вашому запиту:\n\n"
     else:
-        result = f"🏆 Here are the top {len(top_hotels)} hotels from {display_program_name} that match your request:\n\n"
+        result = f"\n🏆 Here are the top {len(top_hotels)} hotels from this program that match your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
-        # ВИПРАВЛЕНО: Простий текст БЕЗ Markdown
+        # Простий текст БЕЗ Markdown
         hotel_name = str(hotel.get('hotel_name', 'N/A'))
         hotel_brand = str(hotel.get('Hotel Brand', 'N/A'))
         rating = float(hotel.get('Weighted rating of each unique hotel', 0))
@@ -1602,6 +1596,48 @@ def format_hotel_examples(top_hotels, program_name, lang='uk'):
         result += f"   🔗 Place ID: {place_id}\n\n"
     
     return result
+
+def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
+    """
+    Додає готелі до детального звіту для кожної програми
+    
+    Args:
+        detailed_results: оригінальний детальний звіт
+        user_data: дані користувача
+        scores_df: DataFrame з результатами програм
+        lang: мова інтерфейсу
+    
+    Returns:
+        str: розширений звіт з готелями
+    """
+    # Розбиваємо звіт на секції для кожної програми
+    sections = detailed_results.split("=" * 50)
+    enhanced_sections = []
+    
+    top_programs = scores_df.head(3)
+    
+    for i, section in enumerate(sections):
+        enhanced_sections.append(section)
+        
+        # Додаємо готелі після кожної програми (крім останньої секції)
+        if i < len(top_programs):
+            try:
+                program_name = top_programs.iloc[i]['loyalty_program']
+                
+                # Знаходимо топ-2 готелі для цієї програми
+                top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
+                
+                # Форматуємо готелі для інтеграції
+                hotels_text = format_hotel_examples_for_integration(top_hotels, program_name, lang)
+                
+                # Додаємо готелі до секції
+                enhanced_sections.append(hotels_text)
+                
+            except Exception as e:
+                debug_log(f"Помилка додавання готелів для програми: {e}")
+    
+    # Об'єднуємо всі секції назад
+    return ("=" * 50).join(enhanced_sections)
 
 # ===============================
 # ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
@@ -2167,7 +2203,7 @@ def calculate_scores_fixed(user_data, hotel_data):
 async def calculate_and_show_results_with_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     НОВА функція обчислення та відображення результатів з урахуванням рейтингів
-    Показує детальний звіт та зберігає дані для команди /more
+    Показує детальний звіт з інтегрованими готелями та зберігає дані для команди /more
     """
     
     user_id = update.effective_user.id
@@ -2216,8 +2252,11 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
         }
         debug_log(f"Збережено результати для користувача {user_id} для команди /more")
         
-        # Генеруємо ДЕТАЛЬНИЙ звіт (замість лаконічного)
+        # Генеруємо базовий детальний звіт
         detailed_results = format_simple_results(user_data, scores_df, lang)
+        
+        # НОВА ЛОГІКА: Додаємо готелі до звіту
+        enhanced_results = add_hotels_to_results(detailed_results, user_data, scores_df, lang)
         
         # Відправляємо детальні результати користувачеві
         if lang == 'uk':
@@ -2231,33 +2270,9 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
             outro_text = ("\n\n💡 **Want even more details?**\n"
                          "Type /more for extended analysis or /start for a new search")
         
-        # Відправляємо детальний звіт
-        full_message = intro_text + detailed_results + outro_text
+        # Відправляємо об'єднаний звіт з готелями
+        full_message = intro_text + enhanced_results + outro_text
         await send_long_message_to_chat(context, update.callback_query.message.chat_id, full_message)
-        
-        # ДОДАНО: Показуємо приклади готелів для топ-3 програм
-        await asyncio.sleep(1)
-        
-        top_programs = scores_df.head(3)
-        for i, (index, row) in enumerate(top_programs.iterrows()):
-            program_name = row['loyalty_program']
-            
-            # Знаходимо топ-3 готелі для цієї програми
-            top_hotels, selection_type = find_top_3_hotels_for_program(program_name, user_data, hotel_data)
-            
-            if not top_hotels.empty:
-                # Форматуємо інформацію про готелі
-                hotels_text = format_hotel_examples(top_hotels, program_name, lang)
-                
-                # ВИПРАВЛЕНО: Простий виклик БЕЗ try-except
-                await context.bot.send_message(
-                    chat_id=update.callback_query.message.chat_id,
-                    text=hotels_text
-                )
-                
-                await asyncio.sleep(1)  # Пауза між програмами
-            else:
-                debug_log(f"Не знайдено готелів для програми {program_name}")
 
     except Exception as e:
         logger.error(f"Помилка при обчисленні результатів з рейтингами: {e}")
