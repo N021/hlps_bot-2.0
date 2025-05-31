@@ -1600,6 +1600,7 @@ def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
 def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
     """
     Додає готелі до детального звіту для кожної програми
+    ВИПРАВЛЕНО: Без додавання зайвих роздільників
     
     Args:
         detailed_results: оригінальний детальний звіт
@@ -1636,8 +1637,17 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk'):
             except Exception as e:
                 debug_log(f"Помилка додавання готелів для програми: {e}")
     
-    # Об'єднуємо всі секції назад
-    return ("=" * 50).join(enhanced_sections)
+    # ВИПРАВЛЕНО: Об'єднуємо секції БЕЗ роздільників між готелями
+    result = ""
+    for i, section in enumerate(enhanced_sections):
+        result += section
+        
+        # Додаємо роздільник ТІЛЬКИ між основними програмами (не перед готелями)
+        # Роздільник додається після парних індексів (0, 2, 4) але не після останньої програми
+        if i % 2 == 0 and i < len(enhanced_sections) - 2 and i < (len(top_programs) * 2 - 2):
+            result += "\n" + "=" * 50 + "\n"
+    
+    return result
 
 # ===============================
 # ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
