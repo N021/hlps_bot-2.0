@@ -1414,13 +1414,19 @@ def convert_rating_column_to_numeric(df):
         DataFrame з правильним типом колонки рейтингу
     """
     if 'Weighted rating of each unique hotel' in df.columns:
-        # Конвертуємо в числовий формат, некоректні значення стають NaN
+        # Створюємо копію для безпеки
+        df = df.copy()
+        
+        # ВИПРАВЛЕНО: Замінюємо коми на крапки (європейський формат -> американський)
+        df['Weighted rating of each unique hotel'] = df['Weighted rating of each unique hotel'].astype(str).str.replace(',', '.')
+        
+        # Конвертуємо в числовий формат
         df['Weighted rating of each unique hotel'] = pd.to_numeric(
             df['Weighted rating of each unique hotel'], 
             errors='coerce'
         )
         
-        # Заповнюємо NaN нулями
+        # Заповнюємо NaN нулями тільки якщо конверсія не вдалася
         df['Weighted rating of each unique hotel'].fillna(0.0, inplace=True)
         
         debug_log(f"Converted rating column to numeric. Sample values: {df['Weighted rating of each unique hotel'].head().tolist()}")
