@@ -2195,19 +2195,11 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
                 # Форматуємо інформацію про готелі
                 hotels_text = format_hotel_examples(top_hotels, program_name, lang)
                 
-                # Відправляємо як окреме повідомлення
-                try:
-                    await context.bot.send_message(
-                        chat_id=update.callback_query.message.chat_id,
-                        text=hotels_text,
-                        parse_mode="Markdown"
-                    )
-                except Exception as e:
-                    logger.error(f"Помилка відправки готелів: {e}")
-                    await context.bot.send_message(
-                        chat_id=update.callback_query.message.chat_id,
-                        text=hotels_text
-                    )
+                # ВИПРАВЛЕНО: Простий виклик БЕЗ try-except
+                await context.bot.send_message(
+                    chat_id=update.callback_query.message.chat_id,
+                    text=hotels_text
+                )
                 
                 await asyncio.sleep(1)  # Пауза між програмами
             else:
