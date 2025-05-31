@@ -1532,12 +1532,18 @@ def format_hotel_examples(top_hotels, program_name, lang='uk'):
         result = f"🏆 Here are the top {len(top_hotels)} hotels from {display_program_name} that match your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
-        hotel_name = hotel.get('hotel_name', 'N/A')
-        rating = hotel.get('Weighted rating of each unique hotel', 0)
-        address = hotel.get('address', 'N/A')
-        place_id = hotel.get('Place ID', '')
+        # ВИПРАВЛЕНО: Безпечне отримання даних з екрануванням Markdown
+        hotel_name = str(hotel.get('hotel_name', 'N/A')).replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]')
+        rating = float(hotel.get('Weighted rating of each unique hotel', 0))
+        address = str(hotel.get('address', 'N/A')).replace('*', '\\*').replace('_', '\\_')
+        place_id = str(hotel.get('Place ID', ''))
         
-        result += f"{i+1}. **{hotel_name}** ⭐{rating:.1f}\n"
+        # ВИПРАВЛЕНО: Показуємо рейтинг тільки якщо він > 0
+        if rating > 0:
+            result += f"{i+1}. {hotel_name} ⭐{rating:.1f}\n"
+        else:
+            result += f"{i+1}. {hotel_name}\n"
+        
         result += f"   📍 {address}\n"
         result += f"   🔗 Place ID: {place_id}\n\n"
     
