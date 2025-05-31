@@ -1400,6 +1400,122 @@ def map_hotel_purpose(hotel_brand):
     
     return result
 
+def find_top_3_hotels_for_program(program_name, user_data, hotel_data):
+    """
+    Знаходить топ-3 готелі для програми лояльності, які відповідають критеріям користувача
+    
+    Args:
+        program_name: назва програми лояльності
+        user_data: дані користувача з відповідями
+        hotel_data: повні дані готелів
+    
+    Returns:
+        tuple: (DataFrame з топ-3 готелів, тип вибірки)
+    """
+    # Переводимо критерії користувача
+    regions = user_data.get('regions', []) or []
+    countries = user_data.get('countries', []) or []
+    category = user_data.get('category')
+    styles = user_data.get('styles', []) or []
+    purposes = user_data.get('purposes', []) or []
+    
+    english_regions = translate_regions_to_english(regions)
+    english_countries = translate_regions_to_english(countries)
+    english_styles = translate_styles_to_english(styles)
+    english_purposes = translate_purposes_to_english(purposes)
+    
+    debug_log(f"Пошук топ-3 готелів для програми: {program_name}")
+    debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
+    
+    # 1. Фільтруємо за регіоном
+    filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
+    
+    # 2. Фільтруємо за програмою лояльності
+    program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
+    
+    if program_hotels.empty:
+        debug_log(f"Немає готелів для програми {program_name} в регіоні")
+        return pd.DataFrame(), "no_hotels"
+    
+    # 3. ПРІОРИТЕТ: основна категорія з усіма критеріями
+    main_category_hotels = filter_hotels_by_category(program_hotels, category)
+    main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
+    main_filtered = filter_hotels_by_purpose(main_filtered, english_purposes)
+    
+    debug_log(f"Готелів в основній категорії {category} з усіма критеріями: {len(main_filtered)}")
+    
+    # 4. Якщо в основній категорії достатньо готелів (3+)
+    if len(main_filtered) >= 3:
+        top_3 = main_filtered.nlargest(3, 'Weighted rating of each unique hotel')
+        debug_log(f"Обрано 3 готелі з основної категорії")
+        return top_3, "main_category"
+    
+    # 5. ДОПОВНЮЄМО з суміжних категорій
+    all_suitable_hotels = main_filtered.copy()
+    
+    adjacent_categories = get_adjacent_categories(category)
+    debug_log(f"Суміжні категорії: {adjacent_categories}")
+    
+    for adj_category in adjacent_categories:
+        adj_category_hotels = filter_hotels_by_category(program_hotels, adj_category)
+        adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
+        adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
+        
+        debug_log(f"Готелів в суміжній категорії {adj_category}: {len(adj_filtered)}")
+        all_suitable_hotels = pd.concat([all_suitable_hotels, adj_filtered], ignore_index=True)
+    
+    # 6. Видаляємо дублікати (якщо є) та беремо топ-3
+    all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
+    
+    if len(all_suitable_hotels) >= 3:
+        top_3 = all_suitable_hotels.nlargest(3, 'Weighted rating of each unique hotel')
+        debug_log(f"Обрано 3 готелі з комбінації основної та суміжних категорій")
+        return top_3, "mixed"
+    else:
+        debug_log(f"Знайдено тільки {len(all_suitable_hotels)} готелів")
+        return all_suitable_hotels.nlargest(min(3, len(all_suitable_hotels)), 'Weighted rating of each unique hotel'), "limited"
+
+def format_hotel_examples(top_hotels, program_name, lang='uk'):
+    """
+    Форматує інформацію про топ-3 готелі для відображення
+    
+    Args:
+        top_hotels: DataFrame з готелями
+        program_name: назва програми лояльності
+        lang: мова інтерфейсу
+    
+    Returns:
+        str: відформатований текст
+    """
+    if top_hotels.empty:
+        if lang == 'uk':
+            return "❌ Не знайдено готелів, що відповідають всім вашим критеріям."
+        else:
+            return "❌ No hotels found matching all your criteria."
+    
+    # Замінюємо назву програми для відображення
+    if program_name == "IHG One Rewards":
+        display_program_name = "InterContinental Hotels One Rewards"
+    else:
+        display_program_name = program_name
+    
+    if lang == 'uk':
+        result = f"🏆 Ось приклад {len(top_hotels)} кращих готелів програми {display_program_name}, які відповідають вашому запиту:\n\n"
+    else:
+        result = f"🏆 Here are the top {len(top_hotels)} hotels from {display_program_name} that match your request:\n\n"
+    
+    for i, (index, hotel) in enumerate(top_hotels.iterrows()):
+        hotel_name = hotel.get('hotel_name', 'N/A')
+        rating = hotel.get('Weighted rating of each unique hotel', 0)
+        address = hotel.get('address', 'N/A')
+        place_id = hotel.get('Place ID', '')
+        
+        result += f"{i+1}. **{hotel_name}** ⭐{rating:.1f}\n"
+        result += f"   📍 {address}\n"
+        result += f"   🔗 Place ID: {place_id}\n\n"
+    
+    return result
+
 # ===============================
 # ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
 # ===============================
@@ -2031,7 +2147,39 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
         # Відправляємо детальний звіт
         full_message = intro_text + detailed_results + outro_text
         await send_long_message_to_chat(context, update.callback_query.message.chat_id, full_message)
-    
+        
+        # ДОДАНО: Показуємо приклади готелів для топ-3 програм
+        await asyncio.sleep(1)
+        
+        top_programs = scores_df.head(3)
+        for i, (index, row) in enumerate(top_programs.iterrows()):
+            program_name = row['loyalty_program']
+            
+            # Знаходимо топ-3 готелі для цієї програми
+            top_hotels, selection_type = find_top_3_hotels_for_program(program_name, user_data, hotel_data)
+            
+            if not top_hotels.empty:
+                # Форматуємо інформацію про готелі
+                hotels_text = format_hotel_examples(top_hotels, program_name, lang)
+                
+                # Відправляємо як окреме повідомлення
+                try:
+                    await context.bot.send_message(
+                        chat_id=update.callback_query.message.chat_id,
+                        text=hotels_text,
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    logger.error(f"Помилка відправки готелів: {e}")
+                    await context.bot.send_message(
+                        chat_id=update.callback_query.message.chat_id,
+                        text=hotels_text
+                    )
+                
+                await asyncio.sleep(1)  # Пауза між програмами
+            else:
+                debug_log(f"Не знайдено готелів для програми {program_name}")
+
     except Exception as e:
         logger.error(f"Помилка при обчисленні результатів з рейтингами: {e}")
         
