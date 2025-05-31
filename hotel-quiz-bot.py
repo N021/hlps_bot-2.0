@@ -2237,7 +2237,7 @@ def calculate_scores_fixed(user_data, hotel_data):
 async def calculate_and_show_results_with_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     ОНОВЛЕНА функція обчислення та відображення результатів з урахуванням рейтингів
-    Показує кожну програму з готелями в одному повідомленні
+    Показує детальний звіт з готелями
     """
     
     user_id = update.effective_user.id
@@ -2286,29 +2286,46 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
         }
         debug_log(f"Збережено результати для користувача {user_id} для команди /more")
         
-        # Відправляємо вступне повідомлення
+        # Формуємо вступний текст
         if lang == 'uk':
             intro_text = ("🎉 **Аналіз завершено!**\n\n"
                          "**Ось топ-3 програми лояльності готелів з детальним розбором балів:**")
+            outro_text = ("\n\n💡 **Хочете ще більше деталей?**\n"
+                         "Натисніть /more для розширеного аналізу або /start для нового пошуку")
         else:
             intro_text = ("🎉 **Analysis completed!**\n\n"
                          "**Here are the top 3 hotel loyalty programs with detailed score breakdown:**")
+            outro_text = ("\n\n💡 **Want even more details?**\n"
+                         "Type /more for extended analysis or /start for a new search")
         
-        await context.bot.send_message(
-            chat_id=update.callback_query.message.chat_id,
-            text=intro_text,
-            parse_mode="Markdown"
-        )
+        # Генеруємо детальний звіт
+        detailed_results = format_simple_results(user_data, scores_df, lang)
         
-        # НОВЕ: Відправляємо кожну програму окремо з готелями та фото
-        await send_programs_with_integrated_hotels_and_photos(
-            context, 
-            update.callback_query.message.chat_id, 
-            user_data, 
-            scores_df, 
-            lang
-        )
+        # Додаємо готелі до звіту
+        enhanced_results = add_hotels_to_results(detailed_results, user_data, scores_df, lang)
         
+        # Формуємо повне повідомлення
+        full_message = intro_text + "\n\n" + enhanced_results + outro_text
+        
+        # Відправляємо повний звіт
+        await send_long_message_to_chat(context, update.callback_query.message.chat_id, full_message)
+
+    except Exception as e:
+        logger.error(f"Помилка при обчисленні результатів з рейтингами: {e}")
+        
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=update.callback_query.message.chat_id,
+                text="Виникла помилка при аналізі ваших відповідей. Будь ласка, спробуйте знову, надіславши команду /start."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=update.callback_query.message.chat_id,
+                text="An error occurred while analyzing your answers. Please try again by sending the /start command."
+            )
+    
+    return ConversationHandler.END
+
         # Відправляємо заключне повідомлення
         if lang == 'uk':
             outro_text = ("💡 **Хочете ще більше деталей?**\n"
