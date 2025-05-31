@@ -1643,56 +1643,43 @@ def format_hotel_examples_for_admin(top_hotels, program_name, lang='uk'):
 def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', admin_mode=False):
     """
     Додає готелі до детального звіту для кожної програми
-    ВИПРАВЛЕНО: Без додавання зайвих роздільників
-    ДОДАНО: Підтримка адмін-режиму з зваженим рейтингом
-    
-    Args:
-        detailed_results: оригінальний детальний звіт
-        user_data: дані користувача
-        scores_df: DataFrame з результатами програм
-        lang: мова інтерфейсу
-        admin_mode: чи це адміністративний режим (/21)
-    
-    Returns:
-        str: розширений звіт з готелями
+    ВИПРАВЛЕНО: Роздільники МІЖ програмами, але НЕ перед готелями
     """
     # Розбиваємо звіт на секції для кожної програми
     sections = detailed_results.split("=" * 50)
-    enhanced_sections = []
     
     # В адмін-режимі показуємо всі 7 програм, інакше топ-3
     top_programs = scores_df.head(7) if admin_mode else scores_df.head(3)
     
-    for i, section in enumerate(sections):
-        enhanced_sections.append(section)
-        
-        # Додаємо готелі після кожної програми (крім останньої секції)
-        if i < len(top_programs):
-            try:
-                program_name = top_programs.iloc[i]['loyalty_program']
-                
-                # Знаходимо топ-2 готелі для цієї програми
-                top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
-                
-                # Використовуємо різні функції форматування залежно від режиму
-                if admin_mode:
-                    hotels_text = format_hotel_examples_for_admin(top_hotels, program_name, lang)
-                else:
-                    hotels_text = format_hotel_examples_for_integration(top_hotels, program_name, lang)
-                
-                # Додаємо готелі до секції
-                enhanced_sections.append(hotels_text)
-                
-            except Exception as e:
-                debug_log(f"Помилка додавання готелів для програми: {e}")
-    
-    # ВИПРАВЛЕНО: Об'єднуємо секції БЕЗ роздільників між готелями
     result = ""
-    for i, section in enumerate(enhanced_sections):
+    
+    for i, section in enumerate(sections):
+        if i >= len(top_programs):
+            break
+            
+        # Додаємо секцію програми
         result += section
         
-        # Додаємо роздільник ТІЛЬКИ між основними програмами (не перед готелями)
-        if i % 2 == 0 and i < len(enhanced_sections) - 2 and i < (len(top_programs) * 2 - 2):
+        try:
+            program_name = top_programs.iloc[i]['loyalty_program']
+            
+            # Знаходимо топ-2 готелі для цієї програми
+            top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
+            
+            # Використовуємо різні функції форматування залежно від режиму
+            if admin_mode:
+                hotels_text = format_hotel_examples_for_admin(top_hotels, program_name, lang)
+            else:
+                hotels_text = format_hotel_examples_for_integration(top_hotels, program_name, lang)
+            
+            # ВИПРАВЛЕНО: Додаємо готелі БЕЗ роздільника
+            result += hotels_text
+            
+        except Exception as e:
+            debug_log(f"Помилка додавання готелів для програми: {e}")
+        
+        # ВИПРАВЛЕНО: Додаємо роздільник МІЖ програмами (після готелів)
+        if i < len(top_programs) - 1:
             result += "\n" + "=" * 50 + "\n"
     
     return result
