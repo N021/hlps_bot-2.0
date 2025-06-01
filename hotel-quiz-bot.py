@@ -691,7 +691,7 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 text=f"Thank you! You have chosen the following regions: {', '.join(selected_regions)}."
             )
         
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2.0)
         return await ask_category(update, context)
     
     # Якщо це вибір регіону
@@ -794,7 +794,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             text=f"Thank you! You have chosen the category: {category}."
         )
 
-    await asyncio.sleep(1.2)
+    await asyncio.sleep(2.0)
 
     return await ask_style(update, context)
 
@@ -1042,7 +1042,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if 'style_message_id' in user_data_global[user_id]:
             del user_data_global[user_id]['style_message_id']
         
-        await asyncio.sleep(1.3)
+        await asyncio.sleep(2.0)
         return await ask_purpose(update, context)
     
     # Якщо це вибір або скасування вибору стилю
