@@ -2585,7 +2585,7 @@ def get_region_score(df, regions=None, countries=None):
                 logger.warning("Колонка 'Total hotels of Corporation / Loyalty Program in this country' відсутня. Використовуємо кількість рядків.")
         
         else:
-            return {}
+            return {}, {}
         
         # Переводимо в float та заповнюємо NaN як 0
         region_counts = {prog: float(count) if pd.notna(count) else 0.0 for prog, count in region_counts.items()}
@@ -2608,86 +2608,12 @@ def get_region_score(df, regions=None, countries=None):
             region_scores = {program: score / normalization_factor for program, score in region_scores.items()}
             debug_log(f"Нормалізація балів (не кількості готелів) на фактор {normalization_factor}")
         
-        # Повертаємо як бали, так і кількість готелів
+        # ВИПРАВЛЕНО: Повертаємо як бали, так і кількість готелів
         return region_scores, region_counts
                 
     except Exception as e:
         logger.error(f"Помилка обчислення балів за регіоном: {e}")
         return {}, {}
-
-# ТАКОЖ ПОТРІБНО ОНОВИТИ функцію calculate_scores_fixed щоб використовувати нову логіку:
-
-def calculate_scores_fixed_updated(user_data, hotel_data):
-    """
-    ОНОВЛЕНА БАЗОВА функція розрахунку балів БЕЗ рейтингів з виправленим підрахунком регіонів
-    """
-    debug_log(f"=== STARTING BASE SCORE CALCULATION ===")
-    debug_log(f"Original user data: {user_data}")
-    
-    # Отримуємо відповіді користувача
-    regions = user_data.get('regions', []) or []
-    countries = user_data.get('countries', []) or []
-    category = user_data.get('category')
-    styles = user_data.get('styles', []) or []
-    purposes = user_data.get('purposes', []) or []
-    
-    # ПЕРЕВОДИМО українські відповіді на англійську для обробки
-    english_regions = translate_regions_to_english(regions)
-    english_countries = translate_regions_to_english(countries)
-    english_styles = translate_styles_to_english(styles)
-    english_purposes = translate_purposes_to_english(purposes)
-    
-    debug_log(f"Translated data - regions: {english_regions}, styles: {english_styles}, purposes: {english_purposes}")
-    
-    # Ініціалізуємо DataFrame для зберігання результатів
-    loyalty_programs = hotel_data['loyalty_program'].unique()
-    scores_df = pd.DataFrame({
-        'loyalty_program': loyalty_programs,
-        'region_score': 0.0,
-        'category_score': 0.0,
-        'style_score': 0.0,
-        'purpose_score': 0.0,
-        'total_score': 0.0,
-        'region_hotels': 0,
-        'category_hotels': 0,
-        'style_hotels': 0,
-        'purpose_hotels': 0
-    })
-    
-    # Крок 1: Фільтруємо готелі за регіоном
-    filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
-    debug_log(f"Hotels after region filter: {len(filtered_by_region)}")
-    
-    # ВИПРАВЛЕНО: Розподіляємо бали за регіонами/країнами з правильним підрахунком
-    region_scores, region_hotel_counts = get_region_score(filtered_by_region, english_regions, english_countries)
-    debug_log(f"Region scores: {region_scores}")
-    debug_log(f"Region hotel counts: {region_hotel_counts}")
-    
-    for index, row in scores_df.iterrows():
-        program = row['loyalty_program']
-        scores_df.at[index, 'region_score'] = region_scores.get(program, 0.0)
-        scores_df.at[index, 'region_hotels'] = region_hotel_counts.get(program, 0)  # Використовуємо правильний підрахунок
-    
-    # Решта функції залишається без змін...
-    # [Крок 2: категорії]
-    # [Крок 3: стилі] 
-    # [Крок 4: мета]
-    # [Підрахунок загального балу]
-    
-    # Обчислюємо загальний рейтинг
-    scores_df['total_score'] = (
-        scores_df['region_score'] + 
-        scores_df['category_score'] + 
-        scores_df['style_score'] + 
-        scores_df['purpose_score']
-    )
-    
-    # Сортуємо за загальним рейтингом
-    scores_df = scores_df.sort_values('total_score', ascending=False)
-    
-    debug_log(f"=== BASE CALCULATION COMPLETE ===")
-    
-    return scores_df
 
 def calculate_scores_with_ratings(user_data, hotel_data):
     """
@@ -2901,7 +2827,7 @@ def calculate_purpose_scores_simple(filtered_by_region, loyalty_programs, catego
 
 def calculate_scores_fixed(user_data, hotel_data):
     """
-    БАЗОВА функція розрахунку балів БЕЗ рейтингів (для внутрішнього використання)
+    ВИПРАВЛЕНА БАЗОВА функція розрахунку балів БЕЗ рейтингів з правильним підрахунком регіонів
     """
     debug_log(f"=== STARTING BASE SCORE CALCULATION ===")
     debug_log(f"Original user data: {user_data}")
@@ -2940,24 +2866,16 @@ def calculate_scores_fixed(user_data, hotel_data):
     filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
     debug_log(f"Hotels after region filter: {len(filtered_by_region)}")
     
-    # Розподіляємо бали за регіонами/країнами
-    region_scores = get_region_score(filtered_by_region, english_regions, english_countries)
+    # ВИПРАВЛЕНО: Розподіляємо бали за регіонами/країнами з правильним підрахунком
+    region_scores, region_hotel_counts = get_region_score(filtered_by_region, english_regions, english_countries)
     debug_log(f"Region scores: {region_scores}")
+    debug_log(f"Region hotel counts: {region_hotel_counts}")
     
     for index, row in scores_df.iterrows():
         program = row['loyalty_program']
         scores_df.at[index, 'region_score'] = region_scores.get(program, 0.0)
-        
-        # Заповнюємо region_hotels
-        if english_regions and len(english_regions) > 0:
-            if 'Total hotels of Corporation / Loyalty Program in this region' in filtered_by_region.columns:
-                program_data = filtered_by_region[filtered_by_region['loyalty_program'] == program]
-                if not program_data.empty:
-                    region_hotels = program_data['Total hotels of Corporation / Loyalty Program in this region'].iloc[0]
-                    scores_df.at[index, 'region_hotels'] = region_hotels
-            else:
-                region_counts = filtered_by_region.groupby('loyalty_program').size()
-                scores_df.at[index, 'region_hotels'] = region_counts.get(program, 0)
+        # ВИПРАВЛЕНО: Використовуємо правильний підрахунок готелів з region_hotel_counts
+        scores_df.at[index, 'region_hotels'] = region_hotel_counts.get(program, 0)
     
     # Крок 2: ВИПРАВЛЕНИЙ розрахунок балів за категорією
     if category:
