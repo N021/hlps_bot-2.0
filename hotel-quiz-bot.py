@@ -1071,6 +1071,8 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
 # ===============================
 
+import asyncio  # Додаємо імпорт для затримки
+
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про мету подорожі з чекбоксами та детальними описами"""
     
@@ -1251,6 +1253,23 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Очищуємо ID повідомлення з метою
         if 'purpose_message_id' in user_data_global[user_id]:
             del user_data_global[user_id]['purpose_message_id']
+        
+        # ДОДАЄМО ЗАТРИМКУ 3.5 СЕКУНДИ
+        await asyncio.sleep(3.5)
+        
+        # Надсилаємо повідомлення про завершення аналізу з новим текстом
+        if lang == 'uk':
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="🎉 Аналіз завершено!\n\n"
+                "Ось топ-3 програми лояльності готелів які найбільше відповідають вашим потребам"
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="🎉 Analysis completed!\n\n"
+                "Here are the top 3 hotel loyalty programs that best match your needs"
+            )
         
         # ОНОВЛЕНО: Розрахунок і відображення результатів з рейтингами + збереження для /more
         return await calculate_and_show_results_with_ratings(update, context)
