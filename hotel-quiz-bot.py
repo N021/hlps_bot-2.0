@@ -1989,6 +1989,10 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
 # ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З ФОТО
 # ===============================
 
+# ===============================
+# ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З ФОТО
+# ===============================
+
 async def send_programs_with_integrated_hotels_and_photos(context, chat_id, user_data, scores_df, lang='uk'):
     """
     Відправляє кожну топ-3 програму в окремому повідомленні з готелями та фото
@@ -2158,14 +2162,14 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
         
         if lang == 'uk':
             result += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
-            if adjacent_style_total > 0 and adjacent_categories_list:
+            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
                 adj_cats_str = ' і '.join(adjacent_categories_list)
                 result += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"
             else:
                 result += "\n"
         else:
             result += f"  - {main_style_total} hotels in selected styles, in {category} category\n"
-            if adjacent_style_total > 0 and adjacent_categories_list:
+            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
                 adj_cats_str = ' and '.join(adjacent_categories_list)
                 result += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n\n"
             else:
@@ -2201,12 +2205,12 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
         
         if lang == 'uk':
             result += f"  - {main_purpose_total} готелів в обраних цілях, в категорії {category}\n"
-            if adjacent_purpose_total > 0 and adjacent_categories_list:
+            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
                 adj_cats_str = ' і '.join(adjacent_categories_list)
                 result += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
         else:
             result += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
-            if adjacent_purpose_total > 0 and adjacent_categories_list:
+            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
                 adj_cats_str = ' and '.join(adjacent_categories_list)
                 result += f"  - {adjacent_purpose_total} hotels for selected purposes, in adjacent categories ({adj_cats_str})\n"
     
