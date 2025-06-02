@@ -20,10 +20,6 @@ import openai
 # ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
 # ===============================
 
-# ===============================
-# ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
-# ===============================
-
 # Налаштування порту
 PORT = int(os.environ.get("PORT", "10000"))
 
@@ -72,8 +68,6 @@ MAX_PHOTOS_PER_HOTEL = 3  # Максимум 3 фото на готель
 PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 PLACES_PHOTOS_URL = "https://maps.googleapis.com/maps/api/place/photo"
 
-<<<<<<< HEAD
-=======
 # ДОДАНО: OpenAI налаштування
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 ENABLE_OPENAI = OPENAI_API_KEY != ""
@@ -155,7 +149,7 @@ Example format:
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Або "gpt-4" для кращої якості
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of hotel brands based on their real characteristics."},
                 {"role": "user", "content": prompt}
@@ -224,7 +218,6 @@ def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: s
     
     return caption
 
->>>>>>> 0f78045 (Removed hardcoded OpenAI API key)
 # ДОДАНО: Функція для логування дебагу (якщо потрібно)
 def debug_log(message):
     """Логування для дебагу розрахунків"""
@@ -2197,20 +2190,142 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
     return result
 
 # ===============================
-# ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З ФОТО
+# ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
-# ===============================
-# ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З ФОТО
-# ===============================
-
-async def send_programs_with_integrated_hotels_and_photos(context, chat_id, user_data, scores_df, lang='uk'):
+async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk'):
     """
-    Відправляє кожну топ-3 програму в окремому повідомленні з готелями та фото
+    ОНОВЛЕНА функція відправлення готелю з AI-описом
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату
+        hotel_info: словник з інформацією про готель
+        user_styles: обрані користувачем стилі
+        user_purposes: обрані користувачем цілі
+        lang: мова
+    """
+    try:
+        hotel_name = hotel_info.get('name', 'N/A')
+        hotel_brand = hotel_info.get('brand', 'N/A')
+        place_id = hotel_info.get('place_id', '')
+        
+        debug_log(f"Генерація AI-опису для готелю: {hotel_name}")
+        
+        # Генеруємо AI-опис
+        ai_description = await generate_hotel_description(
+            hotel_name, hotel_brand, user_styles, user_purposes, lang
+        )
+        
+        # Формуємо підпис з AI-описом
+        caption = format_hotel_caption_with_ai_description(hotel_info, ai_description, lang)
+        
+        # Якщо API ключ доступний і є Place ID, намагаємося отримати фото
+        if ENABLE_PHOTOS and place_id:
+            photos_data = await get_hotel_photos_and_link(place_id, GOOGLE_MAPS_API_KEY, MAX_PHOTOS_PER_HOTEL)
+            
+            photos = photos_data.get('photos', [])
+            maps_link = photos_data.get('maps_link', '')
+            error = photos_data.get('error')
+            
+            if error:
+                debug_log(f"Не вдалося отримати фото для {hotel_name}: {error}")
+            
+            # Якщо є фото, відправляємо як медіагрупу з AI-описом
+            if photos:
+                media_group = []
+                
+                for i, photo_url in enumerate(photos):
+                    from telegram import InputMediaPhoto
+                    if i == 0:
+                        # Перше фото з AI-описом
+                        media_group.append(InputMediaPhoto(
+                            media=photo_url,
+                            caption=caption
+                        ))
+                    else:
+                        # Решта фото без опису
+                        media_group.append(InputMediaPhoto(media=photo_url))
+                
+                try:
+                    # Відправляємо медіагрупу
+                    await context.bot.send_media_group(chat_id=chat_id, media=media_group)
+                    
+                    # Додаємо посилання на Google Maps окремим повідомленням
+                    if maps_link:
+                        if lang == 'uk':
+                            link_text = f"📍 [Переглянути на Google Maps]({maps_link})"
+                        else:
+                            link_text = f"📍 [View on Google Maps]({maps_link})"
+                        
+                        await context.bot.send_message(
+                            chat_id=chat_id, 
+                            text=link_text, 
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True
+                        )
+                    
+                    debug_log(f"Успішно відправлено {len(photos)} фото з AI-описом для готелю {hotel_name}")
+                    return True
+                    
+                except Exception as e:
+                    logger.error(f"Помилка відправлення медіагрупи з AI-описом: {e}")
+        
+        # Fallback: текстове повідомлення з AI-описом
+        fallback_text = caption
+        
+        # Додаємо посилання на Google Maps, якщо доступне
+        if place_id:
+            maps_link = f"https://maps.google.com/?place_id={place_id}"
+            if lang == 'uk':
+                fallback_text += f"\n\n📍 [Переглянути на Google Maps]({maps_link})"
+            else:
+                fallback_text += f"\n\n📍 [View on Google Maps]({maps_link})"
+        
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=fallback_text, 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелю з AI-описом {hotel_info.get('name', 'Unknown')}: {e}")
+        return False
+
+async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, lang='uk'):
+    """
+    ОНОВЛЕНА функція відправлення готелів з AI-описами
+    """
+    try:
+        for i, (index, hotel) in enumerate(top_hotels.iterrows()):
+            hotel_dict = convert_hotel_dataframe_to_dict(hotel)
+            
+            # Відправляємо готель з AI-описом
+            await send_hotel_with_ai_description(
+                context, chat_id, hotel_dict, user_styles, user_purposes, lang
+            )
+            
+            # Пауза між готелями
+            if i < len(top_hotels) - 1:
+                await asyncio.sleep(1.5)  # Трохи більша пауза для AI генерації
+                
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелів з AI-описами: {e}")
+
+async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, scores_df, lang='uk'):
+    """
+    ОНОВЛЕНА функція відправлення програм з AI-інтегрованими готелями
     """
     try:
         # Беремо топ-3 програми
         top_programs = scores_df.head(3)
+        
+        # Отримуємо стилі та цілі користувача для AI
+        user_styles = user_data.get('styles', [])
+        user_purposes = user_data.get('purposes', [])
         
         for i, (index, row) in enumerate(top_programs.iterrows()):
             program_name = row['loyalty_program']
@@ -2233,11 +2348,13 @@ async def send_programs_with_integrated_hotels_and_photos(context, chat_id, user
             # Невелика пауза
             await asyncio.sleep(0.5)
             
-            # 3. Знаходимо та відправляємо кожен готель окремо
+            # 3. Знаходимо та відправляємо кожен готель з AI-описом
             top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
-                await send_individual_hotels_with_photos(context, chat_id, top_hotels, lang)
+                await send_individual_hotels_with_ai_descriptions(
+                    context, chat_id, top_hotels, user_styles, user_purposes, lang
+                )
             else:
                 if lang == 'uk':
                     await context.bot.send_message(chat_id=chat_id, text="❌ Не знайдено готелів, що відповідають вашим критеріям.")
@@ -2249,7 +2366,7 @@ async def send_programs_with_integrated_hotels_and_photos(context, chat_id, user
                 await asyncio.sleep(2)
                 
     except Exception as e:
-        logger.error(f"Помилка при відправленні програм з фото: {e}")
+        logger.error(f"Помилка при відправленні програм з AI-готелями: {e}")
 
 def format_single_program_report(user_data, program_row, position, lang='uk'):
     """
@@ -2373,14 +2490,14 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
         
         if lang == 'uk':
             result += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
-            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
+            if adjacent_categories_list:
                 adj_cats_str = ' і '.join(adjacent_categories_list)
                 result += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"
             else:
                 result += "\n"
         else:
             result += f"  - {main_style_total} hotels in selected styles, in {category} category\n"
-            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
+            if adjacent_categories_list:
                 adj_cats_str = ' and '.join(adjacent_categories_list)
                 result += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n\n"
             else:
@@ -2416,138 +2533,30 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
         
         if lang == 'uk':
             result += f"  - {main_purpose_total} готелів в обраних цілях, в категорії {category}\n"
-            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
+            if adjacent_categories_list:
                 adj_cats_str = ' і '.join(adjacent_categories_list)
                 result += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
         else:
             result += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
-            if adjacent_categories_list:  # ✅ ВИПРАВЛЕНО: завжди показувати, якщо є суміжні категорії
+            if adjacent_categories_list:
                 adj_cats_str = ' and '.join(adjacent_categories_list)
                 result += f"  - {adjacent_purpose_total} hotels for selected purposes, in adjacent categories ({adj_cats_str})\n"
     
     return result
 
-async def send_individual_hotels_with_photos(context, chat_id, top_hotels, lang='uk'):
+# ДОДАНО: Функція для команд /more з AI-описами (без готелів, тільки звіт)
+async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_df, lang='uk', admin_mode=False):
     """
-    Відправляє кожен готель окремо: назва + бренд + фото + посилання
+    Функція більше не потрібна, тому що готелі з AI-описами інтегровані в основний звіт
+    через нову функцію send_programs_with_ai_integrated_hotels
     """
-    try:
-        for i, (index, hotel) in enumerate(top_hotels.iterrows()):
-            hotel_name = str(hotel.get('hotel_name', 'N/A'))
-            hotel_brand = str(hotel.get('Hotel Brand', 'N/A'))
-            place_id = str(hotel.get('Place ID', ''))
-            
-            # Формуємо простий опис готелю (тільки назва та бренд)
-            if lang == 'uk':
-                hotel_description = f"{i+1}. {hotel_name}\n"
-                hotel_description += f"Бренд: {hotel_brand}"
-            else:
-                hotel_description = f"{i+1}. {hotel_name}\n"
-                hotel_description += f"Brand: {hotel_brand}"
-            
-            # Відправляємо опис готелю
-            await context.bot.send_message(chat_id=chat_id, text=hotel_description)
-            
-            # Невелика пауза
-            await asyncio.sleep(0.5)
-            
-            # Відправляємо фото готелю (якщо є Place ID і увімкнені фото)
-            if place_id and ENABLE_PHOTOS:
-                await send_single_hotel_photos(context, chat_id, place_id, hotel_name, lang)
-            else:
-                # Якщо фото немає, відправляємо тільки посилання
-                if place_id:
-                    maps_link = f"https://maps.google.com/?place_id={place_id}"
-                    if lang == 'uk':
-                        link_text = f"📍 [Переглянути на Google Maps]({maps_link})"
-                    else:
-                        link_text = f"📍 [View on Google Maps]({maps_link})"
-                    
-                    await context.bot.send_message(
-                        chat_id=chat_id, 
-                        text=link_text, 
-                        parse_mode="Markdown",
-                        disable_web_page_preview=True
-                    )
-            
-            # Пауза між готелями
-            if i < len(top_hotels) - 1:
-                await asyncio.sleep(1)
-                
-    except Exception as e:
-        logger.error(f"Помилка при відправленні окремих готелів: {e}")
+    # Ця функція тепер порожня, оскільки готелі з AI-описами відправляються разом зі звітом
+    pass
 
-async def send_single_hotel_photos(context, chat_id, place_id, hotel_name, lang='uk'):
-    """
-    Відправляє фото одного готелю з посиланням на Google Maps
-    """
-    try:
-        debug_log(f"Відправка фото для готелю: {hotel_name} (Place ID: {place_id})")
-        
-        # Отримуємо фото та посилання
-        photos_data = await get_hotel_photos_and_link(place_id, GOOGLE_MAPS_API_KEY, MAX_PHOTOS_PER_HOTEL)
-        
-        photos = photos_data.get('photos', [])
-        maps_link = photos_data.get('maps_link', '')
-        error = photos_data.get('error')
-        
-        if error:
-            debug_log(f"Не вдалося отримати фото для {hotel_name}: {error}")
-        
-        # Якщо є фото, відправляємо як медіагрупу
-        if photos:
-            media_group = []
-            
-            for j, photo_url in enumerate(photos):
-                from telegram import InputMediaPhoto
-                media_group.append(InputMediaPhoto(media=photo_url))
-            
-            try:
-                # Відправляємо медіагрупу
-                await context.bot.send_media_group(chat_id=chat_id, media=media_group)
-                debug_log(f"Успішно відправлено {len(photos)} фото для готелю {hotel_name}")
-                
-            except Exception as e:
-                logger.error(f"Помилка відправлення медіагрупи для {hotel_name}: {e}")
-        
-        # Відправляємо посилання на Google Maps (завжди, якщо є place_id)
-        if maps_link or place_id:
-            link = maps_link if maps_link else f"https://maps.google.com/?place_id={place_id}"
-            
-            if lang == 'uk':
-                link_text = f"📍 [Переглянути на Google Maps]({link})"
-            else:
-                link_text = f"📍 [View on Google Maps]({link})"
-            
-            await context.bot.send_message(
-                chat_id=chat_id, 
-                text=link_text, 
-                parse_mode="Markdown",
-                disable_web_page_preview=True
-            )
-            
-    except Exception as e:
-        logger.error(f"Помилка при відправленні фото готелю {hotel_name}: {e}")
-        
-        # Fallback: тільки посилання
-        if place_id:
-            fallback_link = f"https://maps.google.com/?place_id={place_id}"
-            fallback_text = f"📍 [Переглянути на Google Maps]({fallback_link})" if lang == 'uk' else f"📍 [View on Google Maps]({fallback_link})"
-            
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id, 
-                    text=fallback_text, 
-                    parse_mode="Markdown",
-                    disable_web_page_preview=True
-                )
-            except Exception as fallback_error:
-                logger.error(f"Помилка fallback для {hotel_name}: {fallback_error}")
 
 # ===============================
-# ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ
+# ЧАСТИНА 10: ВИПРАВЛЕНІ ФУНКЦІЇ РОЗРАХУНКУ БАЛІВ ТА ГОЛОВНІ ФУНКЦІЇ З AI
 # ===============================
-
 
 ## Функції фільтрації готелів (залишаються без змін)
 def filter_hotels_by_region(df, regions=None, countries=None):
@@ -3178,10 +3187,13 @@ def calculate_scores_fixed(user_data, hotel_data):
     
     return scores_df
 
-async def calculate_and_show_results_with_ratings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+# ===============================
+# ОНОВЛЕНА ГОЛОВНА ФУНКЦІЯ З AI ІНТЕГРАЦІЄЮ
+# ===============================
+
+async def calculate_and_show_results_with_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    ОНОВЛЕНА функція обчислення та відображення результатів з урахуванням рейтингів
-    Показує кожну програму з готелями в одному повідомленні
+    ОНОВЛЕНА функція обчислення та відображення результатів з AI-описами
     """
     
     user_id = update.effective_user.id
@@ -3189,7 +3201,7 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
     lang = user_data['language']
     
     try:
-        debug_log(f"Розрахунок балів з рейтингами для користувача {user_id}")
+        debug_log(f"Розрахунок балів з AI для користувача {user_id}")
         
         if hotel_data is None or hotel_data.empty:
             logger.error("Дані готелів відсутні або порожні!")
@@ -3233,10 +3245,10 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
         # Відправляємо вступне повідомлення
         if lang == 'uk':
             intro_text = ("🎉 **Аналіз завершено!**\n\n"
-                         "**Ось топ-3 програми лояльності готелів з детальним розбором балів:**")
+                         "**Ось топ-3 програми лояльності готелів з персоналізованими рекомендаціями:**")
         else:
             intro_text = ("🎉 **Analysis completed!**\n\n"
-                         "**Here are the top 3 hotel loyalty programs with detailed score breakdown:**")
+                         "**Here are the top 3 hotel loyalty programs with personalized recommendations:**")
         
         await context.bot.send_message(
             chat_id=update.callback_query.message.chat_id,
@@ -3244,8 +3256,8 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
             parse_mode="Markdown"
         )
         
-        # НОВЕ: Відправляємо кожну програму окремо з готелями та фото
-        await send_programs_with_integrated_hotels_and_photos(
+        # НОВЕ: Відправляємо кожну програму з AI-описами готелів
+        await send_programs_with_ai_integrated_hotels(
             context, 
             update.callback_query.message.chat_id, 
             user_data, 
@@ -3268,7 +3280,7 @@ async def calculate_and_show_results_with_ratings(update: Update, context: Conte
         )
 
     except Exception as e:
-        logger.error(f"Помилка при обчисленні результатів з рейтингами: {e}")
+        logger.error(f"Помилка при обчисленні результатів з AI: {e}")
         
         if lang == 'uk':
             await context.bot.send_message(
@@ -3407,23 +3419,23 @@ def format_simple_results(user_data, scores_df, lang='uk'):
             results += "\n"
         
         if lang == 'uk':
-            results += f"{emoji} {position_text} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"{emoji} {position_text} – {display_program_name}\n\n"
             results += f"⭐{row['program_rating']:.2f} – середній рейтинг готелів, що входять до програми\n"
-            results += f"(на основі відгуків з Google Maps):\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"(на основі відгуків з Google Maps):\n\n"
         else:
-            results += f"{emoji} {position_text} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"{emoji} {position_text} – {display_program_name}\n\n"
             results += f"⭐{row['program_rating']:.2f} – average rating of hotels in the program\n"
-            results += f"(based on Google Maps reviews):\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"(based on Google Maps reviews):\n\n"
         
         # РЕГІОН
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон:\n"
-            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region:\n"
-            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"
         
         # КАТЕГОРІЯ - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if category:
@@ -3448,17 +3460,17 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 results += f"Обраний – {category} – {main_count} готелів\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f"Cуміжні – {adj_cats_str} – {adjacent_total} готелів\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f"Cуміжні – {adj_cats_str} – {adjacent_total} готелів\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
             else:
                 results += f"🏨 Segment:\n"
                 results += f"Selected – {category} – {main_count} hotels\n"
                 if adjacent_details:
                     adj_cats_str = ' and '.join(adjacent_details)
-                    results += f"Adjacent – {adj_cats_str} – {adjacent_total} hotels\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f"Adjacent – {adj_cats_str} – {adjacent_total} hotels\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
         
         # СТИЛЬ - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if styles:
@@ -3492,16 +3504,16 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 results += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
                 if adjacent_style_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
             else:
                 results += f"  - {main_style_total} hotels in selected styles, in {category} category\n"
                 if adjacent_style_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' and '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f"  - {adjacent_style_total} hotels in selected styles, in adjacent categories ({adj_cats_str})\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
         
         # МЕТА - НОВИЙ КОМПАКТНИЙ ФОРМАТ
         if purposes:
@@ -3536,16 +3548,14 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
                     results += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
-                # ВИДАЛЕНО додатковий \n\n тут, оскільки це останній блок
             else:
                 results += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' and '.join(adjacent_categories_list)
                     results += f"  - {adjacent_purpose_total} hotels for selected purposes, in adjacent categories ({adj_cats_str})\n"
-                # ВИДАЛЕНО додатковий \n\n тут, оскільки це останній блок
         
         if i < 2:  # Додаємо роздільник між програмами (крім останньої)
-            results += "\n" + "=" * 50 + "\n"  # ЗМІНЕНО: додано \n перед роздільником
+            results += "\n" + "=" * 50 + "\n"
     
     return results
 
@@ -3591,23 +3601,23 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
             results += "\n"
         
         if lang == 'uk':
-            results += f"{emoji} Топ {i+1} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"{emoji} Топ {i+1} – {display_program_name}\n\n"
             results += f"Середній рейтинг готелів, що входять до програми\n"
-            results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}⭐\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"(на основі відгуків з Google Maps): {row['program_rating']:.2f}⭐\n\n"
         else:
-            results += f"{emoji} Top {i+1} – {display_program_name}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"{emoji} Top {i+1} – {display_program_name}\n\n"
             results += f"Average rating of hotels in the program\n"
-            results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n\n"  # ДОДАНО: \n\n замість \n
+            results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n\n"
         
         # РЕГІОН
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон:\n"
-            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f" • {row['region_hotels']} готелів у {region_str}\n\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region:\n"
-            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"  # ДОДАНО: \n\n замість \n
+            results += f" • {row['region_hotels']} hotels in {region_str}\n\n"
         
         # СЕГМЕНТ
         if category:
@@ -3631,24 +3641,24 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                 results += f" • {main_count} готелів в категорії {category} (обраний сегмент)\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
             else:
                 results += f"🏨 Segment:\n"
                 results += f" • {main_count} hotels in {category} category (selected segment)\n"
                 if adjacent_details:
                     adj_cats_str = ' and '.join(adjacent_details)
-                    results += f" • {adjacent_total} hotels in {adj_cats_str} categories (adjacent segment to selected)\n\n"  # ДОДАНО: \n\n замість \n
+                    results += f" • {adjacent_total} hotels in {adj_cats_str} categories (adjacent segment to selected)\n\n"
                 else:
-                    results += "\n"  # ДОДАНО: порожній рядок, якщо немає суміжних
+                    results += "\n"
         
         # СТИЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНОМУ СТИЛЮ
         if styles:
             if lang == 'uk':
-                results += f"🎨 Стиль, позиціонування:\n\n"  # ДОДАНО: \n\n замість \n
+                results += f"🎨 Стиль, позиціонування:\n\n"
             else:
-                results += f"🎨 Style, positioning:\n\n"  # ДОДАНО: \n\n замість \n
+                results += f"🎨 Style, positioning:\n\n"
             
             for j, style in enumerate(styles):
                 results += f"{style}:\n"
@@ -3695,9 +3705,9 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Ціль подорожі:\n\n"  # ДОДАНО: \n\n замість \n
+                results += f"🎯 Ціль подорожі:\n\n"
             else:
-                results += f"🎯 Travel purpose:\n\n"  # ДОДАНО: \n\n замість \n
+                results += f"🎯 Travel purpose:\n\n"
             
             for j, purpose in enumerate(purposes):
                 results += f"{purpose}:\n"
@@ -3739,7 +3749,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                         results += "\n"
         
         if i < len(all_programs) - 1:  # Додаємо роздільник між програмами (крім останньої)
-            results += "\n" + "=" * 50 + "\n"  # ЗМІНЕНО: додано \n перед роздільником
+            results += "\n" + "=" * 50 + "\n"
     
     return results
 
