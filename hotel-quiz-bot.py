@@ -798,6 +798,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     return await ask_style(update, context)
 
+
 # ===============================
 # ЧАСТИНА 7: ОБРОБНИКИ СТИЛЮ
 # ===============================
@@ -907,7 +908,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         styles_description = (
             "Питання 3/4:\n"
             "Який стиль готелю ви зазвичай обираєте?\n"
-            "*(Оберіть до трьох варіантів)*\n\n"
+            "*(Оберіть мінімум 2 варіанти)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "до трьох"
         )
         
         # Динамічно генеруємо описи тільки для доступних стилів
@@ -930,7 +931,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         styles_description = (
             "Question 3/4:\n"
             "What hotel style do you usually choose?\n"
-            "*(Choose up to three options)*\n\n"
+            "*(Select at least 2 options)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "up to three"
         )
         
         # Динамічно генеруємо описи тільки для доступних стилів
@@ -1017,33 +1018,33 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         selected_styles = user_data_global[user_id]['selected_styles']
         lang = user_data_global[user_id]['language']
         
-        # Перевіряємо, чи вибрано хоча б один стиль
-        if not selected_styles:
+        # НОВА ПЕРЕВІРКА: мінімум 2 стилі з блокуванням
+        if len(selected_styles) < 2:
             if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б один стиль", show_alert=True)
+                await query.answer("Будь ласка, оберіть мінімум 2 стилі", show_alert=True)
             else:
-                await query.answer("Please select at least one style", show_alert=True)
+                await query.answer("Please select at least 2 styles", show_alert=True)
             return WAITING_STYLE_SUBMIT
         
-        # Обмеження до трьох варіантів
-        if len(selected_styles) > 3:
-            original_count = len(selected_styles)
-            user_data_global[user_id]['selected_styles'] = selected_styles[:3]
-            
-            if lang == 'uk':
-                await query.answer(
-                    f"Ви обрали {original_count} стилів, але дозволено максимум 3. "
-                    f"Враховано тільки перші три стилі.", 
-                    show_alert=True
-                )
-            else:
-                await query.answer(
-                    f"You selected {original_count} styles, but a maximum of 3 is allowed. "
-                    f"Only the first three have been considered.", 
-                    show_alert=True
-                )
-            # Оновлюємо вибір та клавіатуру
-            return await ask_style(update, context)
+        # ВИДАЛЕНО: перевірка максимуму 3 стилі
+        # if len(selected_styles) > 3:
+        #     original_count = len(selected_styles)
+        #     user_data_global[user_id]['selected_styles'] = selected_styles[:3]
+        #     
+        #     if lang == 'uk':
+        #         await query.answer(
+        #             f"Ви обрали {original_count} стилів, але дозволено максимум 3. "
+        #             f"Враховано тільки перші три стилі.", 
+        #             show_alert=True
+        #         )
+        #     else:
+        #         await query.answer(
+        #             f"You selected {original_count} styles, but a maximum of 3 is allowed. "
+        #             f"Only the first three have been considered.", 
+        #             show_alert=True
+        #         )
+        #     # Оновлюємо вибір та клавіатуру
+        #     return await ask_style(update, context)
         
         # Зберігаємо вибрані стилі
         user_data_global[user_id]['styles'] = selected_styles
@@ -1077,14 +1078,14 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     else:
         style = callback_data.replace("style_", "")
         
-        # Перевіряємо, чи не перевищено максимальну кількість стилів (3)
-        if style not in user_data_global[user_id]['selected_styles'] and len(user_data_global[user_id]['selected_styles']) >= 3:
-            lang = user_data_global[user_id]['language']
-            if lang == 'uk':
-                await query.answer("Ви вже обрали максимальну кількість стилів (3)", show_alert=True)
-            else:
-                await query.answer("You have already selected the maximum number of styles (3)", show_alert=True)
-            return WAITING_STYLE_SUBMIT
+        # ВИДАЛЕНО: перевірка максимуму 3 стилі
+        # if style not in user_data_global[user_id]['selected_styles'] and len(user_data_global[user_id]['selected_styles']) >= 3:
+        #     lang = user_data_global[user_id]['language']
+        #     if lang == 'uk':
+        #         await query.answer("Ви вже обрали максимальну кількість стилів (3)", show_alert=True)
+        #     else:
+        #         await query.answer("You have already selected the maximum number of styles (3)", show_alert=True)
+        #     return WAITING_STYLE_SUBMIT
         
         # Перемикаємо стан вибору стилю
         if style in user_data_global[user_id]['selected_styles']:
@@ -1095,9 +1096,6 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         # Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
 
-# ===============================
-# ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
-# ===============================
 
 # ===============================
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
@@ -1176,7 +1174,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         purpose_description = (
             "Питання 4/4:\n"
             "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "*(Оберіть до двох варіантів)*\n\n"
+            "*(Оберіть мінімум 2 варіанти)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "до двох"
         )
         
         # Динамічно генеруємо описи тільки для доступних цілей
@@ -1197,7 +1195,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         purpose_description = (
             "Question 4/4:\n"
             "For what purpose do you usually stay at a hotel?\n"
-            "*(Choose up to two options)*\n\n"
+            "*(Select at least 2 options)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "up to two"
         )
         
         # Динамічно генеруємо описи тільки для доступних цілей
@@ -1282,33 +1280,33 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         selected_purposes = user_data_global[user_id]['selected_purposes']
         lang = user_data_global[user_id]['language']
         
-        # Перевіряємо, чи вибрано хоча б одну мету
-        if not selected_purposes:
+        # НОВА ПЕРЕВІРКА: мінімум 2 цілі з блокуванням
+        if len(selected_purposes) < 2:
             if lang == 'uk':
-                await query.answer("Будь ласка, виберіть хоча б одну мету", show_alert=True)
+                await query.answer("Будь ласка, оберіть мінімум 2 мети", show_alert=True)
             else:
-                await query.answer("Please select at least one purpose", show_alert=True)
+                await query.answer("Please select at least 2 purposes", show_alert=True)
             return WAITING_PURPOSE_SUBMIT
         
-        # Обмеження до двох варіантів
-        if len(selected_purposes) > 2:
-            original_count = len(selected_purposes)
-            user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
-            
-            if lang == 'uk':
-                await query.answer(
-                    f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-                    f"Враховано тільки перші дві цілі.", 
-                    show_alert=True
-                )
-            else:
-                await query.answer(
-                    f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-                    f"Only the first two have been considered.", 
-                    show_alert=True
-                )
-            # Оновлюємо вибір та клавіатуру
-            return await ask_purpose(update, context)
+        # ВИДАЛЕНО: перевірка максимуму 2 цілі
+        # if len(selected_purposes) > 2:
+        #     original_count = len(selected_purposes)
+        #     user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
+        #     
+        #     if lang == 'uk':
+        #         await query.answer(
+        #             f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
+        #             f"Враховано тільки перші дві цілі.", 
+        #             show_alert=True
+        #         )
+        #     else:
+        #         await query.answer(
+        #             f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
+        #             f"Only the first two have been considered.", 
+        #             show_alert=True
+        #         )
+        #     # Оновлюємо вибір та клавіатуру
+        #     return await ask_purpose(update, context)
         
         # Зберігаємо вибрані цілі
         user_data_global[user_id]['purposes'] = selected_purposes
@@ -1361,14 +1359,14 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         purpose = callback_data.replace("purpose_", "")
         
-        # Перевіряємо, чи не перевищено максимальну кількість цілей (2)
-        if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
-            lang = user_data_global[user_id]['language']
-            if lang == 'uk':
-                await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
-            else:
-                await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
-            return WAITING_PURPOSE_SUBMIT
+        # ВИДАЛЕНО: перевірка максимуму 2 цілі
+        # if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
+        #     lang = user_data_global[user_id]['language']
+        #     if lang == 'uk':
+        #         await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
+        #     else:
+        #         await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
+        #     return WAITING_PURPOSE_SUBMIT
         
         # Перемикаємо стан вибору мети
         if purpose in user_data_global[user_id]['selected_purposes']:
