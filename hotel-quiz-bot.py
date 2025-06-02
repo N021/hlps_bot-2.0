@@ -177,7 +177,7 @@ def translate_styles_to_english(styles):
         "Класичний і традиційний": "Classic and traditional",
         "Сучасний і дизайнерський": "Modern and designer",
         "Затишний і сімейний": "Cozy and family-friendly",
-        "Практичний і економічний": "Practical and economical"
+        "Практичний і стриманий": "Practical and understated"
     }
     
     if not styles:
@@ -807,43 +807,71 @@ def get_styles_for_category(category, lang='uk'):
     Повертає список стилів, які відповідають обраній категорії готелю
     """
     if lang == 'uk':
-        all_styles = [
-            "Розкішний і вишуканий", 
-            "Бутік і унікальний", 
-            "Класичний і традиційний", 
-            "Сучасний і дизайнерський",
-            "Затишний і сімейний", 
-            "Практичний і економічний"
-        ]
-        
         if category == "Luxury":
-            # Для Luxury виключаємо "Практичний і економічний"
-            return [style for style in all_styles if style != "Практичний і економічний"]
+            return [
+                "Розкішний і вишуканий",
+                "Бутік і унікальний", 
+                "Класичний і традиційний",
+                "Сучасний і дизайнерський"
+            ]
+        elif category == "Comfort":
+            return [
+                "Бутік і унікальний",
+                "Класичний і традиційний", 
+                "Сучасний і дизайнерський",
+                "Затишний і сімейний",
+                "Практичний і стриманий"
+            ]
         elif category == "Standard":
-            # Для Standard виключаємо "Розкішний і вишуканий" і "Бутік і унікальний"
-            return [style for style in all_styles if style not in ["Розкішний і вишуканий", "Бутік і унікальний"]]
+            return [
+                "Класичний і традиційний",
+                "Сучасний і дизайнерський",
+                "Затишний і сімейний",
+                "Практичний і стриманий"
+            ]
         else:
-            # Для Comfort залишаємо всі стилі
-            return all_styles
-    else:
-        all_styles = [
-            "Luxurious and refined", 
-            "Boutique and unique",
-            "Classic and traditional", 
-            "Modern and designer",
-            "Cozy and family-friendly", 
-            "Practical and economical"
-        ]
-        
+            # Fallback - всі стилі
+            return [
+                "Розкішний і вишуканий", 
+                "Бутік і унікальний", 
+                "Класичний і традиційний", 
+                "Сучасний і дизайнерський",
+                "Затишний і сімейний", 
+                "Практичний і стриманий"
+            ]
+    else:  # English
         if category == "Luxury":
-            # Для Luxury виключаємо "Practical and economical"
-            return [style for style in all_styles if style != "Practical and economical"]
+            return [
+                "Luxurious and refined",
+                "Boutique and unique",
+                "Classic and traditional",
+                "Modern and designer"
+            ]
+        elif category == "Comfort":
+            return [
+                "Boutique and unique",
+                "Classic and traditional",
+                "Modern and designer", 
+                "Cozy and family-friendly",
+                "Practical and understated"
+            ]
         elif category == "Standard":
-            # Для Standard виключаємо "Luxurious and refined" і "Boutique and unique"
-            return [style for style in all_styles if style not in ["Luxurious and refined", "Boutique and unique"]]
+            return [
+                "Classic and traditional",
+                "Modern and designer",
+                "Cozy and family-friendly",
+                "Practical and understated"
+            ]
         else:
-            # Для Comfort залишаємо всі стилі
-            return all_styles
+            # Fallback - всі стилі
+            return [
+                "Luxurious and refined", 
+                "Boutique and unique",
+                "Classic and traditional", 
+                "Modern and designer",
+                "Cozy and family-friendly", 
+                "Practical and understated"
+            ]
 
 async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Питання про стиль готелю з чекбоксами та фільтрацією по категорії"""
@@ -865,10 +893,10 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if 'selected_styles' not in user_data_global[user_id]:
         user_data_global[user_id]['selected_styles'] = []
     
-    # НОВОЕ: Отримуємо фільтровані стилі відповідно до категорії
+    # Отримуємо фільтровані стилі відповідно до категорії
     styles = get_styles_for_category(category, lang)
     
-    # НОВОЕ: Очищуємо вибрані стилі, якщо вони більше не доступні для цієї категорії
+    # Очищуємо вибрані стилі, якщо вони більше не доступні для цієї категорії
     user_data_global[user_id]['selected_styles'] = [
         style for style in user_data_global[user_id]['selected_styles'] 
         if style in styles
@@ -882,14 +910,14 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "*(Оберіть до трьох варіантів)*\n\n"
         )
         
-        # НОВОЕ: Динамічно генеруємо описи тільки для доступних стилів
+        # Динамічно генеруємо описи тільки для доступних стилів
         style_descriptions = {
             "Розкішний і вишуканий": "**Розкішний і вишуканий** (преміум-матеріали, елегантний дизайн, високий рівень сервісу)",
             "Бутік і унікальний": "**Бутік і унікальний** (оригінальний інтер'єр, творча атмосфера, відчуття ексклюзивності)",
             "Класичний і традиційний": "**Класичний і традиційний** (перевірений часом стиль, консервативність, історичність)",
             "Сучасний і дизайнерський": "**Сучасний і дизайнерський** (модні інтер'єри, мінімалізм, технологічність)",
             "Затишний і сімейний": "**Затишний і сімейний** (тепла атмосфера, комфорт, дружній до дітей)",
-            "Практичний і економічний": "**Практичний і економічний** (без зайвих деталей, функціональний, доступний)"
+            "Практичний і стриманий": "**Практичний і стриманий** (функціональний, комфорт без надлишків, продуманий простір)"
         }
         
         # Додаємо описи тільки для доступних стилів
@@ -905,14 +933,14 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "*(Choose up to three options)*\n\n"
         )
         
-        # НОВОЕ: Динамічно генеруємо описи тільки для доступних стилів
+        # Динамічно генеруємо описи тільки для доступних стилів
         style_descriptions = {
             "Luxurious and refined": "**Luxurious and refined** (premium materials, elegant design, high level of service)",
             "Boutique and unique": "**Boutique and unique** (original interior, creative atmosphere, sense of exclusivity)",
             "Classic and traditional": "**Classic and traditional** (time-tested style, conservatism, historical ambiance)",
             "Modern and designer": "**Modern and designer** (fashionable interiors, minimalism, technological features)",
             "Cozy and family-friendly": "**Cozy and family-friendly** (warm atmosphere, comfort, child-friendly)",
-            "Practical and economical": "**Practical and economical** (no unnecessary details, functional, affordable)"
+            "Practical and understated": "**Practical and understated** (functional, comfort without excess, well-designed space)"
         }
         
         # Додаємо описи тільки для доступних стилів
@@ -1071,10 +1099,51 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
 # ===============================
 
+# ===============================
+# ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
+# ===============================
+
 import asyncio  # Додаємо імпорт для затримки
 
+def get_purposes_for_category(category, lang='uk'):
+    """
+    Повертає список цілей подорожі, які відповідають обраній категорії готелю
+    """
+    if lang == 'uk':
+        if category == "Luxury":
+            # Для Luxury виключаємо "Довготривале проживання"
+            return [
+                "Бізнес-подорожі / відрядження",
+                "Відпустка / релакс",
+                "Сімейний відпочинок"
+            ]
+        else:
+            # Для Comfort та Standard залишаємо всі цілі
+            return [
+                "Бізнес-подорожі / відрядження",
+                "Відпустка / релакс",
+                "Сімейний відпочинок",
+                "Довготривале проживання"
+            ]
+    else:  # English
+        if category == "Luxury":
+            # Для Luxury виключаємо "Long-term stay"
+            return [
+                "Business travel",
+                "Vacation / relaxation",
+                "Family vacation"
+            ]
+        else:
+            # Для Comfort та Standard залишаємо всі цілі
+            return [
+                "Business travel",
+                "Vacation / relaxation",
+                "Family vacation",
+                "Long-term stay"
+            ]
+
 async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Питання про мету подорожі з чекбоксами та детальними описами"""
+    """Питання про мету подорожі з чекбоксами та фільтрацією по категорії"""
     
     if update.callback_query:
         query = update.callback_query
@@ -1086,48 +1155,62 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     
     lang = user_data_global[user_id]['language']
     
+    # Отримуємо обрану категорію
+    category = user_data_global[user_id].get('category')
+    
     # Ініціалізуємо вибрані цілі, якщо їх ще не обрано
     if 'selected_purposes' not in user_data_global[user_id]:
         user_data_global[user_id]['selected_purposes'] = []
     
+    # Отримуємо фільтровані цілі відповідно до категорії
+    purposes = get_purposes_for_category(category, lang)
+    
+    # Очищуємо вибрані цілі, якщо вони більше не доступні для цієї категорії
+    user_data_global[user_id]['selected_purposes'] = [
+        purpose for purpose in user_data_global[user_id]['selected_purposes'] 
+        if purpose in purposes
+    ]
+    
     # Створюємо InlineKeyboard з чекбоксами для цілей
     if lang == 'uk':
-        purposes = [
-            "Бізнес-подорожі / відрядження",
-            "Відпустка / релакс",
-            "Сімейний відпочинок",
-            "Довготривале проживання"
-        ]
-        
         purpose_description = (
             "Питання 4/4:\n"
             "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
             "*(Оберіть до двох варіантів)*\n\n"
-            "1. **Бізнес-подорожі / відрядження** (зручність для роботи, доступ до ділових центрів)\n"
-            "2. **Відпустка / релакс** (комфорт, розваги, відпочинок)\n"
-            "3. **Сімейний відпочинок** (розваги для дітей, сімейні номери)\n"
-            "4. **Довготривале проживання** (відчуття дому, кухня, пральня)"
         )
+        
+        # Динамічно генеруємо описи тільки для доступних цілей
+        purpose_descriptions = {
+            "Бізнес-подорожі / відрядження": "**Бізнес-подорожі / відрядження** (зручність для роботи, доступ до ділових центрів)",
+            "Відпустка / релакс": "**Відпустка / релакс** (комфорт, розваги, відпочинок)",
+            "Сімейний відпочинок": "**Сімейний відпочинок** (розваги для дітей, сімейні номери)",
+            "Довготривале проживання": "**Довготривале проживання** (відчуття дому, кухня, пральня)"
+        }
+        
+        # Додаємо описи тільки для доступних цілей
+        for i, purpose in enumerate(purposes):
+            purpose_description += f"{i+1}. {purpose_descriptions[purpose]}\n"
         
         title_text = purpose_description
         submit_text = "Відповісти"
     else:
-        purposes = [
-            "Business travel",
-            "Vacation / relaxation",
-            "Family vacation",
-            "Long-term stay"
-        ]
-        
         purpose_description = (
             "Question 4/4:\n"
             "For what purpose do you usually stay at a hotel?\n"
             "*(Choose up to two options)*\n\n"
-            "1. **Business travel** (convenience for work, access to business centers)\n"
-            "2. **Vacation / relaxation** (comfort, entertainment, rest)\n"
-            "3. **Family vacation** (activities for children, family rooms)\n"
-            "4. **Long-term stay** (home feeling, kitchen, laundry)"
         )
+        
+        # Динамічно генеруємо описи тільки для доступних цілей
+        purpose_descriptions = {
+            "Business travel": "**Business travel** (convenience for work, access to business centers)",
+            "Vacation / relaxation": "**Vacation / relaxation** (comfort, entertainment, rest)",
+            "Family vacation": "**Family vacation** (activities for children, family rooms)",
+            "Long-term stay": "**Long-term stay** (home feeling, kitchen, laundry)"
+        }
+        
+        # Додаємо описи тільки для доступних цілей
+        for i, purpose in enumerate(purposes):
+            purpose_description += f"{i+1}. {purpose_descriptions[purpose]}\n"
         
         title_text = purpose_description
         submit_text = "Submit"
@@ -1330,6 +1413,7 @@ def map_hotel_style(hotel_brand):
             "Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
             "Mercure Hotels", "ibis Styles", "Park Hyatt Hotels", 
             "Alila Hotels", "Ascend Hotel Collection"
+            "Hyatt Regency", "Grand Hyatt"
         ],
         
         "Класичний і традиційний": [
@@ -1344,7 +1428,8 @@ def map_hotel_style(hotel_brand):
             "Conrad Hotels & Resorts", "Kimpton Hotels & Restaurants", 
             "Crowne Plaza", "Wyndham Grand", "Novotel Hotels", 
             "Ibis Hotels", "ibis Styles", "Cambria Hotels", 
-            "Park Hyatt Hotels", "Grand Hyatt", "Hyatt Place"
+            "Park Hyatt Hotels", "Grand Hyatt", "Hyatt Place",
+            "Hyatt Regency", "Novotel Hotels"
         ],
         
         "Затишний і сімейний": [
@@ -1355,7 +1440,7 @@ def map_hotel_style(hotel_brand):
             "Comfort Inn Hotels", "Hyatt House"
         ],
         
-        "Практичний і економічний": [
+        "Практичний і стриманий": [
             "Fairfield Inn & Suites", "Courtyard by Marriott", 
             "Hampton by Hilton", "Hilton Garden Inn", 
             "Holiday Inn Hotels & Resorts", "Holiday Inn Express", 
@@ -1374,7 +1459,7 @@ def map_hotel_style(hotel_brand):
         "Classic and traditional": style_mapping["Класичний і традиційний"],
         "Modern and designer": style_mapping["Сучасний і дизайнерський"],
         "Cozy and family-friendly": style_mapping["Затишний і сімейний"],
-        "Practical and economical": style_mapping["Практичний і економічний"]
+        "Practical and understated": style_mapping["Практичний і стриманий"]
     }
     
     # Об'єднуємо словники
@@ -1421,7 +1506,8 @@ def map_hotel_purpose(hotel_brand):
                              "Conrad Hotels & Resorts", "Park Hyatt Hotels", "Fairmont Hotels", 
                              "Raffles Hotels & Resorts", "InterContinental Hotels & Resorts", 
                              "Kimpton Hotels & Restaurants", "Alila Hotels", "Registry Collection Hotels", 
-                             "Ascend Hotel Collection", "Hilton Hotels & Resorts", "Wyndham Grand", "Grand Hyatt"],
+                             "Ascend Hotel Collection", "Hilton Hotels & Resorts", "Wyndham Grand", "Grand Hyatt", "Sheraton", "DoubleTree by Hilton", 
+                             "Holiday Inn Hotels & Resorts", "Mercure Hotels", "Novotel Hotels"],
         
         "Сімейний відпочинок": ["JW Marriott", "Hyatt Regency", "Sheraton", "Holiday Inn Hotels & Resorts", 
                               "DoubleTree by Hilton", "Wyndham", "Mercure Hotels", "Novotel Hotels", 
