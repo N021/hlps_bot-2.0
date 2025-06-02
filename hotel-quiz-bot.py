@@ -908,7 +908,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         styles_description = (
             "Питання 3/4:\n"
             "Який стиль готелю ви зазвичай обираєте?\n"
-            "*(Оберіть мінімум 2 варіанти)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "до трьох"
+            "*(Оберіть мінімум 2 варіанти)*\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних стилів
@@ -931,7 +931,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         styles_description = (
             "Question 3/4:\n"
             "What hotel style do you usually choose?\n"
-            "*(Select at least 2 options)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "up to three"
+            "*(Select at least 2 options)*\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних стилів
@@ -1008,7 +1008,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє вибір стилю через чекбокси"""
     query = update.callback_query
-    await query.answer()
+    # НЕ викликаємо query.answer() одразу!
     
     user_id = query.from_user.id
     callback_data = query.data
@@ -1026,25 +1026,8 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 await query.answer("Please select at least 2 styles", show_alert=True)
             return WAITING_STYLE_SUBMIT
         
-        # ВИДАЛЕНО: перевірка максимуму 3 стилі
-        # if len(selected_styles) > 3:
-        #     original_count = len(selected_styles)
-        #     user_data_global[user_id]['selected_styles'] = selected_styles[:3]
-        #     
-        #     if lang == 'uk':
-        #         await query.answer(
-        #             f"Ви обрали {original_count} стилів, але дозволено максимум 3. "
-        #             f"Враховано тільки перші три стилі.", 
-        #             show_alert=True
-        #         )
-        #     else:
-        #         await query.answer(
-        #             f"You selected {original_count} styles, but a maximum of 3 is allowed. "
-        #             f"Only the first three have been considered.", 
-        #             show_alert=True
-        #         )
-        #     # Оновлюємо вибір та клавіатуру
-        #     return await ask_style(update, context)
+        # Якщо все ОК - показуємо стандартне повідомлення
+        await query.answer()
         
         # Зберігаємо вибрані стилі
         user_data_global[user_id]['styles'] = selected_styles
@@ -1076,16 +1059,10 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     
     # Якщо це вибір або скасування вибору стилю
     else:
-        style = callback_data.replace("style_", "")
+        # Для вибору окремих стилів показуємо стандартну відповідь
+        await query.answer()
         
-        # ВИДАЛЕНО: перевірка максимуму 3 стилі
-        # if style not in user_data_global[user_id]['selected_styles'] and len(user_data_global[user_id]['selected_styles']) >= 3:
-        #     lang = user_data_global[user_id]['language']
-        #     if lang == 'uk':
-        #         await query.answer("Ви вже обрали максимальну кількість стилів (3)", show_alert=True)
-        #     else:
-        #         await query.answer("You have already selected the maximum number of styles (3)", show_alert=True)
-        #     return WAITING_STYLE_SUBMIT
+        style = callback_data.replace("style_", "")
         
         # Перемикаємо стан вибору стилю
         if style in user_data_global[user_id]['selected_styles']:
@@ -1095,8 +1072,6 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         # Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
-
-
 # ===============================
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
 # ===============================
