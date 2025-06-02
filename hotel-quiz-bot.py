@@ -14,6 +14,7 @@ import ssl
 from aiohttp import web
 import aiohttp
 from urllib.parse import quote
+import openai
 
 # ===============================
 # ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
@@ -63,7 +64,7 @@ LOYALTY_PROGRAM_RATINGS = {
 user_last_results = {}
 
 # НОВЕ: Google Maps API налаштування
-GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "AIzaSyAwQgH4NBgBPW03mJ-WzxEQrGaCjXJx5zw")
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 ENABLE_PHOTOS = GOOGLE_MAPS_API_KEY != ""  # Вмикаємо фото тільки якщо є API ключ
 MAX_PHOTOS_PER_HOTEL = 3  # Максимум 3 фото на готель
 
@@ -71,6 +72,159 @@ MAX_PHOTOS_PER_HOTEL = 3  # Максимум 3 фото на готель
 PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 PLACES_PHOTOS_URL = "https://maps.googleapis.com/maps/api/place/photo"
 
+<<<<<<< HEAD
+=======
+# ДОДАНО: OpenAI налаштування
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+ENABLE_OPENAI = OPENAI_API_KEY != ""
+
+# Ініціалізуємо OpenAI клієнт, якщо ключ доступний
+if ENABLE_OPENAI:
+    openai.api_key = OPENAI_API_KEY
+
+# ===============================
+# ДОДАНО: OpenAI Integration для генерації описів готелів
+# ===============================
+
+async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
+                                   selected_purposes: list, lang: str = 'uk') -> str:
+    """
+    Генерує персоналізований опис готелю через OpenAI API
+    
+    Args:
+        hotel_name: назва готелю
+        hotel_brand: бренд готелю
+        selected_styles: обрані користувачем стилі
+        selected_purposes: обрані користувачем цілі подорожі
+        lang: мова для опису
+    
+    Returns:
+        str: згенерований опис готелю (2 речення)
+    """
+    if not ENABLE_OPENAI:
+        # Fallback: базовий опис без OpenAI
+        if lang == 'uk':
+            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
+        else:
+            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+    
+    try:
+        # Формуємо промт для OpenAI
+        styles_text = ', '.join(selected_styles)
+        purposes_text = ', '.join(selected_purposes)
+        
+        if lang == 'uk':
+            prompt = f"""
+Створи персоналізований опис готелю "{hotel_name}" бренду {hotel_brand} українською мовою.
+
+Обрані користувачем стилі: {styles_text}
+Обрані користувачем цілі подорожі: {purposes_text}
+
+Вимоги:
+1. Опис має бути точно 2 речення
+2. Опис має показати, як цей готель/бренд відповідає обраним стилям та цілям подорожі
+3. Використовуй тільки правдиву інформацію про бренд {hotel_brand}
+4. Будь конкретним щодо особливостей цього бренду
+5. Не використовуй загальні фрази, а покажи унікальність бренду
+6. Не згадуй назву готелю в описі, тільки особливості бренду
+
+Приклад формату:
+[Перше речення про те, як бренд відповідає обраним стилям]. [Друге речення про те, як бренд підходить для обраних цілей подорожі].
+"""
+        else:
+            prompt = f"""
+Create a personalized description of hotel "{hotel_name}" from {hotel_brand} brand in English.
+
+User selected styles: {styles_text}
+User selected travel purposes: {purposes_text}
+
+Requirements:
+1. Description must be exactly 2 sentences
+2. Description should show how this hotel/brand matches the selected styles and travel purposes
+3. Use only truthful information about {hotel_brand} brand
+4. Be specific about this brand's features
+5. Don't use generic phrases, show the brand's uniqueness
+6. Don't mention the hotel name in description, only brand features
+
+Example format:
+[First sentence about how the brand matches selected styles]. [Second sentence about how the brand suits selected travel purposes].
+"""
+        
+        # Викликаємо OpenAI API (оновлена версія для новішого API)
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Або "gpt-4" для кращої якості
+            messages=[
+                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of hotel brands based on their real characteristics."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150,
+            temperature=0.7,
+            timeout=10
+        )
+        
+        generated_text = response.choices[0].message.content.strip()
+        
+        # Валідація: перевіряємо, що це дійсно 2 речення
+        sentences = generated_text.split('.')
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        if len(sentences) >= 2:
+            # Беремо перші 2 речення
+            result = f"{sentences[0]}. {sentences[1]}."
+        else:
+            # Якщо менше 2 речень, додаємо fallback
+            result = generated_text
+            if lang == 'uk':
+                result += " Ідеальний вибір для вашої подорожі."
+            else:
+                result += " Perfect choice for your trip."
+        
+        debug_log(f"OpenAI generated description for {hotel_name}: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Помилка генерації опису через OpenAI: {e}")
+        
+        # Fallback: базовий опис
+        if lang == 'uk':
+            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
+        else:
+            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+
+def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
+    """
+    Форматує підпис до фото готелю з AI-описом
+    
+    Args:
+        hotel_info: словник з інформацією про готель
+        ai_description: згенерований OpenAI опис
+        lang: мова
+    
+    Returns:
+        str: відформатований підпис
+    """
+    hotel_name = hotel_info.get('name', 'N/A')
+    hotel_brand = hotel_info.get('brand', 'N/A')
+    address = hotel_info.get('address', 'N/A')
+    
+    # Парсимо адресу для отримання міста та країни
+    address_parts = address.split(',')
+    if len(address_parts) >= 2:
+        city = address_parts[-2].strip()
+        country = address_parts[-1].strip()
+        location = f"{city}, {country}"
+    else:
+        location = address
+    
+    # Формуємо фінальний підпис
+    caption = f'"{hotel_name}" by {hotel_brand}, {location}\n\n{ai_description}'
+    
+    return caption
+
+>>>>>>> 0f78045 (Removed hardcoded OpenAI API key)
 # ДОДАНО: Функція для логування дебагу (якщо потрібно)
 def debug_log(message):
     """Логування для дебагу розрахунків"""
@@ -1313,7 +1467,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         
         # ОНОВЛЕНО: Розрахунок і відображення результатів з рейтингами + збереження для /more
-        return await calculate_and_show_results_with_ratings(update, context)
+        return await calculate_and_show_results_with_ai(update, context)
     
     # Якщо це вибір або скасування вибору мети
     else:
