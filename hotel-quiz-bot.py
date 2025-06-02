@@ -1072,6 +1072,8 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         # Оновлюємо клавіатуру з новим вибором
         return await ask_style(update, context)
+
+
 # ===============================
 # ЧАСТИНА 8: ОБРОБНИКИ МЕТИ ПОДОРОЖІ
 # ===============================
@@ -1149,7 +1151,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         purpose_description = (
             "Питання 4/4:\n"
             "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "*(Оберіть мінімум 2 варіанти)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "до двох"
+            "*(Оберіть мінімум 2 варіанти)*\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних цілей
@@ -1170,7 +1172,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         purpose_description = (
             "Question 4/4:\n"
             "For what purpose do you usually stay at a hotel?\n"
-            "*(Select at least 2 options)*\n\n"  # ЗМІНЕНО: мінімум 2 замість "up to two"
+            "*(Select at least 2 options)*\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних цілей
@@ -1245,7 +1247,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє вибір мети через чекбокси"""
     query = update.callback_query
-    await query.answer()
+    # НЕ викликаємо query.answer() одразу!
     
     user_id = query.from_user.id
     callback_data = query.data
@@ -1255,7 +1257,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         selected_purposes = user_data_global[user_id]['selected_purposes']
         lang = user_data_global[user_id]['language']
         
-        # НОВА ПЕРЕВІРКА: мінімум 2 цілі з блокуванням
+        # НОВА ПЕРЕВІРКА: мінімум 2 цілі з блокуванням та попапом
         if len(selected_purposes) < 2:
             if lang == 'uk':
                 await query.answer("Будь ласка, оберіть мінімум 2 мети", show_alert=True)
@@ -1263,25 +1265,8 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await query.answer("Please select at least 2 purposes", show_alert=True)
             return WAITING_PURPOSE_SUBMIT
         
-        # ВИДАЛЕНО: перевірка максимуму 2 цілі
-        # if len(selected_purposes) > 2:
-        #     original_count = len(selected_purposes)
-        #     user_data_global[user_id]['selected_purposes'] = selected_purposes[:2]
-        #     
-        #     if lang == 'uk':
-        #         await query.answer(
-        #             f"Ви обрали {original_count} цілей, але дозволено максимум 2. "
-        #             f"Враховано тільки перші дві цілі.", 
-        #             show_alert=True
-        #         )
-        #     else:
-        #         await query.answer(
-        #             f"You selected {original_count} purposes, but a maximum of 2 is allowed. "
-        #             f"Only the first two have been considered.", 
-        #             show_alert=True
-        #         )
-        #     # Оновлюємо вибір та клавіатуру
-        #     return await ask_purpose(update, context)
+        # Якщо все ОК - показуємо стандартне повідомлення
+        await query.answer()
         
         # Зберігаємо вибрані цілі
         user_data_global[user_id]['purposes'] = selected_purposes
@@ -1332,16 +1317,10 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Якщо це вибір або скасування вибору мети
     else:
-        purpose = callback_data.replace("purpose_", "")
+        # Для вибору окремих цілей показуємо стандартну відповідь
+        await query.answer()
         
-        # ВИДАЛЕНО: перевірка максимуму 2 цілі
-        # if purpose not in user_data_global[user_id]['selected_purposes'] and len(user_data_global[user_id]['selected_purposes']) >= 2:
-        #     lang = user_data_global[user_id]['language']
-        #     if lang == 'uk':
-        #         await query.answer("Ви вже обрали максимальну кількість цілей (2)", show_alert=True)
-        #     else:
-        #         await query.answer("You have already selected the maximum number of purposes (2)", show_alert=True)
-        #     return WAITING_PURPOSE_SUBMIT
+        purpose = callback_data.replace("purpose_", "")
         
         # Перемикаємо стан вибору мети
         if purpose in user_data_global[user_id]['selected_purposes']:
