@@ -91,30 +91,27 @@ if ENABLE_OPENAI:
 # ДОДАНО: OpenAI Integration для генерації описів готелів
 # ===============================
 
-async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_program: str, corporation: str,
-                                   category: str, selected_styles: list, selected_purposes: list, lang: str = 'uk') -> str:
+async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
+                                   selected_purposes: list, lang: str = 'uk') -> str:
     """
     Генерує персоналізований опис готелю через OpenAI API
     
     Args:
         hotel_name: назва готелю
         hotel_brand: бренд готелю
-        loyalty_program: назва програми лояльності
-        corporation: назва корпорації
-        category: обрана категорія готелю
         selected_styles: обрані користувачем стилі
         selected_purposes: обрані користувачем цілі подорожі
         lang: мова для опису
     
     Returns:
-        str: згенерований опис готелю (3 речення)
+        str: згенерований опис готелю (2 речення)
     """
     if not ENABLE_OPENAI:
         # Fallback: базовий опис без OpenAI
         if lang == 'uk':
-            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування. Стати учасником програми лояльності {loyalty_program}."
+            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
         else:
-            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay. Join the {loyalty_program} loyalty program."
+            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay."
     
     try:
         # Формуємо промт для OpenAI
@@ -123,79 +120,72 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_
         
         if lang == 'uk':
             prompt = f"""
-Створи опис конкретного готелю "{hotel_name}" бренду {hotel_brand} як представника програми корпорації {corporation}.
+Створи персоналізований опис готелю "{hotel_name}" бренду {hotel_brand}.
 
-Користувач обрав:
-- Категорію: {category}
-- Стиль: {styles_text}
-- Мету подорожі: {purposes_text}
+Обрані користувачем стилі: {styles_text}
+Обрані користувачем цілі подорожі: {purposes_text}
 
-Структура (точно 3 речення):
-1. Поясни, чому цей готель є ідеальним представником категорії {category} та демонструє характерні риси стилю {styles_text}
-2. Опиши, як готель втілює потреби для {purposes_text} та які унікальні особливості роблять його зразковим прикладом таких готелів
-3. Закінчи: "Стати учасником програми лояльності {loyalty_program}."
+Вимоги:
+1. Опис має бути точно 2 речення
+2. Опис має показати, як цей готель/бренд відповідає обраним стилям та цілям подорожі
+3. Використовуй тільки правдиву інформацію про бренд {hotel_brand}
+4. Будь конкретним щодо особливостей цього бренду
+5. Не використовуй загальні фрази, а покажи унікальність бренду
+6. Не згадуй назву готелю в описі, тільки особливості бренду
 
-НЕ згадуй розташування в центрі чи локацію.
-Фокусуйся на тому, чому саме ЦЕЙ готель є еталоном обраних характеристик.
-Кожне речення має бути повним і закінчуватися крапкою.
+Приклад формату:
+[Перше речення про те, як бренд відповідає обраним стилям]. [Друге речення про те, як бренд підходить для обраних цілей подорожі].
 """
         else:
             prompt = f"""
-Create a description of the specific hotel "{hotel_name}" by {hotel_brand} as a representative of {corporation} corporation program.
+Create a personalized description of hotel "{hotel_name}" from {hotel_brand} brand.
 
-User selected:
-- Category: {category}
-- Style: {styles_text}
-- Travel purpose: {purposes_text}
+User selected styles: {styles_text}
+User selected travel purposes: {purposes_text}
 
-Structure (exactly 3 sentences):
-1. Explain why this hotel is an ideal representative of the {category} category and demonstrates the characteristic features of {styles_text} style
-2. Describe how the hotel embodies the needs for {purposes_text} and what unique features make it an exemplary example of such hotels
-3. End with: "Join the {loyalty_program} loyalty program."
+Requirements:
+1. Description must be exactly 2 sentences
+2. Description should show how this hotel/brand matches the selected styles and travel purposes
+3. Use only truthful information about {hotel_brand} brand
+4. Be specific about this brand's features
+5. Don't use generic phrases, show the brand's uniqueness
+6. Don't mention the hotel name in description, only brand features
 
-DO NOT mention central location or positioning.
-Focus on why THIS hotel is the epitome of the selected characteristics.
-Each sentence must be complete and end with a period.
+Example format:
+[First sentence about how the brand matches selected styles]. [Second sentence about how the brand suits selected travel purposes].
 """
         
-        # Викликаємо OpenAI API з збільшеним лімітом токенів
+        # Викликаємо OpenAI API (оновлена версія для новішого API)
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of specific hotels based on their real characteristics."},
+                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of hotel brands based on their real characteristics."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300,  # ЗБІЛЬШЕНО з 150 до 300
+            max_tokens=150,
             temperature=0.7,
-            timeout=15  # Збільшено таймаут
+            timeout=10
         )
         
         generated_text = response.choices[0].message.content.strip()
         
-        # ПОКРАЩЕНА валідація: перевіряємо, що це дійсно 3 повних речення
-        sentences = [s.strip() for s in generated_text.split('.') if s.strip()]
+        # Валідація: перевіряємо, що це дійсно 2 речення
+        sentences = generated_text.split('.')
+        sentences = [s.strip() for s in sentences if s.strip()]
         
-        if len(sentences) >= 3:
-            # Беремо перші 3 речення і додаємо крапки
-            result = f"{sentences[0]}. {sentences[1]}. {sentences[2]}."
-        elif len(sentences) == 2:
-            # Якщо 2 речення, додаємо стандартне третє
-            if lang == 'uk':
-                result = f"{sentences[0]}. {sentences[1]}. Стати учасником програми лояльності {loyalty_program}."
-            else:
-                result = f"{sentences[0]}. {sentences[1]}. Join the {loyalty_program} loyalty program."
+        if len(sentences) >= 2:
+            # Беремо перші 2 речення
+            result = f"{sentences[0]}. {sentences[1]}."
         else:
-            # Fallback для коротких описів
+            # Якщо менше 2 речень, додаємо fallback
             result = generated_text
-            if not result.endswith('.'):
-                result += '.'
             if lang == 'uk':
-                result += f" Стати учасником програми лояльності {loyalty_program}."
+                result += " Ідеальний вибір для вашої подорожі."
             else:
-                result += f" Join the {loyalty_program} loyalty program."
+                result += " Perfect choice for your trip."
         
         debug_log(f"OpenAI generated description for {hotel_name}: {result}")
         return result
@@ -205,9 +195,9 @@ Each sentence must be complete and end with a period.
         
         # Fallback: базовий опис
         if lang == 'uk':
-            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування. Стати учасником програми лояльності {loyalty_program}."
+            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
         else:
-            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay. Join the {loyalty_program} loyalty program."
+            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
 
 def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
     """
@@ -313,7 +303,6 @@ def calculate_rating_coefficient(program_rating):
         float: коефіцієнт (рейтинг/5.0)
     """
     return program_rating / 5.0
-
 
 # ===============================
 # ЧАСТИНА 2.5: ФУНКЦІЇ ПЕРЕКЛАДУ
@@ -2338,7 +2327,7 @@ def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
 # ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
-async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_program, user_styles, user_purposes, lang='uk'):
+async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk'):
     """
     ОНОВЛЕНА функція відправлення готелю з AI-описом
     
@@ -2346,7 +2335,6 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_p
         context: Telegram bot context
         chat_id: ID чату
         hotel_info: словник з інформацією про готель
-        loyalty_program: назва програми лояльності
         user_styles: обрані користувачем стилі
         user_purposes: обрані користувачем цілі
         lang: мова
@@ -2358,9 +2346,9 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_p
         
         debug_log(f"Генерація AI-опису для готелю: {hotel_name}")
         
-        # Генеруємо AI-опис з програмою лояльності
+        # Генеруємо AI-опис
         ai_description = await generate_hotel_description(
-            hotel_name, hotel_brand, loyalty_program, user_styles, user_purposes, lang
+            hotel_name, hotel_brand, user_styles, user_purposes, lang
         )
         
         # Формуємо підпис з AI-описом
@@ -2397,13 +2385,12 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_p
                     # Відправляємо медіагрупу
                     await context.bot.send_media_group(chat_id=chat_id, media=media_group)
                     
-                    # ЗМІНЕНО: Додаємо посилання на реєстрацію в програмі лояльності замість Google Maps
-                    loyalty_link = get_loyalty_program_link(loyalty_program)
-                    if loyalty_link:
+                    # Додаємо посилання на Google Maps окремим повідомленням
+                    if maps_link:
                         if lang == 'uk':
-                            link_text = f"🎯 [Зареєструватися в програмі лояльності {loyalty_program}]({loyalty_link})"
+                            link_text = f"📍 [Переглянути на Google Maps]({maps_link})"
                         else:
-                            link_text = f"🎯 [Join {loyalty_program} loyalty program]({loyalty_link})"
+                            link_text = f"📍 [View on Google Maps]({maps_link})"
                         
                         await context.bot.send_message(
                             chat_id=chat_id, 
@@ -2421,13 +2408,13 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_p
         # Fallback: текстове повідомлення з AI-описом
         fallback_text = caption
         
-        # ЗМІНЕНО: Додаємо посилання на реєстрацію замість Google Maps
-        loyalty_link = get_loyalty_program_link(loyalty_program)
-        if loyalty_link:
+        # Додаємо посилання на Google Maps, якщо доступне
+        if place_id:
+            maps_link = f"https://maps.google.com/?place_id={place_id}"
             if lang == 'uk':
-                fallback_text += f"\n\n🎯 [Зареєструватися в програмі лояльності {loyalty_program}]({loyalty_link})"
+                fallback_text += f"\n\n📍 [Переглянути на Google Maps]({maps_link})"
             else:
-                fallback_text += f"\n\n🎯 [Join {loyalty_program} loyalty program]({loyalty_link})"
+                fallback_text += f"\n\n📍 [View on Google Maps]({maps_link})"
         
         await context.bot.send_message(
             chat_id=chat_id, 
@@ -2442,7 +2429,7 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, loyalty_p
         logger.error(f"Помилка при відправленні готелю з AI-описом {hotel_info.get('name', 'Unknown')}: {e}")
         return False
 
-async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, loyalty_program, user_styles, user_purposes, lang='uk'):
+async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, lang='uk'):
     """
     ОНОВЛЕНА функція відправлення готелів з AI-описами
     """
@@ -2452,12 +2439,12 @@ async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hote
             
             # Відправляємо готель з AI-описом
             await send_hotel_with_ai_description(
-                context, chat_id, hotel_dict, loyalty_program, user_styles, user_purposes, lang
+                context, chat_id, hotel_dict, user_styles, user_purposes, lang
             )
             
-            # Пауза між готелями (тепер не потрібна, оскільки відправляємо тільки 1 готель)
+            # Пауза між готелями
             if i < len(top_hotels) - 1:
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(1.5)  # Трохи більша пауза для AI генерації
                 
     except Exception as e:
         logger.error(f"Помилка при відправленні готелів з AI-описами: {e}")
@@ -2484,23 +2471,23 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             # Невелика пауза
             await asyncio.sleep(0.5)
             
-            # 2. ЗМІНЕНО: Відправляємо заголовок для 1 готелю
+            # 2. Відправляємо заголовок готелів
             if lang == 'uk':
-                hotels_header = f"🏆 Ось приклад готелю програми {program_name}, який відповідає вашому запиту:"
+                hotels_header = f"🏆 Ось приклад 2 кращих готелів цієї програми:"
             else:
-                hotels_header = f"🏆 Here is an example hotel from {program_name} program that matches your request:"
+                hotels_header = f"🏆 Here are the top 2 hotels from this program:"
             
             await context.bot.send_message(chat_id=chat_id, text=hotels_header)
             
             # Невелика пауза
             await asyncio.sleep(0.5)
             
-            # 3. ЗМІНЕНО: Знаходимо та відправляємо 1 готель з AI-описом
-            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
+            # 3. Знаходимо та відправляємо кожен готель з AI-описом
+            top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
                 await send_individual_hotels_with_ai_descriptions(
-                    context, chat_id, top_hotels, program_name, user_styles, user_purposes, lang
+                    context, chat_id, top_hotels, user_styles, user_purposes, lang
                 )
             else:
                 if lang == 'uk':
@@ -2654,7 +2641,7 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     if purposes:
         if lang == 'uk':
             purposes_str = '; '.join(purposes)
-            result += f"🎯 Мета подорожі:\n{purposes_str}:\n"
+            result += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
         else:
             purposes_str = '; '.join(purposes)
             result += f"🎯 Travel purpose:\n{purposes_str}:\n"
