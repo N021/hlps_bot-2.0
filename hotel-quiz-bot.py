@@ -1511,7 +1511,7 @@ def map_hotel_style(hotel_brand):
         "Бутік і унікальний": [
             "Kimpton Hotels & Restaurants", "Registry Collection Hotels", 
             "Mercure Hotels", "ibis Styles", "Park Hyatt Hotels", 
-            "Alila Hotels", "Ascend Hotel Collection"
+            "Alila Hotels", "Ascend Hotel Collection",
             "Hyatt Regency", "Grand Hyatt"
         ],
         
@@ -1905,6 +1905,250 @@ async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_
     pass
 
 # ===============================
+# НОВІ ФУНКЦІЇ ДЛЯ СЦЕНАРІЇВ ГОТЕЛІВ
+# ===============================
+
+def get_real_hotel_style(hotel_brand):
+    """
+    Визначає реальний стиль готелю за брендом
+    
+    Args:
+        hotel_brand: бренд готелю
+    
+    Returns:
+        str: перший знайдений стиль готелю або 'Класичний і традиційний' за замовчуванням
+    """
+    if not hotel_brand:
+        return "Класичний і традиційний"
+    
+    hotel_styles = map_hotel_style(hotel_brand)
+    
+    # Знаходимо перший True стиль
+    for style, matches in hotel_styles.items():
+        if matches:
+            return style
+    
+    # Якщо не знайдено стиль, повертаємо класичний за замовчуванням
+    return "Класичний і традиційний"
+
+def determine_hotel_scenario(program_hotels, category, styles, purposes):
+    """
+    Визначає який сценарій застосувати для вибору готелів
+    
+    Args:
+        program_hotels: DataFrame з готелями програми
+        category: обрана категорія користувача
+        styles: обрані стилі користувача
+        purposes: обрані цілі користувача
+    
+    Returns:
+        str: тип сценарію ('perfect', 'two_hotels', 'compromise', 'worst_case', 'no_hotels')
+    """
+    if program_hotels.empty:
+        return 'no_hotels'
+    
+    # Перевіряємо основну категорію
+    main_category_hotels = filter_hotels_by_category(program_hotels, category)
+    
+    if main_category_hotels.empty:
+        # Немає готелів в основній категорії
+        # Перевіряємо суміжні категорії
+        adjacent_categories = get_adjacent_categories(category)
+        has_adjacent_match = False
+        
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                # Перевіряємо стилі та цілі в суміжній категорії
+                adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
+                adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
+                
+                if not adj_purpose_filtered.empty:
+                    has_adjacent_match = True
+                    break
+        
+        if has_adjacent_match:
+            return 'compromise'  # Сценарій 3
+        else:
+            return 'worst_case'  # Сценарій 4
+    else:
+        # Є готелі в основній категорії
+        # Перевіряємо стилі та цілі
+        main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
+        main_purpose_filtered = filter_hotels_by_purpose(main_style_filtered, purposes)
+        
+        if not main_purpose_filtered.empty:
+            return 'perfect'  # Сценарій 1
+        else:
+            # Основна категорія є, але не відповідає стилям/цілям
+            # Перевіряємо чи є підходящі готелі в суміжних категоріях
+            adjacent_categories = get_adjacent_categories(category)
+            has_adjacent_match = False
+            
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+                if not adj_category_hotels.empty:
+                    adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
+                    adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
+                    
+                    if not adj_purpose_filtered.empty:
+                        has_adjacent_match = True
+                        break
+            
+            if has_adjacent_match:
+                return 'two_hotels'  # Сценарій 2
+            else:
+                return 'worst_case'  # Сценарій 4
+
+def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles, lang='uk'):
+    """
+    Генерує пояснювальний текст залежно від сценарію
+    
+    Args:
+        scenario: тип сценарію
+        hotel_info: інформація про готель
+        user_category: обрана користувачем категорія
+        user_styles: обрані користувачем стилі
+        lang: мова
+    
+    Returns:
+        str: пояснювальний текст
+    """
+    if scenario == 'perfect':
+        if lang == 'uk':
+            return "🏆 Ось приклад кращого готелю цієї програми:"
+        else:
+            return "🏆 Here is the top hotel from this program:"
+    
+    elif scenario == 'two_hotels_main':
+        # Для першого готелю в сценарії 2
+        hotel_brand = hotel_info.get('brand', 'N/A')
+        real_style = get_real_hotel_style(hotel_brand)
+        
+        if lang == 'uk':
+            return (f"🔄 Ось приклад готелю {user_category} сегменту в цій програмі "
+                   f"(стиль його вказано як \"{real_style}\", що відрізняється від обраного вами. "
+                   f"Але категорія точно ваша):")
+        else:
+            return (f"🔄 Here is an example of a {user_category} segment hotel in this program "
+                   f"(its style is listed as \"{real_style}\", which differs from your selection. "
+                   f"But the category is exactly yours):")
+    
+    elif scenario == 'two_hotels_alt':
+        # Для другого готелю в сценарії 2
+        if lang == 'uk':
+            return ("💡 Як альтернативу, ось приклад готелю сегменту Comfort, який входить до цієї програми "
+                   "і відповідає вашим стилям та цілям:")
+        else:
+            return ("💡 As an alternative, here is an example of a Comfort segment hotel that belongs to this program "
+                   "and matches your styles and purposes:")
+    
+    elif scenario == 'compromise':
+        if lang == 'uk':
+            return (f"🔄 У категорії {user_category} готелів мало, тому показуємо кращий варіант "
+                   f"із суміжної категорії:")
+        else:
+            return (f"🔄 Few hotels in {user_category} category, showing best option "
+                   f"from adjacent category:")
+    
+    elif scenario == 'worst_case':
+        if lang == 'uk':
+            return ("⚠️ Програма слабко представлена в обраних вами категорії та стилях у цьому регіоні. "
+                   "Показуємо найкращий доступний варіант:")
+        else:
+            return ("⚠️ The program is poorly represented in your selected category and styles in this region. "
+                   "Showing the best available option:")
+    
+    else:
+        if lang == 'uk':
+            return "🏆 Ось приклад готелю цієї програми:"
+        else:
+            return "🏆 Here is an example hotel from this program:"
+
+def find_hotels_by_scenario(program_hotels, user_data, scenario):
+    """
+    Шукає готелі відповідно до визначеного сценарію
+    
+    Args:
+        program_hotels: DataFrame з готелями програми
+        user_data: дані користувача
+        scenario: тип сценарію
+    
+    Returns:
+        dict: {
+            'main_hotel': DataFrame з основним готелем,
+            'alt_hotel': DataFrame з альтернативним готелем (для сценарію 2),
+            'main_type': тип основного готелю,
+            'alt_type': тип альтернативного готелю
+        }
+    """
+    regions = user_data.get('regions', []) or []
+    countries = user_data.get('countries', []) or []
+    category = user_data.get('category')
+    styles = user_data.get('styles', []) or []
+    purposes = user_data.get('purposes', []) or []
+    
+    english_styles = translate_styles_to_english(styles)
+    english_purposes = translate_purposes_to_english(purposes)
+    
+    result = {
+        'main_hotel': pd.DataFrame(),
+        'alt_hotel': pd.DataFrame(),
+        'main_type': scenario,
+        'alt_type': None
+    }
+    
+    if scenario == 'perfect':
+        # Сценарій 1: ідеальне співпадіння
+        main_category_hotels = filter_hotels_by_category(program_hotels, category)
+        main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
+        main_filtered = filter_hotels_by_purpose(main_filtered, english_purposes)
+        
+        if not main_filtered.empty:
+            result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
+    
+    elif scenario == 'two_hotels':
+        # Сценарій 2: показуємо 2 готелі
+        # 1. Готель з основної категорії (навіть якщо не відповідає стилям/цілям)
+        main_category_hotels = filter_hotels_by_category(program_hotels, category)
+        if not main_category_hotels.empty:
+            result['main_hotel'] = select_diverse_hotels(main_category_hotels, 1)
+            result['main_type'] = 'two_hotels_main'
+        
+        # 2. Готель з суміжних категорій, який відповідає стилям/цілям
+        adjacent_categories = get_adjacent_categories(category)
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
+                adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
+                
+                if not adj_filtered.empty:
+                    result['alt_hotel'] = select_diverse_hotels(adj_filtered, 1)
+                    result['alt_type'] = 'two_hotels_alt'
+                    break
+    
+    elif scenario == 'compromise':
+        # Сценарій 3: готель з суміжної категорії
+        adjacent_categories = get_adjacent_categories(category)
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
+                adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
+                
+                if not adj_filtered.empty:
+                    result['main_hotel'] = select_diverse_hotels(adj_filtered, 1)
+                    break
+    
+    elif scenario == 'worst_case':
+        # Сценарій 4: найкращий готель програми в регіоні
+        if not program_hotels.empty:
+            result['main_hotel'] = select_diverse_hotels(program_hotels, 1)
+    
+    return result
+
+# ===============================
 # ЗАЛИШАЮТЬСЯ БЕЗ ЗМІН: ФУНКЦІЇ АНАЛІЗУ ГОТЕЛІВ
 # ===============================
 
@@ -1985,10 +2229,9 @@ def select_diverse_hotels(hotels_df, max_count=1):
     else:
         return pd.DataFrame()
 
-def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
+def find_top_hotels_for_program_with_scenarios(program_name, user_data, hotel_data):
     """
-    Знаходить топ-1 готель для програми лояльності, який відповідає критеріям користувача
-    З диверсифікацією брендів - максимум 1 готель від одного бренду
+    НОВА ФУНКЦІЯ: Знаходить готелі для програми лояльності з підтримкою всіх сценаріїв
     
     Args:
         program_name: назва програми лояльності
@@ -1996,7 +2239,13 @@ def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
         hotel_data: повні дані готелів
     
     Returns:
-        tuple: (DataFrame з топ-1 готелем, тип вибірки)
+        dict: {
+            'scenario': тип сценарію,
+            'main_hotel': DataFrame з основним готелем,
+            'alt_hotel': DataFrame з альтернативним готелем (якщо є),
+            'main_type': тип основного готелю,
+            'alt_type': тип альтернативного готелю
+        }
     """
     # Переводимо критерії користувача
     regions = user_data.get('regions', []) or []
@@ -2010,7 +2259,7 @@ def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    debug_log(f"Пошук топ-1 готелю для програми: {program_name}")
+    debug_log(f"Пошук готелів для програми: {program_name}")
     debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
     
     # 1. Фільтруємо за регіоном
@@ -2024,49 +2273,59 @@ def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
     
     if program_hotels.empty:
         debug_log(f"Немає готелів для програми {program_name} в регіоні")
-        return pd.DataFrame(), "no_hotels"
+        return {
+            'scenario': 'no_hotels',
+            'main_hotel': pd.DataFrame(),
+            'alt_hotel': pd.DataFrame(),
+            'main_type': 'no_hotels',
+            'alt_type': None
+        }
     
-    # 3. ПРІОРИТЕТ: основна категорія з усіма критеріями
-    main_category_hotels = filter_hotels_by_category(program_hotels, category)
-    main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
-    main_filtered = filter_hotels_by_purpose(main_filtered, english_purposes)
+    # 3. Визначаємо сценарій
+    scenario = determine_hotel_scenario(program_hotels, category, english_styles, english_purposes)
+    debug_log(f"Визначено сценарій: {scenario}")
     
-    debug_log(f"Готелів в основній категорії {category} з усіма критеріями: {len(main_filtered)}")
+    # 4. Знаходимо готелі згідно сценарію
+    hotels_result = find_hotels_by_scenario(program_hotels, user_data, scenario)
     
-    # 4. ОНОВЛЕНО: Якщо в основній категорії є готелі
-    if len(main_filtered) > 0:
-        # НОВА ЛОГІКА: Диверсифікація брендів (1 готель)
-        top_1 = select_diverse_hotels(main_filtered, 1)
-        if len(top_1) >= 1:
-            debug_log(f"Обрано 1 готель з основної категорії")
-            return top_1, "main_category"
-    else:
-        main_filtered = pd.DataFrame()
+    # 5. Додаємо сценарій до результату
+    hotels_result['scenario'] = scenario
     
-    # 5. ДОПОВНЮЄМО з суміжних категорій
-    all_suitable_hotels = main_filtered.copy()
+    return hotels_result
+
+# ОНОВЛЕНА СТАРА ФУНКЦІЯ ДЛЯ ЗВОРОТНОЇ СУМІСНОСТІ
+def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
+    """
+    ОНОВЛЕНА ФУНКЦІЯ: Тепер використовує нову логіку сценаріїв, але повертає старий формат
+    Для зворотної сумісності з існуючим кодом
     
-    adjacent_categories = get_adjacent_categories(category)
-    debug_log(f"Суміжні категорії: {adjacent_categories}")
+    Args:
+        program_name: назва програми лояльності
+        user_data: дані користувача з відповідями
+        hotel_data: повні дані готелів
     
-    for adj_category in adjacent_categories:
-        adj_category_hotels = filter_hotels_by_category(program_hotels, adj_category)
-        adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
-        adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
-        
-        debug_log(f"Готелів в суміжній категорії {adj_category}: {len(adj_filtered)}")
-        all_suitable_hotels = pd.concat([all_suitable_hotels, adj_filtered], ignore_index=True)
+    Returns:
+        tuple: (DataFrame з топ-1 готелем, тип вибірки)
+    """
+    # Використовуємо нову функцію
+    result = find_top_hotels_for_program_with_scenarios(program_name, user_data, hotel_data)
     
-    # 6. ОНОВЛЕНО: Видаляємо дублікати та диверсифікуємо бренди
-    all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
+    # Повертаємо в старому форматі для сумісності
+    main_hotel = result.get('main_hotel', pd.DataFrame())
+    scenario = result.get('scenario', 'no_hotels')
     
-    if len(all_suitable_hotels) > 0:
-        top_1 = select_diverse_hotels(all_suitable_hotels, 1)
-        debug_log(f"Обрано {len(top_1)} готель з комбінації категорій")
-        return top_1, "mixed"
-    else:
-        debug_log(f"Не знайдено готелів для програми {program_name}")
-        return pd.DataFrame(), "no_hotels"
+    # Мапимо нові сценарії на старі типи
+    scenario_mapping = {
+        'perfect': 'main_category',
+        'two_hotels': 'mixed',
+        'compromise': 'mixed',
+        'worst_case': 'mixed',
+        'no_hotels': 'no_hotels'
+    }
+    
+    old_scenario = scenario_mapping.get(scenario, 'mixed')
+    
+    return main_hotel, old_scenario
 
 def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
@@ -2168,7 +2427,7 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
         try:
             program_name = top_programs.iloc[i]['loyalty_program']
             
-            # Знаходимо топ-1 готель для цієї програми
+            # Знаходимо топ-1 готель для цієї програми (використовуємо стару функцію для сумісності)
             top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
             
             # Використовуємо різні функції форматування залежно від режиму
@@ -2193,28 +2452,42 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
 # ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
-async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk'):
+async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk', scenario_type='perfect'):
     """
-    ОНОВЛЕНА функція відправлення готелю з AI-описом
+    ОНОВЛЕНА функція відправлення готелю з AI-описом з підтримкою сценаріїв
     
     Args:
         context: Telegram bot context
         chat_id: ID чату
         hotel_info: словник з інформацією про готель
-        user_styles: обрані користувачем стилі
-        user_purposes: обрані користувачем цілі
+        user_styles: обрані користувачем стилі або реальні стилі готелю
+        user_purposes: обрані користувачем цілі або реальні цілі готелю
         lang: мова
+        scenario_type: тип сценарію для правильного AI-опису
     """
     try:
         hotel_name = hotel_info.get('name', 'N/A')
         hotel_brand = hotel_info.get('brand', 'N/A')
         place_id = hotel_info.get('place_id', '')
         
-        debug_log(f"Генерація AI-опису для готелю: {hotel_name}")
+        debug_log(f"Генерація AI-опису для готелю: {hotel_name} (сценарій: {scenario_type})")
+        
+        # НОВЕ: Для сценарію 'two_hotels_main' використовуємо реальний стиль готелю
+        if scenario_type == 'two_hotels_main':
+            # Використовуємо реальний стиль готелю замість обраного користувачем
+            real_style = get_real_hotel_style(hotel_brand)
+            ai_styles = [real_style]
+            # Цілі можуть залишатися пустими або дефолтними для такого готелю
+            ai_purposes = ["Відпустка / релакс"] if lang == 'uk' else ["Vacation / relaxation"]
+            debug_log(f"Використовуємо реальний стиль готелю: {real_style}")
+        else:
+            # Для всіх інших сценаріїв використовуємо обрані користувачем критерії
+            ai_styles = user_styles
+            ai_purposes = user_purposes
         
         # Генеруємо AI-опис
         ai_description = await generate_hotel_description(
-            hotel_name, hotel_brand, user_styles, user_purposes, lang
+            hotel_name, hotel_brand, ai_styles, ai_purposes, lang
         )
         
         # Формуємо підпис з AI-описом
@@ -2295,37 +2568,107 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         logger.error(f"Помилка при відправленні готелю з AI-описом {hotel_info.get('name', 'Unknown')}: {e}")
         return False
 
+async def send_hotels_by_scenario(context, chat_id, hotels_result, user_data, lang='uk'):
+    """
+    НОВА функція відправлення готелів з правильними заголовками та AI-описами залежно від сценарію
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату
+        hotels_result: результат з find_top_hotels_for_program_with_scenarios
+        user_data: дані користувача
+        lang: мова
+    """
+    try:
+        scenario = hotels_result.get('scenario', 'no_hotels')
+        main_hotel = hotels_result.get('main_hotel', pd.DataFrame())
+        alt_hotel = hotels_result.get('alt_hotel', pd.DataFrame())
+        main_type = hotels_result.get('main_type', 'perfect')
+        alt_type = hotels_result.get('alt_type', None)
+        
+        user_styles = user_data.get('styles', [])
+        user_purposes = user_data.get('purposes', [])
+        user_category = user_data.get('category', 'Comfort')
+        
+        debug_log(f"Відправлення готелів для сценарію: {scenario}")
+        
+        if scenario == 'no_hotels':
+            # Сценарій 5: Немає готелів
+            if lang == 'uk':
+                await context.bot.send_message(chat_id=chat_id, text="❌ Не знайдено готелів, що відповідають вашим критеріям.")
+            else:
+                await context.bot.send_message(chat_id=chat_id, text="❌ No hotels found matching your criteria.")
+            return
+        
+        # Відправляємо основний готель
+        if not main_hotel.empty:
+            main_hotel_info = convert_hotel_dataframe_to_dict(main_hotel.iloc[0])
+            
+            # Генеруємо правильний заголовок
+            explanation_text = get_hotel_explanation_text(
+                main_type, main_hotel_info, user_category, user_styles, lang
+            )
+            
+            # Відправляємо заголовок
+            await context.bot.send_message(chat_id=chat_id, text=explanation_text)
+            await asyncio.sleep(0.5)
+            
+            # Відправляємо готель з правильним AI-описом
+            await send_hotel_with_ai_description(
+                context, chat_id, main_hotel_info, user_styles, user_purposes, lang, main_type
+            )
+        
+        # Відправляємо альтернативний готель (тільки для сценарію 2)
+        if not alt_hotel.empty and alt_type:
+            await asyncio.sleep(1.5)  # Пауза між готелями
+            
+            alt_hotel_info = convert_hotel_dataframe_to_dict(alt_hotel.iloc[0])
+            
+            # Генеруємо заголовок для альтернативного готелю
+            alt_explanation_text = get_hotel_explanation_text(
+                alt_type, alt_hotel_info, user_category, user_styles, lang
+            )
+            
+            # Відправляємо заголовок
+            await context.bot.send_message(chat_id=chat_id, text=alt_explanation_text)
+            await asyncio.sleep(0.5)
+            
+            # Відправляємо альтернативний готель з AI-описом за обраними критеріями
+            await send_hotel_with_ai_description(
+                context, chat_id, alt_hotel_info, user_styles, user_purposes, lang, alt_type
+            )
+        
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелів за сценарієм: {e}")
+
 async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, lang='uk'):
     """
-    ОНОВЛЕНА функція відправлення готелів з AI-описами
+    ЗАСТАРІЛА функція - тепер використовується send_hotels_by_scenario
+    Залишена для зворотної сумісності
     """
     try:
         for i, (index, hotel) in enumerate(top_hotels.iterrows()):
             hotel_dict = convert_hotel_dataframe_to_dict(hotel)
             
-            # Відправляємо готель з AI-описом
+            # Відправляємо готель з AI-описом у звичайному режимі
             await send_hotel_with_ai_description(
-                context, chat_id, hotel_dict, user_styles, user_purposes, lang
+                context, chat_id, hotel_dict, user_styles, user_purposes, lang, 'perfect'
             )
             
             # Пауза між готелями
             if i < len(top_hotels) - 1:
-                await asyncio.sleep(1.5)  # Трохи більша пауза для AI генерації
+                await asyncio.sleep(1.5)
                 
     except Exception as e:
         logger.error(f"Помилка при відправленні готелів з AI-описами: {e}")
 
-async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, scores_df, lang='uk'):
+async def send_programs_with_ai_integrated_hotels_new(context, chat_id, user_data, scores_df, lang='uk'):
     """
-    ОНОВЛЕНА функція відправлення програм з AI-інтегрованими готелями
+    НОВА ГОЛОВНА функція відправлення програм з AI-інтегрованими готелями та сценаріями
     """
     try:
         # Беремо топ-3 програми
         top_programs = scores_df.head(3)
-        
-        # Отримуємо стилі та цілі користувача для AI
-        user_styles = user_data.get('styles', [])
-        user_purposes = user_data.get('purposes', [])
         
         for i, (index, row) in enumerate(top_programs.iterrows()):
             program_name = row['loyalty_program']
@@ -2337,36 +2680,26 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             # Невелика пауза
             await asyncio.sleep(0.5)
             
-            # 2. Відправляємо заголовок готелів
-            if lang == 'uk':
-                hotels_header = f"🏆 Ось приклад кращого готелю цієї програми:"
-            else:
-                hotels_header = f"🏆 Here is the top hotel from this program:"
+            # 2. НОВЕ: Використовуємо нову логіку з сценаріями
+            hotels_result = find_top_hotels_for_program_with_scenarios(program_name, user_data, hotel_data)
             
-            await context.bot.send_message(chat_id=chat_id, text=hotels_header)
-            
-            # Невелика пауза
-            await asyncio.sleep(0.5)
-            
-            # 3. Знаходимо та відправляємо кожен готель з AI-описом
-            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
-            
-            if not top_hotels.empty:
-                await send_individual_hotels_with_ai_descriptions(
-                    context, chat_id, top_hotels, user_styles, user_purposes, lang
-                )
-            else:
-                if lang == 'uk':
-                    await context.bot.send_message(chat_id=chat_id, text="❌ Не знайдено готелів, що відповідають вашим критеріям.")
-                else:
-                    await context.bot.send_message(chat_id=chat_id, text="❌ No hotels found matching your criteria.")
+            # 3. Відправляємо готелі за сценарієм
+            await send_hotels_by_scenario(context, chat_id, hotels_result, user_data, lang)
             
             # Пауза між програмами
             if i < len(top_programs) - 1:
                 await asyncio.sleep(2)
                 
     except Exception as e:
-        logger.error(f"Помилка при відправленні програм з AI-готелями: {e}")
+        logger.error(f"Помилка при відправленні програм з новою логікою AI-готелів: {e}")
+
+async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, scores_df, lang='uk'):
+    """
+    ОНОВЛЕНА функція відправлення програм з AI-інтегрованими готелями
+    Тепер використовує нову логіку сценаріїв
+    """
+    # Перенаправляємо на нову функцію
+    await send_programs_with_ai_integrated_hotels_new(context, chat_id, user_data, scores_df, lang)
 
 def format_single_program_report(user_data, program_row, position, lang='uk'):
     """
@@ -2547,11 +2880,80 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
 # ДОДАНО: Функція для команд /more з AI-описами (без готелів, тільки звіт)
 async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_df, lang='uk', admin_mode=False):
     """
-    Функція більше не потрібна, тому що готелі з AI-описами інтегровані в основний звіт
-    через нову функцію send_programs_with_ai_integrated_hotels
+    ОНОВЛЕНА функція для /more команди з підтримкою нових сценаріїв
     """
-    # Ця функція тепер порожня, оскільки готелі з AI-описами відправляються разом зі звітом
-    pass
+    try:
+        if admin_mode:
+            # В адмін режимі показуємо готелі з рейтингами без AI-описів
+            await add_hotels_to_results_with_photos_admin(context, chat_id, user_data, scores_df, lang)
+        else:
+            # В звичайному режимі /more показуємо готелі з новою логікою сценаріїв
+            await add_hotels_to_results_with_photos_user(context, chat_id, user_data, scores_df, lang)
+    except Exception as e:
+        logger.error(f"Помилка при додаванні готелів до результатів: {e}")
+
+async def add_hotels_to_results_with_photos_user(context, chat_id, user_data, scores_df, lang='uk'):
+    """
+    Функція для звичайного режиму /more з новими сценаріями
+    """
+    try:
+        # Беремо всі 7 програм для режиму /more
+        all_programs = scores_df.head(7)
+        
+        for i, (index, row) in enumerate(all_programs.iterrows()):
+            program_name = row['loyalty_program']
+            
+            # Знаходимо готелі з новою логікою сценаріїв
+            hotels_result = find_top_hotels_for_program_with_scenarios(program_name, user_data, hotel_data)
+            
+            # Відправляємо готелі за сценарієм (але без повного звіту програми)
+            await send_hotels_by_scenario(context, chat_id, hotels_result, user_data, lang)
+            
+            # Пауза між програмами
+            if i < len(all_programs) - 1:
+                await asyncio.sleep(2)
+                
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелів для /more: {e}")
+
+async def add_hotels_to_results_with_photos_admin(context, chat_id, user_data, scores_df, lang='uk'):
+    """
+    Функція для адмін режиму (/21) з рейтингами
+    """
+    try:
+        # Беремо всі 7 програм для адмін режиму
+        all_programs = scores_df.head(7)
+        
+        for i, (index, row) in enumerate(all_programs.iterrows()):
+            program_name = row['loyalty_program']
+            
+            # Використовуємо стару логіку для адмін режиму (з рейтингами)
+            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
+            
+            if not top_hotels.empty:
+                # Відправляємо заголовок
+                if lang == 'uk':
+                    header_text = f"🏆 Готель для програми {program_name}:"
+                else:
+                    header_text = f"🏆 Hotel for {program_name} program:"
+                
+                await context.bot.send_message(chat_id=chat_id, text=header_text)
+                await asyncio.sleep(0.5)
+                
+                # Відправляємо готель з рейтингом (admin_mode=True)
+                for j, (hotel_index, hotel) in enumerate(top_hotels.iterrows()):
+                    hotel_dict = convert_hotel_dataframe_to_dict(hotel)
+                    await send_hotel_with_photos(context, chat_id, hotel_dict, lang, admin_mode=True)
+                    
+                    if j < len(top_hotels) - 1:
+                        await asyncio.sleep(1)
+            
+            # Пауза між програмами
+            if i < len(all_programs) - 1:
+                await asyncio.sleep(2)
+                
+    except Exception as e:
+        logger.error(f"Помилка при відправленні готелів для адмін режиму: {e}")
 
 
 # ===============================
