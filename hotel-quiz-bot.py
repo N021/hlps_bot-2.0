@@ -1877,9 +1877,9 @@ async def send_hotels_for_program(context, chat_id, top_hotels, program_name, la
     
     # Відправляємо заголовок
     if lang == 'uk':
-        header_text = f"🏆 Ось приклад {len(top_hotels)} кращих готелів програми {program_name}:"
+        header_text = f"🏆 Ось приклад кращого готелю програми {program_name}:"
     else:
-        header_text = f"🏆 Here are the top {len(top_hotels)} hotels from {program_name} program:"
+        header_text = f"🏆 Here is the top hotel from {program_name} program:"
     
     await context.bot.send_message(chat_id=chat_id, text=header_text)
     
@@ -1938,13 +1938,13 @@ def convert_rating_column_to_numeric(df):
     
     return df
 
-def select_diverse_hotels(hotels_df, max_count=2):
+def select_diverse_hotels(hotels_df, max_count=1):
     """
     Вибирає готелі з різних брендів, максимум 1 готель від одного бренду
     
     Args:
         hotels_df: DataFrame з готелями
-        max_count: максимальна кількість готелів для вибору (тепер 2)
+        max_count: максимальна кількість готелів для вибору (тепер 1)
     
     Returns:
         DataFrame з обраними готелями
@@ -1985,9 +1985,9 @@ def select_diverse_hotels(hotels_df, max_count=2):
     else:
         return pd.DataFrame()
 
-def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
+def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
     """
-    Знаходить топ-2 готелі для програми лояльності, які відповідають критеріям користувача
+    Знаходить топ-1 готель для програми лояльності, який відповідає критеріям користувача
     З диверсифікацією брендів - максимум 1 готель від одного бренду
     
     Args:
@@ -1996,7 +1996,7 @@ def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
         hotel_data: повні дані готелів
     
     Returns:
-        tuple: (DataFrame з топ-2 готелів, тип вибірки)
+        tuple: (DataFrame з топ-1 готелем, тип вибірки)
     """
     # Переводимо критерії користувача
     regions = user_data.get('regions', []) or []
@@ -2010,7 +2010,7 @@ def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    debug_log(f"Пошук топ-2 готелів для програми: {program_name}")
+    debug_log(f"Пошук топ-1 готелю для програми: {program_name}")
     debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
     
     # 1. Фільтруємо за регіоном
@@ -2035,11 +2035,11 @@ def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
     
     # 4. ОНОВЛЕНО: Якщо в основній категорії є готелі
     if len(main_filtered) > 0:
-        # НОВА ЛОГІКА: Диверсифікація брендів (2 готелі)
-        top_2 = select_diverse_hotels(main_filtered, 2)
-        if len(top_2) >= 2:
-            debug_log(f"Обрано 2 готелі з основної категорії (різні бренди)")
-            return top_2, "main_category"
+        # НОВА ЛОГІКА: Диверсифікація брендів (1 готель)
+        top_1 = select_diverse_hotels(main_filtered, 1)
+        if len(top_1) >= 1:
+            debug_log(f"Обрано 1 готель з основної категорії")
+            return top_1, "main_category"
     else:
         main_filtered = pd.DataFrame()
     
@@ -2061,16 +2061,16 @@ def find_top_2_hotels_for_program(program_name, user_data, hotel_data):
     all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
     
     if len(all_suitable_hotels) > 0:
-        top_2 = select_diverse_hotels(all_suitable_hotels, 2)
-        debug_log(f"Обрано {len(top_2)} готелі з комбінації категорій (різні бренди)")
-        return top_2, "mixed"
+        top_1 = select_diverse_hotels(all_suitable_hotels, 1)
+        debug_log(f"Обрано {len(top_1)} готель з комбінації категорій")
+        return top_1, "mixed"
     else:
         debug_log(f"Не знайдено готелів для програми {program_name}")
         return pd.DataFrame(), "no_hotels"
 
 def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
-    Форматує інформацію про топ-2 готелі для звичайного режиму та /more
+    Форматує інформацію про топ-1 готель для звичайного режиму та /more
     БЕЗ зваженого рейтингу
     
     Args:
@@ -2088,9 +2088,9 @@ def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
             return "\n❌ No hotels found matching all your criteria."
     
     if lang == 'uk':
-        result = f"\n🏆 Ось приклад {len(top_hotels)} кращих готелів цієї програми, які відповідають вашому запиту:\n\n"
+        result = f"\n🏆 Ось приклад кращого готелю цієї програми, який відповідає вашому запиту:\n\n"
     else:
-        result = f"\n🏆 Here are the top {len(top_hotels)} hotels from this program that match your request:\n\n"
+        result = f"\n🏆 Here is the top hotel from this program that matches your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
         # Простий текст БЕЗ рейтингу в звичайному режимі
@@ -2108,7 +2108,7 @@ def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
 
 def format_hotel_examples_for_admin(top_hotels, program_name, lang='uk'):
     """
-    Форматує інформацію про топ-2 готелі для АДМІНІСТРАТИВНОГО режиму (/21)
+    Форматує інформацію про топ-1 готель для АДМІНІСТРАТИВНОГО режиму (/21)
     З відображенням зваженого рейтингу
     
     Args:
@@ -2126,9 +2126,9 @@ def format_hotel_examples_for_admin(top_hotels, program_name, lang='uk'):
             return "\n❌ No hotels found matching all your criteria."
     
     if lang == 'uk':
-        result = f"\n🏆 Ось приклад {len(top_hotels)} кращих готелів цієї програми, які відповідають вашому запиту:\n\n"
+        result = f"\n🏆 Ось приклад кращого готелю цієї програми, який відповідає вашому запиту:\n\n"
     else:
-        result = f"\n🏆 Here are the top {len(top_hotels)} hotels from this program that match your request:\n\n"
+        result = f"\n🏆 Here is the top hotel from this program that matches your request:\n\n"
     
     for i, (index, hotel) in enumerate(top_hotels.iterrows()):
         hotel_name = str(hotel.get('hotel_name', 'N/A'))
@@ -2168,8 +2168,8 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
         try:
             program_name = top_programs.iloc[i]['loyalty_program']
             
-            # Знаходимо топ-2 готелі для цієї програми
-            top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
+            # Знаходимо топ-1 готель для цієї програми
+            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
             
             # Використовуємо різні функції форматування залежно від режиму
             if admin_mode:
@@ -2339,9 +2339,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             
             # 2. Відправляємо заголовок готелів
             if lang == 'uk':
-                hotels_header = f"🏆 Ось приклад 2 кращих готелів цієї програми:"
+                hotels_header = f"🏆 Ось приклад кращого готелю цієї програми:"
             else:
-                hotels_header = f"🏆 Here are the top 2 hotels from this program:"
+                hotels_header = f"🏆 Here is the top hotel from this program:"
             
             await context.bot.send_message(chat_id=chat_id, text=hotels_header)
             
@@ -2349,7 +2349,7 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             await asyncio.sleep(0.5)
             
             # 3. Знаходимо та відправляємо кожен готель з AI-описом
-            top_hotels, selection_type = find_top_2_hotels_for_program(program_name, user_data, hotel_data)
+            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
                 await send_individual_hotels_with_ai_descriptions(
