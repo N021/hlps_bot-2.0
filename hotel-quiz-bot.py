@@ -1933,7 +1933,7 @@ def get_real_hotel_style(hotel_brand):
 
 def determine_hotel_scenario(program_hotels, category, styles, purposes):
     """
-    Визначає який сценарій застосувати для вибору готелів
+    ОНОВЛЕНА функція визначення сценарію з більш детальною логікою
     
     Args:
         program_hotels: DataFrame з готелями програми
@@ -1942,7 +1942,7 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
         purposes: обрані цілі користувача
     
     Returns:
-        str: тип сценарію ('perfect', 'two_hotels', 'compromise', 'worst_case', 'no_hotels')
+        str: тип сценарію ('perfect', 'two_hotels_style', 'two_hotels_purpose', 'two_hotels_none', 'compromise', 'worst_case', 'no_hotels')
     """
     if program_hotels.empty:
         return 'no_hotels'
@@ -1951,8 +1951,7 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
     main_category_hotels = filter_hotels_by_category(program_hotels, category)
     
     if main_category_hotels.empty:
-        # Немає готелів в основній категорії
-        # Перевіряємо суміжні категорії
+        # Немає готелів в основній категорії - перевіряємо суміжні
         adjacent_categories = get_adjacent_categories(category)
         has_adjacent_match = False
         
@@ -1972,15 +1971,18 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
         else:
             return 'worst_case'  # Сценарій 4
     else:
-        # Є готелі в основній категорії
-        # Перевіряємо стилі та цілі
-        main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
-        main_purpose_filtered = filter_hotels_by_purpose(main_style_filtered, purposes)
+        # Є готелі в основній категорії - детальна перевірка
         
-        if not main_purpose_filtered.empty:
+        # 1. ІДЕАЛЬНИЙ ВАРІАНТ: стилі + цілі
+        main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
+        main_perfect_filtered = filter_hotels_by_purpose(main_style_filtered, purposes)
+        
+        if not main_perfect_filtered.empty:
             return 'perfect'  # Сценарій 1
-        else:
-            # Основна категорія є, але не відповідає стилям/цілям
+        
+        # 2. ПЕРЕВІРЯЄМО ТІЛЬКИ СТИЛІ (цілі не підходять)
+        if not main_style_filtered.empty:
+            # Стилі підходять, але цілі ні
             # Перевіряємо чи є підходящі готелі в суміжних категоріях
             adjacent_categories = get_adjacent_categories(category)
             has_adjacent_match = False
@@ -1996,13 +1998,57 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
                         break
             
             if has_adjacent_match:
-                return 'two_hotels'  # Сценарій 2
+                return 'two_hotels_style'  # Новий підсценарій 2a
             else:
                 return 'worst_case'  # Сценарій 4
+        
+        # 3. ПЕРЕВІРЯЄМО ТІЛЬКИ ЦІЛІ (стилі не підходять)
+        main_purpose_only_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
+        
+        if not main_purpose_only_filtered.empty:
+            # Цілі підходять, але стилі ні
+            # Перевіряємо чи є підходящі готелі в суміжних категоріях
+            adjacent_categories = get_adjacent_categories(category)
+            has_adjacent_match = False
+            
+            for adj_cat in adjacent_categories:
+                adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+                if not adj_category_hotels.empty:
+                    adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
+                    adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
+                    
+                    if not adj_purpose_filtered.empty:
+                        has_adjacent_match = True
+                        break
+            
+            if has_adjacent_match:
+                return 'two_hotels_purpose'  # Новий підсценарій 2b
+            else:
+                return 'worst_case'  # Сценарій 4
+        
+        # 4. НІ СТИЛІ, НІ ЦІЛІ НЕ ПІДХОДЯТЬ в основній категорії
+        # Перевіряємо суміжні категорії
+        adjacent_categories = get_adjacent_categories(category)
+        has_adjacent_match = False
+        
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
+                adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
+                
+                if not adj_purpose_filtered.empty:
+                    has_adjacent_match = True
+                    break
+        
+        if has_adjacent_match:
+            return 'two_hotels_none'  # Новий підсценарій 2c
+        else:
+            return 'worst_case'  # Сценарій 4
 
 def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles, lang='uk'):
     """
-    Генерує пояснювальний текст залежно від сценарію
+    ОНОВЛЕНА функція генерації пояснювальних текстів з новими підсценаріями
     
     Args:
         scenario: тип сценарію
@@ -2020,8 +2066,34 @@ def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles,
         else:
             return "🏆 Here is the top hotel from this program:"
     
-    elif scenario == 'two_hotels_main':
-        # Для першого готелю в сценарії 2
+    elif scenario == 'two_hotels_style':
+        # Підсценарій 2a: стилі підходять, цілі ні
+        hotel_brand = hotel_info.get('brand', 'N/A')
+        real_style = get_real_hotel_style(hotel_brand)
+        
+        if lang == 'uk':
+            return (f"🔄 Ось приклад готелю {user_category} сегменту в цій програмі "
+                   f"(стиль відповідає обраному, але ціль подорожі відрізняється від вашої):")
+        else:
+            return (f"🔄 Here is an example of a {user_category} segment hotel in this program "
+                   f"(style matches your selection, but travel purpose differs from yours):")
+    
+    elif scenario == 'two_hotels_purpose':
+        # Підсценарій 2b: цілі підходять, стилі ні
+        hotel_brand = hotel_info.get('brand', 'N/A')
+        real_style = get_real_hotel_style(hotel_brand)
+        
+        if lang == 'uk':
+            return (f"🔄 Ось приклад готелю {user_category} сегменту в цій програмі "
+                   f"(стиль його вказано як \"{real_style}\", що відрізняється від обраного вами. "
+                   f"Але категорія точно ваша і ціль подорожі відповідає):")
+        else:
+            return (f"🔄 Here is an example of a {user_category} segment hotel in this program "
+                   f"(its style is listed as \"{real_style}\", which differs from your selection. "
+                   f"But the category is exactly yours and the travel purpose matches):")
+    
+    elif scenario == 'two_hotels_none':
+        # Підсценарій 2c: ні стилі, ні цілі не підходять
         hotel_brand = hotel_info.get('brand', 'N/A')
         real_style = get_real_hotel_style(hotel_brand)
         
@@ -2034,8 +2106,8 @@ def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles,
                    f"(its style is listed as \"{real_style}\", which differs from your selection. "
                    f"But the category is exactly yours):")
     
-    elif scenario == 'two_hotels_alt':
-        # Для другого готелю в сценарії 2
+    elif scenario in ['two_hotels_alt']:
+        # Для другого готелю в усіх підсценаріях 2
         if lang == 'uk':
             return ("💡 Як альтернативу, ось приклад готелю сегменту Comfort, який входить до цієї програми "
                    "і відповідає вашим стилям та цілям:")
@@ -2067,7 +2139,7 @@ def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles,
 
 def find_hotels_by_scenario(program_hotels, user_data, scenario):
     """
-    Шукає готелі відповідно до визначеного сценарію
+    ОНОВЛЕНА функція пошуку готелів з підтримкою нових підсценаріїв
     
     Args:
         program_hotels: DataFrame з готелями програми
@@ -2075,12 +2147,7 @@ def find_hotels_by_scenario(program_hotels, user_data, scenario):
         scenario: тип сценарію
     
     Returns:
-        dict: {
-            'main_hotel': DataFrame з основним готелем,
-            'alt_hotel': DataFrame з альтернативним готелем (для сценарію 2),
-            'main_type': тип основного готелю,
-            'alt_type': тип альтернативного готелю
-        }
+        dict: результат з готелями
     """
     regions = user_data.get('regions', []) or []
     countries = user_data.get('countries', []) or []
@@ -2107,13 +2174,31 @@ def find_hotels_by_scenario(program_hotels, user_data, scenario):
         if not main_filtered.empty:
             result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
     
-    elif scenario == 'two_hotels':
-        # Сценарій 2: показуємо 2 готелі
-        # 1. Готель з основної категорії (навіть якщо не відповідає стилям/цілям)
+    elif scenario in ['two_hotels_style', 'two_hotels_purpose', 'two_hotels_none']:
+        # Підсценарії 2a, 2b, 2c: показуємо 2 готелі
+        
+        # 1. Готель з основної категорії
         main_category_hotels = filter_hotels_by_category(program_hotels, category)
-        if not main_category_hotels.empty:
-            result['main_hotel'] = select_diverse_hotels(main_category_hotels, 1)
-            result['main_type'] = 'two_hotels_main'
+        
+        if scenario == 'two_hotels_style':
+            # Беремо готель, який підходить за стилем
+            main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
+            if not main_filtered.empty:
+                result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
+                result['main_type'] = 'two_hotels_style'
+        
+        elif scenario == 'two_hotels_purpose':
+            # Беремо готель, який підходить за цілями
+            main_filtered = filter_hotels_by_purpose(main_category_hotels, english_purposes)
+            if not main_filtered.empty:
+                result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
+                result['main_type'] = 'two_hotels_purpose'
+        
+        elif scenario == 'two_hotels_none':
+            # Беремо будь-який готель з основної категорії
+            if not main_category_hotels.empty:
+                result['main_hotel'] = select_diverse_hotels(main_category_hotels, 1)
+                result['main_type'] = 'two_hotels_none'
         
         # 2. Готель з суміжних категорій, який відповідає стилям/цілям
         adjacent_categories = get_adjacent_categories(category)
