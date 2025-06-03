@@ -91,8 +91,8 @@ if ENABLE_OPENAI:
 # ДОДАНО: OpenAI Integration для генерації описів готелів
 # ===============================
 
-async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_program: str,
-                                   selected_styles: list, selected_purposes: list, lang: str = 'uk') -> str:
+async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_program: str, corporation: str,
+                                   category: str, selected_styles: list, selected_purposes: list, lang: str = 'uk') -> str:
     """
     Генерує персоналізований опис готелю через OpenAI API
     
@@ -100,6 +100,8 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_
         hotel_name: назва готелю
         hotel_brand: бренд готелю
         loyalty_program: назва програми лояльності
+        corporation: назва корпорації
+        category: обрана категорія готелю
         selected_styles: обрані користувачем стилі
         selected_purposes: обрані користувачем цілі подорожі
         lang: мова для опису
@@ -121,32 +123,38 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_
         
         if lang == 'uk':
             prompt = f"""
-Створи опис конкретного готелю "{hotel_name}" бренду {hotel_brand} як представника програми лояльності {loyalty_program}.
+Створи опис конкретного готелю "{hotel_name}" бренду {hotel_brand} як представника програми корпорації {corporation}.
 
-Користувач шукає готелі для: {purposes_text} в стилі: {styles_text}
+Користувач обрав:
+- Категорію: {category}
+- Стиль: {styles_text}
+- Мету подорожі: {purposes_text}
 
 Структура (точно 3 речення):
-1. Опиши конкретні особливості ЦЬОГО готелю (локація, архітектура, унікальні послуги)
-2. Поясни, як цей готель демонструє переваги всієї програми лояльності {loyalty_program}
+1. Поясни, чому цей готель є ідеальним представником категорії {category} та демонструє характерні риси стилю {styles_text}
+2. Опиши, як готель втілює потреби для {purposes_text} та які унікальні особливості роблять його зразковим прикладом таких готелів
 3. Закінчи: "Стати учасником програми лояльності {loyalty_program}."
 
-НЕ використовуй дослівно слова: {styles_text}, {purposes_text}
-Використовуй конкретні факти про готель та програму лояльності.
+НЕ згадуй розташування в центрі чи локацію.
+Фокусуйся на тому, чому саме ЦЕЙ готель є еталоном обраних характеристик.
 Кожне речення має бути повним і закінчуватися крапкою.
 """
         else:
             prompt = f"""
-Create a description of the specific hotel "{hotel_name}" by {hotel_brand} as a representative of the {loyalty_program} loyalty program.
+Create a description of the specific hotel "{hotel_name}" by {hotel_brand} as a representative of {corporation} corporation program.
 
-User is looking for hotels for: {purposes_text} in style: {styles_text}
+User selected:
+- Category: {category}
+- Style: {styles_text}
+- Travel purpose: {purposes_text}
 
 Structure (exactly 3 sentences):
-1. Describe the specific features of THIS hotel (location, architecture, unique services)
-2. Explain how this hotel demonstrates the advantages of the entire {loyalty_program} loyalty program
+1. Explain why this hotel is an ideal representative of the {category} category and demonstrates the characteristic features of {styles_text} style
+2. Describe how the hotel embodies the needs for {purposes_text} and what unique features make it an exemplary example of such hotels
 3. End with: "Join the {loyalty_program} loyalty program."
 
-DO NOT use literally the words: {styles_text}, {purposes_text}
-Use specific facts about the hotel and loyalty program.
+DO NOT mention central location or positioning.
+Focus on why THIS hotel is the epitome of the selected characteristics.
 Each sentence must be complete and end with a period.
 """
         
@@ -1454,7 +1462,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if lang == 'uk':
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
+                text=f"Дякую! Ви обрали наступні пункти для мети подорожі: {', '.join(selected_purposes)}.\n"
                 "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
             )
         else:
@@ -2478,9 +2486,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             
             # 2. ЗМІНЕНО: Відправляємо заголовок для 1 готелю
             if lang == 'uk':
-                hotels_header = f"🏆 Ось кращий готель цієї програми:"
+                hotels_header = f"🏆 Ось приклад готелю програми {program_name}, який відповідає вашому запиту:"
             else:
-                hotels_header = f"🏆 Here is the best hotel from this program:"
+                hotels_header = f"🏆 Here is an example hotel from {program_name} program that matches your request:"
             
             await context.bot.send_message(chat_id=chat_id, text=hotels_header)
             
@@ -2646,7 +2654,7 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     if purposes:
         if lang == 'uk':
             purposes_str = '; '.join(purposes)
-            result += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
+            result += f"🎯 Мета подорожі:\n{purposes_str}:\n"
         else:
             purposes_str = '; '.join(purposes)
             result += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -3658,7 +3666,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
         if purposes:
             if lang == 'uk':
                 purposes_str = '; '.join(purposes)
-                results += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
+                results += f"🎯 Мета подорожі:\n{purposes_str}:\n"
             else:
                 purposes_str = '; '.join(purposes)
                 results += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -3844,7 +3852,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Ціль подорожі:\n\n"
+                results += f"🎯 Мета подорожі:\n\n"
             else:
                 results += f"🎯 Travel purpose:\n\n"
             
@@ -4028,7 +4036,7 @@ def format_admin_scoring_report(user_data, scores_df):
         
         # ЦІЛЬ - детальний розбір з нормалізацією
         if purposes:
-            results += f"🎯 Ціль подорожі: {row['purpose_score']:.1f} балів\n"
+            results += f"🎯 Мета подорожі: {row['purpose_score']:.1f} балів\n"
             
             total_purpose_points = 0.0
             
