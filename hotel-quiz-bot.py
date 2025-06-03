@@ -1933,7 +1933,7 @@ def get_real_hotel_style(hotel_brand):
 
 def determine_hotel_scenario(program_hotels, category, styles, purposes):
     """
-    ОНОВЛЕНА функція визначення сценарію з більш детальною логікою
+    ВИПРАВЛЕНА функція визначення сценарію - правильно обробляє випадки з частковим співпадінням
     
     Args:
         program_hotels: DataFrame з готелями програми
@@ -1942,7 +1942,7 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
         purposes: обрані цілі користувача
     
     Returns:
-        str: тип сценарію ('perfect', 'two_hotels_style', 'two_hotels_purpose', 'two_hotels_none', 'compromise', 'worst_case', 'no_hotels')
+        str: тип сценарію
     """
     if program_hotels.empty:
         return 'no_hotels'
@@ -1958,7 +1958,6 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
         for adj_cat in adjacent_categories:
             adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
             if not adj_category_hotels.empty:
-                # Перевіряємо стилі та цілі в суміжній категорії
                 adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
                 adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
                 
@@ -1973,78 +1972,64 @@ def determine_hotel_scenario(program_hotels, category, styles, purposes):
     else:
         # Є готелі в основній категорії - детальна перевірка
         
-        # 1. ІДЕАЛЬНИЙ ВАРІАНТ: стилі + цілі
+        # 1. ІДЕАЛЬНИЙ ВАРІАНТ: стилі + цілі одночасно
         main_style_filtered = filter_hotels_by_style(main_category_hotels, styles)
         main_perfect_filtered = filter_hotels_by_purpose(main_style_filtered, purposes)
         
         if not main_perfect_filtered.empty:
-            return 'perfect'  # Сценарій 1
+            return 'perfect'  # Сценарій 1 - все ідеально
         
-        # 2. ПЕРЕВІРЯЄМО ТІЛЬКИ СТИЛІ (цілі не підходять)
-        if not main_style_filtered.empty:
-            # Стилі підходять, але цілі ні
-            # Перевіряємо чи є підходящі готелі в суміжних категоріях
-            adjacent_categories = get_adjacent_categories(category)
-            has_adjacent_match = False
-            
-            for adj_cat in adjacent_categories:
-                adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
-                if not adj_category_hotels.empty:
-                    adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
-                    adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
-                    
-                    if not adj_purpose_filtered.empty:
-                        has_adjacent_match = True
-                        break
-            
-            if has_adjacent_match:
-                return 'two_hotels_style'  # Новий підсценарій 2a
-            else:
-                return 'worst_case'  # Сценарій 4
+        # 2. Перевіряємо стилі і цілі ОКРЕМО
+        main_style_only = filter_hotels_by_style(main_category_hotels, styles)
+        main_purpose_only = filter_hotels_by_purpose(main_category_hotels, purposes)
         
-        # 3. ПЕРЕВІРЯЄМО ТІЛЬКИ ЦІЛІ (стилі не підходять)
-        main_purpose_only_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
+        has_styles = not main_style_only.empty
+        has_purposes = not main_purpose_only.empty
         
-        if not main_purpose_only_filtered.empty:
-            # Цілі підходять, але стилі ні
-            # Перевіряємо чи є підходящі готелі в суміжних категоріях
-            adjacent_categories = get_adjacent_categories(category)
-            has_adjacent_match = False
-            
-            for adj_cat in adjacent_categories:
-                adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
-                if not adj_category_hotels.empty:
-                    adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
-                    adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
-                    
-                    if not adj_purpose_filtered.empty:
-                        has_adjacent_match = True
-                        break
-            
-            if has_adjacent_match:
-                return 'two_hotels_purpose'  # Новий підсценарій 2b
-            else:
-                return 'worst_case'  # Сценарій 4
+        debug_log(f"Main category analysis: styles={len(main_style_only) if has_styles else 0}, purposes={len(main_purpose_only) if has_purposes else 0}")
         
-        # 4. НІ СТИЛІ, НІ ЦІЛІ НЕ ПІДХОДЯТЬ в основній категорії
-        # Перевіряємо суміжні категорії
+        # 3. Перевіряємо суміжні категорії (для альтернативи)
         adjacent_categories = get_adjacent_categories(category)
-        has_adjacent_match = False
+        has_adjacent_perfect = False
         
         for adj_cat in adjacent_categories:
             adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
             if not adj_category_hotels.empty:
                 adj_style_filtered = filter_hotels_by_style(adj_category_hotels, styles)
-                adj_purpose_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
+                adj_perfect_filtered = filter_hotels_by_purpose(adj_style_filtered, purposes)
                 
-                if not adj_purpose_filtered.empty:
-                    has_adjacent_match = True
+                if not adj_perfect_filtered.empty:
+                    has_adjacent_perfect = True
                     break
         
-        if has_adjacent_match:
-            return 'two_hotels_none'  # Новий підсценарій 2c
+        # 4. ЛОГІКА ВИБОРУ СЦЕНАРІЮ
+        if has_styles and has_purposes:
+            # І стилі, і цілі є окремо, але разом не працюють
+            if has_adjacent_perfect:
+                return 'two_hotels_style'  # Віддаємо перевагу стилям
+            else:
+                return 'worst_case'
+        
+        elif has_styles and not has_purposes:
+            # Тільки стилі підходять, цілі ні
+            if has_adjacent_perfect:
+                return 'two_hotels_style'  # Сценарій 2a
+            else:
+                return 'worst_case'
+        
+        elif not has_styles and has_purposes:
+            # ВАЖЛИВО: Тільки цілі підходять, стилі ні - твій випадок!
+            if has_adjacent_perfect:
+                return 'two_hotels_purpose'  # Сценарій 2b - це те, що нам потрібно!
+            else:
+                return 'worst_case'
+        
         else:
-            return 'worst_case'  # Сценарій 4
+            # Ні стилі, ні цілі не підходять в основній категорії
+            if has_adjacent_perfect:
+                return 'two_hotels_none'  # Сценарій 2c
+            else:
+                return 'worst_case'  # Сценарій 4
 
 def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles, lang='uk'):
     """
@@ -2139,15 +2124,7 @@ def get_hotel_explanation_text(scenario, hotel_info, user_category, user_styles,
 
 def find_hotels_by_scenario(program_hotels, user_data, scenario):
     """
-    ОНОВЛЕНА функція пошуку готелів з підтримкою нових підсценаріїв
-    
-    Args:
-        program_hotels: DataFrame з готелями програми
-        user_data: дані користувача
-        scenario: тип сценарію
-    
-    Returns:
-        dict: результат з готелями
+    ВИПРАВЛЕНА функція пошуку готелів - правильно обирає готелі для кожного сценарію
     """
     regions = user_data.get('regions', []) or []
     countries = user_data.get('countries', []) or []
@@ -2174,33 +2151,61 @@ def find_hotels_by_scenario(program_hotels, user_data, scenario):
         if not main_filtered.empty:
             result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
     
-    elif scenario in ['two_hotels_style', 'two_hotels_purpose', 'two_hotels_none']:
-        # Підсценарії 2a, 2b, 2c: показуємо 2 готелі
+    elif scenario == 'two_hotels_style':
+        # Підсценарій 2a: стилі підходять, цілі ні
+        main_category_hotels = filter_hotels_by_category(program_hotels, category)
+        main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
         
-        # 1. Готель з основної категорії
+        if not main_filtered.empty:
+            result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
+            result['main_type'] = 'two_hotels_style'
+        
+        # Альтернатива з суміжних категорій
+        adjacent_categories = get_adjacent_categories(category)
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
+                adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
+                
+                if not adj_filtered.empty:
+                    result['alt_hotel'] = select_diverse_hotels(adj_filtered, 1)
+                    result['alt_type'] = 'two_hotels_alt'
+                    break
+    
+    elif scenario == 'two_hotels_purpose':
+        # Підсценарій 2b: цілі підходять, стилі ні - ТВІЙ ВИПАДОК!
+        main_category_hotels = filter_hotels_by_category(program_hotels, category)
+        main_filtered = filter_hotels_by_purpose(main_category_hotels, english_purposes)
+        
+        if not main_filtered.empty:
+            result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
+            result['main_type'] = 'two_hotels_purpose'
+            debug_log(f"Found {len(main_filtered)} hotels matching purposes in main category")
+        
+        # Альтернатива з суміжних категорій (стилі + цілі)
+        adjacent_categories = get_adjacent_categories(category)
+        for adj_cat in adjacent_categories:
+            adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
+            if not adj_category_hotels.empty:
+                adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
+                adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
+                
+                if not adj_filtered.empty:
+                    result['alt_hotel'] = select_diverse_hotels(adj_filtered, 1)
+                    result['alt_type'] = 'two_hotels_alt'
+                    debug_log(f"Found {len(adj_filtered)} perfect hotels in adjacent category {adj_cat}")
+                    break
+    
+    elif scenario == 'two_hotels_none':
+        # Підсценарій 2c: ні стилі, ні цілі не підходять
         main_category_hotels = filter_hotels_by_category(program_hotels, category)
         
-        if scenario == 'two_hotels_style':
-            # Беремо готель, який підходить за стилем
-            main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
-            if not main_filtered.empty:
-                result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
-                result['main_type'] = 'two_hotels_style'
+        if not main_category_hotels.empty:
+            result['main_hotel'] = select_diverse_hotels(main_category_hotels, 1)
+            result['main_type'] = 'two_hotels_none'
         
-        elif scenario == 'two_hotels_purpose':
-            # Беремо готель, який підходить за цілями
-            main_filtered = filter_hotels_by_purpose(main_category_hotels, english_purposes)
-            if not main_filtered.empty:
-                result['main_hotel'] = select_diverse_hotels(main_filtered, 1)
-                result['main_type'] = 'two_hotels_purpose'
-        
-        elif scenario == 'two_hotels_none':
-            # Беремо будь-який готель з основної категорії
-            if not main_category_hotels.empty:
-                result['main_hotel'] = select_diverse_hotels(main_category_hotels, 1)
-                result['main_type'] = 'two_hotels_none'
-        
-        # 2. Готель з суміжних категорій, який відповідає стилям/цілям
+        # Альтернатива з суміжних категорій
         adjacent_categories = get_adjacent_categories(category)
         for adj_cat in adjacent_categories:
             adj_category_hotels = filter_hotels_by_category(program_hotels, adj_cat)
