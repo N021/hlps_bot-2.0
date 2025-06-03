@@ -56,17 +56,6 @@ LOYALTY_PROGRAM_RATINGS = {
     "Wyndham Rewards": 3.17
 }
 
-# ДОДАНО: Посилання на реєстрацію в програмах лояльності
-LOYALTY_PROGRAM_LINKS = {
-    "Marriott Bonvoy": "https://www.marriott.com/loyalty/join/joinPromotion.mi?promotion=FT25",
-    "Hilton Honors": "https://www.hilton.com/en/hilton-honors/join/?ocode=JHTNW",
-    "IHG One Rewards": "https://www.ihg.com/rewardsclub/us/en/enrollment/join?cm_sp=WEB-_-6C-_-ONEREWARDS-HOME-_-LYMOD1-_-US-EN-_-LOY-_-JOIN-_-FS",
-    "Wyndham Rewards": "https://www.wyndhamhotels.com/wyndham-rewards",
-    "ALL - Accor Live Limitless": "https://all.accor.com/loyalty-program/reasonstojoin/index.en.shtml",
-    "Choice Privileges": "https://www.choicehotels.com/content/choicehotels/apac/au/en/choice-privileges",
-    "World of Hyatt": "https://world.hyatt.com/content/gp/en/program-overview.html"
-}
-
 # ДОДАНО: Глобальна змінна для зберігання останніх результатів користувача (для команди /more)
 user_last_results = {}
 
@@ -91,30 +80,27 @@ if ENABLE_OPENAI:
 # ДОДАНО: OpenAI Integration для генерації описів готелів
 # ===============================
 
-async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_program: str, corporation: str,
-                                   category: str, selected_styles: list, selected_purposes: list, lang: str = 'uk') -> str:
+async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
+                                   selected_purposes: list, lang: str = 'uk') -> str:
     """
     Генерує персоналізований опис готелю через OpenAI API
     
     Args:
         hotel_name: назва готелю
         hotel_brand: бренд готелю
-        loyalty_program: назва програми лояльності
-        corporation: назва корпорації
-        category: обрана категорія готелю
         selected_styles: обрані користувачем стилі
         selected_purposes: обрані користувачем цілі подорожі
         lang: мова для опису
     
     Returns:
-        str: згенерований опис готелю (3 речення)
+        str: згенерований опис готелю (2 речення)
     """
     if not ENABLE_OPENAI:
         # Fallback: базовий опис без OpenAI
         if lang == 'uk':
-            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування. Стати учасником програми лояльності {loyalty_program}."
+            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
         else:
-            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay. Join the {loyalty_program} loyalty program."
+            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay."
     
     try:
         # Формуємо промт для OpenAI
@@ -123,79 +109,72 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, loyalty_
         
         if lang == 'uk':
             prompt = f"""
-Створи опис конкретного готелю "{hotel_name}" бренду {hotel_brand} як представника програми корпорації {corporation}.
+Створи персоналізований опис готелю "{hotel_name}" бренду {hotel_brand} українською мовою.
 
-Користувач обрав:
-- Категорію: {category}
-- Стиль: {styles_text}
-- Мету подорожі: {purposes_text}
+Обрані користувачем стилі: {styles_text}
+Обрані користувачем цілі подорожі: {purposes_text}
 
-Структура (точно 3 речення):
-1. Поясни, чому цей готель є ідеальним представником категорії {category} та демонструє характерні риси стилю {styles_text}
-2. Опиши, як готель втілює потреби для {purposes_text} та які унікальні особливості роблять його зразковим прикладом таких готелів
-3. Закінчи: "Стати учасником програми лояльності {loyalty_program}."
+Вимоги:
+1. Опис має бути точно 2 речення
+2. Опис має показати, як цей готель/бренд відповідає обраним стилям та цілям подорожі
+3. Використовуй тільки правдиву інформацію про бренд {hotel_brand}
+4. Будь конкретним щодо особливостей цього бренду
+5. Не використовуй загальні фрази, а покажи унікальність бренду
+6. Не згадуй назву готелю в описі, тільки особливості бренду
 
-НЕ згадуй розташування в центрі чи локацію.
-Фокусуйся на тому, чому саме ЦЕЙ готель є еталоном обраних характеристик.
-Кожне речення має бути повним і закінчуватися крапкою.
+Приклад формату:
+[Перше речення про те, як бренд відповідає обраним стилям]. [Друге речення про те, як бренд підходить для обраних цілей подорожі].
 """
         else:
             prompt = f"""
-Create a description of the specific hotel "{hotel_name}" by {hotel_brand} as a representative of {corporation} corporation program.
+Create a personalized description of hotel "{hotel_name}" from {hotel_brand} brand in English.
 
-User selected:
-- Category: {category}
-- Style: {styles_text}
-- Travel purpose: {purposes_text}
+User selected styles: {styles_text}
+User selected travel purposes: {purposes_text}
 
-Structure (exactly 3 sentences):
-1. Explain why this hotel is an ideal representative of the {category} category and demonstrates the characteristic features of {styles_text} style
-2. Describe how the hotel embodies the needs for {purposes_text} and what unique features make it an exemplary example of such hotels
-3. End with: "Join the {loyalty_program} loyalty program."
+Requirements:
+1. Description must be exactly 2 sentences
+2. Description should show how this hotel/brand matches the selected styles and travel purposes
+3. Use only truthful information about {hotel_brand} brand
+4. Be specific about this brand's features
+5. Don't use generic phrases, show the brand's uniqueness
+6. Don't mention the hotel name in description, only brand features
 
-DO NOT mention central location or positioning.
-Focus on why THIS hotel is the epitome of the selected characteristics.
-Each sentence must be complete and end with a period.
+Example format:
+[First sentence about how the brand matches selected styles]. [Second sentence about how the brand suits selected travel purposes].
 """
         
-        # Викликаємо OpenAI API з збільшеним лімітом токенів
+        # Викликаємо OpenAI API (оновлена версія для новішого API)
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of specific hotels based on their real characteristics."},
+                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of hotel brands based on their real characteristics."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300,  # ЗБІЛЬШЕНО з 150 до 300
+            max_tokens=150,
             temperature=0.7,
-            timeout=15  # Збільшено таймаут
+            timeout=10
         )
         
         generated_text = response.choices[0].message.content.strip()
         
-        # ПОКРАЩЕНА валідація: перевіряємо, що це дійсно 3 повних речення
-        sentences = [s.strip() for s in generated_text.split('.') if s.strip()]
+        # Валідація: перевіряємо, що це дійсно 2 речення
+        sentences = generated_text.split('.')
+        sentences = [s.strip() for s in sentences if s.strip()]
         
-        if len(sentences) >= 3:
-            # Беремо перші 3 речення і додаємо крапки
-            result = f"{sentences[0]}. {sentences[1]}. {sentences[2]}."
-        elif len(sentences) == 2:
-            # Якщо 2 речення, додаємо стандартне третє
-            if lang == 'uk':
-                result = f"{sentences[0]}. {sentences[1]}. Стати учасником програми лояльності {loyalty_program}."
-            else:
-                result = f"{sentences[0]}. {sentences[1]}. Join the {loyalty_program} loyalty program."
+        if len(sentences) >= 2:
+            # Беремо перші 2 речення
+            result = f"{sentences[0]}. {sentences[1]}."
         else:
-            # Fallback для коротких описів
+            # Якщо менше 2 речень, додаємо fallback
             result = generated_text
-            if not result.endswith('.'):
-                result += '.'
             if lang == 'uk':
-                result += f" Стати учасником програми лояльності {loyalty_program}."
+                result += " Ідеальний вибір для вашої подорожі."
             else:
-                result += f" Join the {loyalty_program} loyalty program."
+                result += " Perfect choice for your trip."
         
         debug_log(f"OpenAI generated description for {hotel_name}: {result}")
         return result
@@ -205,9 +184,9 @@ Each sentence must be complete and end with a period.
         
         # Fallback: базовий опис
         if lang == 'uk':
-            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування. Стати учасником програми лояльності {loyalty_program}."
+            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
         else:
-            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay. Join the {loyalty_program} loyalty program."
+            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
 
 def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
     """
@@ -238,19 +217,6 @@ def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: s
     caption = f'"{hotel_name}" by {hotel_brand}, {location}\n\n{ai_description}'
     
     return caption
-
-# ДОДАНО: Функція для отримання посилання на програму лояльності
-def get_loyalty_program_link(program_name: str) -> str:
-    """
-    Повертає посилання на реєстрацію в програмі лояльності
-    
-    Args:
-        program_name: назва програми лояльності
-    
-    Returns:
-        str: URL для реєстрації
-    """
-    return LOYALTY_PROGRAM_LINKS.get(program_name, "")
 
 # ДОДАНО: Функція для логування дебагу (якщо потрібно)
 def debug_log(message):
@@ -313,6 +279,7 @@ def calculate_rating_coefficient(program_rating):
         float: коефіцієнт (рейтинг/5.0)
     """
     return program_rating / 5.0
+
 
 # ===============================
 # ЧАСТИНА 2.5: ФУНКЦІЇ ПЕРЕКЛАДУ
@@ -1461,7 +1428,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if lang == 'uk':
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні пункти для мети подорожі: {', '.join(selected_purposes)}.\n"
+                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
                 "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
             )
         else:
@@ -2221,117 +2188,6 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
             result += "\n" + "=" * 50 + "\n"
     
     return result
-
-# ===============================
-# ДОДАНО: ФУНКЦІЇ ДЛЯ ОДНОГО ГОТЕЛЮ (замість 2)
-# ===============================
-
-def select_single_hotel(hotels_df):
-    """
-    Вибирає найкращий готель за рейтингом
-    
-    Args:
-        hotels_df: DataFrame з готелями
-    
-    Returns:
-        DataFrame з одним готелем
-    """
-    if hotels_df.empty:
-        return hotels_df
-    
-    # Сортуємо за рейтингом (найкращі спочатку) і беремо перший
-    sorted_hotels = hotels_df.sort_values('Weighted rating of each unique hotel', ascending=False)
-    
-    best_hotel = sorted_hotels.head(1)
-    
-    if not best_hotel.empty:
-        hotel_name = best_hotel.iloc[0].get('hotel_name', 'Unknown')
-        hotel_brand = best_hotel.iloc[0].get('Hotel Brand', 'Unknown')
-        debug_log(f"Обрано найкращий готель: {hotel_name} (бренд: {hotel_brand})")
-    
-    return best_hotel
-
-def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
-    """
-    Знаходить топ-1 готель для програми лояльності, який відповідає критеріям користувача
-    
-    Args:
-        program_name: назва програми лояльності
-        user_data: дані користувача з відповідями
-        hotel_data: повні дані готелів
-    
-    Returns:
-        tuple: (DataFrame з топ-1 готелем, тип вибірки)
-    """
-    # Переводимо критерії користувача
-    regions = user_data.get('regions', []) or []
-    countries = user_data.get('countries', []) or []
-    category = user_data.get('category')
-    styles = user_data.get('styles', []) or []
-    purposes = user_data.get('purposes', []) or []
-    
-    english_regions = translate_regions_to_english(regions)
-    english_countries = translate_regions_to_english(countries)
-    english_styles = translate_styles_to_english(styles)
-    english_purposes = translate_purposes_to_english(purposes)
-    
-    debug_log(f"Пошук топ-1 готелю для програми: {program_name}")
-    debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
-    
-    # 1. Фільтруємо за регіоном
-    filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
-    
-    # 2. Фільтруємо за програмою лояльності
-    program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
-    
-    # Конвертуємо рейтинг в числовий формат
-    program_hotels = convert_rating_column_to_numeric(program_hotels)
-    
-    if program_hotels.empty:
-        debug_log(f"Немає готелів для програми {program_name} в регіоні")
-        return pd.DataFrame(), "no_hotels"
-    
-    # 3. ПРІОРИТЕТ: основна категорія з усіма критеріями
-    main_category_hotels = filter_hotels_by_category(program_hotels, category)
-    main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
-    main_filtered = filter_hotels_by_purpose(main_filtered, english_purposes)
-    
-    debug_log(f"Готелів в основній категорії {category} з усіма критеріями: {len(main_filtered)}")
-    
-    # 4. Якщо в основній категорії є готелі
-    if len(main_filtered) > 0:
-        # Вибираємо найкращий готель
-        top_1 = select_single_hotel(main_filtered)
-        if len(top_1) >= 1:
-            debug_log(f"Обрано 1 готель з основної категорії")
-            return top_1, "main_category"
-    else:
-        main_filtered = pd.DataFrame()
-    
-    # 5. ДОПОВНЮЄМО з суміжних категорій
-    all_suitable_hotels = main_filtered.copy()
-    
-    adjacent_categories = get_adjacent_categories(category)
-    debug_log(f"Суміжні категорії: {adjacent_categories}")
-    
-    for adj_category in adjacent_categories:
-        adj_category_hotels = filter_hotels_by_category(program_hotels, adj_category)
-        adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
-        adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
-        
-        debug_log(f"Готелів в суміжній категорії {adj_category}: {len(adj_filtered)}")
-        all_suitable_hotels = pd.concat([all_suitable_hotels, adj_filtered], ignore_index=True)
-    
-    # 6. Видаляємо дублікати та вибираємо найкращий
-    all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
-    
-    if len(all_suitable_hotels) > 0:
-        top_1 = select_single_hotel(all_suitable_hotels)
-        debug_log(f"Обрано {len(top_1)} готель з комбінації категорій")
-        return top_1, "mixed"
-    else:
-        debug_log(f"Не знайдено готелів для програми {program_name}")
-        return pd.DataFrame(), "no_hotels"
 
 # ===============================
 # ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
@@ -3663,7 +3519,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
         if purposes:
             if lang == 'uk':
                 purposes_str = '; '.join(purposes)
-                results += f"🎯 Мета подорожі:\n{purposes_str}:\n"
+                results += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
             else:
                 purposes_str = '; '.join(purposes)
                 results += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -3849,7 +3705,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Мета подорожі:\n\n"
+                results += f"🎯 Ціль подорожі:\n\n"
             else:
                 results += f"🎯 Travel purpose:\n\n"
             
@@ -4033,7 +3889,7 @@ def format_admin_scoring_report(user_data, scores_df):
         
         # ЦІЛЬ - детальний розбір з нормалізацією
         if purposes:
-            results += f"🎯 Мета подорожі: {row['purpose_score']:.1f} балів\n"
+            results += f"🎯 Ціль подорожі: {row['purpose_score']:.1f} балів\n"
             
             total_purpose_points = 0.0
             
