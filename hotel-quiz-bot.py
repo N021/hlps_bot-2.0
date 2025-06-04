@@ -1910,7 +1910,7 @@ async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_
 
 def convert_rating_column_to_numeric(df):
     """
-    Конвертує колонку рейтингу в числовий формат
+    Конвертує колонку рейтингу в числовий формат (функція залишається без змін)
     
     Args:
         df: DataFrame з готелями
@@ -1938,57 +1938,47 @@ def convert_rating_column_to_numeric(df):
     
     return df
 
-def select_diverse_hotels(hotels_df, max_count=1):
+
+def select_best_hotel_by_rating(hotels_df, max_count=1):
     """
-    Вибирає готелі з різних брендів, максимум 1 готель від одного бренду
+    НОВА ФУНКЦІЯ: Вибирає найкращі готелі за зваженим рейтингом
+    Замінює стару логіку диверсифікації брендів
     
     Args:
         hotels_df: DataFrame з готелями
-        max_count: максимальна кількість готелів для вибору (тепер 1)
+        max_count: максимальна кількість готелів для вибору (зазвичай 1)
     
     Returns:
-        DataFrame з обраними готелями
+        DataFrame з обраними готелями, відсортованими за рейтингом
     """
     if hotels_df.empty:
+        debug_log("Пустий DataFrame для вибору готелів")
         return hotels_df
     
-    # Сортуємо за рейтингом (найкращі спочатку)
+    # Переконуємося, що рейтинг в числовому форматі
+    if 'Weighted rating of each unique hotel' not in hotels_df.columns:
+        debug_log("Відсутня колонка рейтингу, повертаємо перші готелі")
+        return hotels_df.head(max_count)
+    
+    # Сортуємо за рейтингом (найкращі спочатку) 
     sorted_hotels = hotels_df.sort_values('Weighted rating of each unique hotel', ascending=False)
     
-    selected_hotels = []
-    used_brands = set()
+    # Беремо топ готелі
+    top_hotels = sorted_hotels.head(max_count)
     
-    for index, hotel in sorted_hotels.iterrows():
-        hotel_brand = hotel.get('Hotel Brand', 'Unknown')
-        
-        # Якщо бренд ще не використаний і ми не набрали максимум
-        if hotel_brand not in used_brands and len(selected_hotels) < max_count:
-            selected_hotels.append(hotel)
-            used_brands.add(hotel_brand)
-            debug_log(f"Обрано готель: {hotel.get('hotel_name')} (бренд: {hotel_brand})")
+    debug_log(f"Обрано {len(top_hotels)} готель(ів) з найвищим рейтингом:")
+    for idx, hotel in top_hotels.iterrows():
+        hotel_name = hotel.get('hotel_name', 'Unknown')
+        rating = hotel.get('Weighted rating of each unique hotel', 0)
+        debug_log(f"  - {hotel_name}: {rating:.2f}★")
     
-    # Якщо не набрали достатньо готелів, додаємо решту (може бути дублікат брендів)
-    if len(selected_hotels) < max_count:
-        for index, hotel in sorted_hotels.iterrows():
-            if len(selected_hotels) >= max_count:
-                break
-            
-            # Перевіряємо, чи цей готель вже не додано
-            if not any(h.get('hotel_name') == hotel.get('hotel_name') for h in selected_hotels):
-                selected_hotels.append(hotel)
-    
-    # Конвертуємо назад в DataFrame
-    if selected_hotels:
-        result_df = pd.DataFrame(selected_hotels)
-        debug_log(f"Підсумок: обрано {len(result_df)} готель з {len(used_brands)} різних брендів")
-        return result_df
-    else:
-        return pd.DataFrame()
+    return top_hotels
 
-def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
+def find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data):
     """
-    Знаходить топ-1 готель для програми лояльності, який відповідає критеріям користувача
-    З диверсифікацією брендів - максимум 1 готель від одного бренду
+    НОВА СТРОГА ЛОГІКА: Знаходить топ-1 готель для програми лояльності
+    з жорсткою фільтрацією тільки за обраними користувачем критеріями
+    БЕЗ суміжних категорій, тільки точний збіг
     
     Args:
         program_name: назва програми лояльності
@@ -2010,63 +2000,67 @@ def find_top_1_hotel_for_program(program_name, user_data, hotel_data):
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    debug_log(f"Пошук топ-1 готелю для програми: {program_name}")
+    debug_log(f"СТРОГА фільтрація для програми: {program_name}")
     debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
     
-    # 1. Фільтруємо за регіоном
+    # 1. Фільтруємо за регіоном (тільки обрані)
     filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
+    debug_log(f"Після фільтрації за регіоном: {len(filtered_by_region)} готелів")
     
     # 2. Фільтруємо за програмою лояльності
     program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
-    
-    # ВИПРАВЛЕННЯ: Конвертуємо рейтинг в числовий формат
-    program_hotels = convert_rating_column_to_numeric(program_hotels)
+    debug_log(f"Після фільтрації за програмою {program_name}: {len(program_hotels)} готелів")
     
     if program_hotels.empty:
-        debug_log(f"Немає готелів для програми {program_name} в регіоні")
+        debug_log(f"Немає готелів для програми {program_name} в обраних регіонах")
         return pd.DataFrame(), "no_hotels"
     
-    # 3. ПРІОРИТЕТ: основна категорія з усіма критеріями
-    main_category_hotels = filter_hotels_by_category(program_hotels, category)
-    main_filtered = filter_hotels_by_style(main_category_hotels, english_styles)
-    main_filtered = filter_hotels_by_purpose(main_filtered, english_purposes)
-    
-    debug_log(f"Готелів в основній категорії {category} з усіма критеріями: {len(main_filtered)}")
-    
-    # 4. ОНОВЛЕНО: Якщо в основній категорії є готелі
-    if len(main_filtered) > 0:
-        # НОВА ЛОГІКА: Диверсифікація брендів (1 готель)
-        top_1 = select_diverse_hotels(main_filtered, 1)
-        if len(top_1) >= 1:
-            debug_log(f"Обрано 1 готель з основної категорії")
-            return top_1, "main_category"
+    # 3. СТРОГА фільтрація за категорією (БЕЗ суміжних категорій)
+    if category:
+        category_filtered = filter_hotels_by_category(program_hotels, category)
+        debug_log(f"Після СТРОГОЇ фільтрації за категорією {category}: {len(category_filtered)} готелів")
     else:
-        main_filtered = pd.DataFrame()
+        category_filtered = program_hotels
     
-    # 5. ДОПОВНЮЄМО з суміжних категорій
-    all_suitable_hotels = main_filtered.copy()
+    if category_filtered.empty:
+        debug_log(f"Немає готелів для програми {program_name} в категорії {category}")
+        return pd.DataFrame(), "no_category"
     
-    adjacent_categories = get_adjacent_categories(category)
-    debug_log(f"Суміжні категорії: {adjacent_categories}")
-    
-    for adj_category in adjacent_categories:
-        adj_category_hotels = filter_hotels_by_category(program_hotels, adj_category)
-        adj_filtered = filter_hotels_by_style(adj_category_hotels, english_styles)
-        adj_filtered = filter_hotels_by_purpose(adj_filtered, english_purposes)
-        
-        debug_log(f"Готелів в суміжній категорії {adj_category}: {len(adj_filtered)}")
-        all_suitable_hotels = pd.concat([all_suitable_hotels, adj_filtered], ignore_index=True)
-    
-    # 6. ОНОВЛЕНО: Видаляємо дублікати та диверсифікуємо бренди
-    all_suitable_hotels = all_suitable_hotels.drop_duplicates(subset=['hotel_name', 'Place ID'])
-    
-    if len(all_suitable_hotels) > 0:
-        top_1 = select_diverse_hotels(all_suitable_hotels, 1)
-        debug_log(f"Обрано {len(top_1)} готель з комбінації категорій")
-        return top_1, "mixed"
+    # 4. Фільтруємо за стилем (тільки обрані стилі)
+    if english_styles:
+        style_filtered = filter_hotels_by_style(category_filtered, english_styles)
+        debug_log(f"Після фільтрації за стилями {english_styles}: {len(style_filtered)} готелів")
     else:
-        debug_log(f"Не знайдено готелів для програми {program_name}")
-        return pd.DataFrame(), "no_hotels"
+        style_filtered = category_filtered
+    
+    if style_filtered.empty:
+        debug_log(f"Немає готелів для програми {program_name} з обраними стилями")
+        return pd.DataFrame(), "no_style"
+    
+    # 5. Фільтруємо за метою (тільки обрані мети)
+    if english_purposes:
+        purpose_filtered = filter_hotels_by_purpose(style_filtered, english_purposes)
+        debug_log(f"Після фільтрації за метами {english_purposes}: {len(purpose_filtered)} готелів")
+    else:
+        purpose_filtered = style_filtered
+    
+    if purpose_filtered.empty:
+        debug_log(f"Немає готелів для програми {program_name} з обраними метами")
+        return pd.DataFrame(), "no_purpose"
+    
+    # 6. КОНВЕРТУЄМО рейтинг в числовий формат
+    purpose_filtered = convert_rating_column_to_numeric(purpose_filtered)
+    
+    # 7. НОВА ЛОГІКА: Сортуємо за зваженим рейтингом і беремо топ-1
+    top_1_hotel = select_best_hotel_by_rating(purpose_filtered, 1)
+    
+    if not top_1_hotel.empty:
+        debug_log(f"Обрано топ-1 готель: {top_1_hotel.iloc[0].get('hotel_name')} "
+                 f"з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+        return top_1_hotel, "strict_match"
+    else:
+        debug_log(f"Не знайдено готелів для програми {program_name} після всіх фільтрів")
+        return pd.DataFrame(), "no_match"
 
 def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
@@ -2169,7 +2163,7 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
             program_name = top_programs.iloc[i]['loyalty_program']
             
             # Знаходимо топ-1 готель для цієї програми
-            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
+            top_hotels, selection_type = find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data)
             
             # Використовуємо різні функції форматування залежно від режиму
             if admin_mode:
@@ -2349,7 +2343,7 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             await asyncio.sleep(0.5)
             
             # 3. Знаходимо та відправляємо кожен готель з AI-описом
-            top_hotels, selection_type = find_top_1_hotel_for_program(program_name, user_data, hotel_data)
+            top_hotels, selection_type = find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
                 await send_individual_hotels_with_ai_descriptions(
