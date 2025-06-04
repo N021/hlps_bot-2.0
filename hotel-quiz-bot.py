@@ -1643,7 +1643,7 @@ def map_hotel_purpose(hotel_brand):
     return result
 
 # ===============================
-# НОВІ ФУНКЦІЇ GOOGLE MAPS API
+# ЧАСТИНА 9.1:НОВІ ФУНКЦІЇ GOOGLE MAPS API
 # ===============================
 
 async def get_hotel_photos_and_link(place_id, api_key, max_photos=3):
@@ -1905,7 +1905,7 @@ async def add_hotels_to_results_with_photos(context, chat_id, user_data, scores_
     pass
 
 # ===============================
-# ЗАЛИШАЮТЬСЯ БЕЗ ЗМІН: ФУНКЦІЇ АНАЛІЗУ ГОТЕЛІВ
+# ЧАСТИНА 9.2: ОНОВЛЕНІ ФУНКЦІЇ АНАЛІЗУ ГОТЕЛІВ З FALLBACK-ЛОГІКОЮ
 # ===============================
 
 def convert_rating_column_to_numeric(df):
@@ -1937,7 +1937,6 @@ def convert_rating_column_to_numeric(df):
         debug_log(f"Converted rating column to numeric. Sample values: {df['Weighted rating of each unique hotel'].head().tolist()}")
     
     return df
-
 
 def select_best_hotel_by_rating(hotels_df, max_count=1):
     """
@@ -1974,11 +1973,129 @@ def select_best_hotel_by_rating(hotels_df, max_count=1):
     
     return top_hotels
 
+# ===============================
+# НОВІ ДОПОМІЖНІ ФУНКЦІЇ ДЛЯ FALLBACK-СЦЕНАРІЇВ
+# ===============================
+
+def find_hotel_with_style_only(program_hotels, category, styles):
+    """
+    Fallback 2: Регіон + Сегмент + Стиль (БЕЗ фільтру за метою)
+    
+    Args:
+        program_hotels: готелі програми після фільтрації за регіоном
+        category: обрана категорія
+        styles: обрані стилі
+    
+    Returns:
+        DataFrame з відфільтрованими готелями
+    """
+    debug_log(f"FALLBACK 2: Пошук з фільтром тільки за стилем")
+    
+    # Фільтруємо за категорією
+    if category:
+        category_filtered = filter_hotels_by_category(program_hotels, category)
+        debug_log(f"Після фільтрації за категорією {category}: {len(category_filtered)} готелів")
+    else:
+        category_filtered = program_hotels
+    
+    if category_filtered.empty:
+        return pd.DataFrame()
+    
+    # Фільтруємо за стилем (БЕЗ мети)
+    if styles:
+        style_filtered = filter_hotels_by_style(category_filtered, styles)
+        debug_log(f"Після фільтрації за стилями {styles}: {len(style_filtered)} готелів")
+        return style_filtered
+    else:
+        return category_filtered
+
+def find_hotel_with_purpose_only(program_hotels, category, purposes):
+    """
+    Fallback 3: Регіон + Сегмент + Мета (БЕЗ фільтру за стилем)
+    
+    Args:
+        program_hotels: готелі програми після фільтрації за регіоном
+        category: обрана категорія
+        purposes: обрані мети
+    
+    Returns:
+        DataFrame з відфільтрованими готелями
+    """
+    debug_log(f"FALLBACK 3: Пошук з фільтром тільки за метою")
+    
+    # Фільтруємо за категорією
+    if category:
+        category_filtered = filter_hotels_by_category(program_hotels, category)
+        debug_log(f"Після фільтрації за категорією {category}: {len(category_filtered)} готелів")
+    else:
+        category_filtered = program_hotels
+    
+    if category_filtered.empty:
+        return pd.DataFrame()
+    
+    # Фільтруємо за метою (БЕЗ стилю)
+    if purposes:
+        purpose_filtered = filter_hotels_by_purpose(category_filtered, purposes)
+        debug_log(f"Після фільтрації за метами {purposes}: {len(purpose_filtered)} готелів")
+        return purpose_filtered
+    else:
+        return category_filtered
+
+def find_hotel_basic_filter(program_hotels, category):
+    """
+    Fallback 4: Регіон + Сегмент + Програма (БЕЗ стилю і мети)
+    
+    Args:
+        program_hotels: готелі програми після фільтрації за регіоном
+        category: обрана категорія
+    
+    Returns:
+        DataFrame з відфільтрованими готелями
+    """
+    debug_log(f"FALLBACK 4: Пошук тільки за регіоном, сегментом та програмою")
+    
+    # Фільтруємо тільки за категорією
+    if category:
+        category_filtered = filter_hotels_by_category(program_hotels, category)
+        debug_log(f"Після фільтрації за категорією {category}: {len(category_filtered)} готелів")
+        return category_filtered
+    else:
+        debug_log(f"Повертаємо всі готелі програми: {len(program_hotels)} готелів")
+        return program_hotels
+
+def find_hotel_minimal_filter(filtered_by_region, program_name):
+    """
+    Fallback 5: Регіон + Програма (крайній випадок)
+    
+    Args:
+        filtered_by_region: готелі після фільтрації за регіоном
+        program_name: назва програми лояльності
+    
+    Returns:
+        DataFrame з відфільтрованими готелями
+    """
+    debug_log(f"FALLBACK 5: Крайній випадок - тільки регіон + програма")
+    
+    # Фільтруємо тільки за програмою
+    program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
+    debug_log(f"Після мінімальної фільтрації за програмою {program_name}: {len(program_hotels)} готелів")
+    
+    return program_hotels
+
+# ===============================
+# ГОЛОВНА ФУНКЦІЯ З FALLBACK-ЛОГІКОЮ
+# ===============================
+
 def find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data):
     """
-    НОВА СТРОГА ЛОГІКА: Знаходить топ-1 готель для програми лояльності
-    з жорсткою фільтрацією тільки за обраними користувачем критеріями
-    БЕЗ суміжних категорій, тільки точний збіг
+    ОНОВЛЕНА ФУНКЦІЯ з 5-рівневою fallback-логікою для знаходження топ-1 готелю
+    
+    ПРІОРИТЕТИ ПОШУКУ:
+    1. Ідеальний збіг: Регіон + Сегмент + Стиль + Мета
+    2. Fallback 1: Регіон + Сегмент + Мета (якщо стиль = 0)
+    3. Fallback 2: Регіон + Сегмент + Стиль (якщо мета = 0)  
+    4. Fallback 3: Регіон + Сегмент (якщо стиль = 0 і мета = 0)
+    5. Fallback 4: Регіон + Програма (крайній випадок)
     
     Args:
         program_name: назва програми лояльності
@@ -2000,10 +2117,11 @@ def find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data):
     english_styles = translate_styles_to_english(styles)
     english_purposes = translate_purposes_to_english(purposes)
     
-    debug_log(f"СТРОГА фільтрація для програми: {program_name}")
+    debug_log(f"=== FALLBACK ПОШУК для програми: {program_name} ===")
     debug_log(f"Критерії: regions={english_regions}, category={category}, styles={english_styles}, purposes={english_purposes}")
     
-    # 1. Фільтруємо за регіоном (тільки обрані)
+    # БАЗОВА ФІЛЬТРАЦІЯ (для всіх сценаріїв)
+    # 1. Фільтруємо за регіоном
     filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
     debug_log(f"Після фільтрації за регіоном: {len(filtered_by_region)} готелів")
     
@@ -2012,55 +2130,110 @@ def find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data):
     debug_log(f"Після фільтрації за програмою {program_name}: {len(program_hotels)} готелів")
     
     if program_hotels.empty:
-        debug_log(f"Немає готелів для програми {program_name} в обраних регіонах")
+        debug_log(f"❌ Немає готелів для програми {program_name} в обраних регіонах")
         return pd.DataFrame(), "no_hotels"
     
-    # 3. СТРОГА фільтрація за категорією (БЕЗ суміжних категорій)
+    # СЦЕНАРІЙ 1: ІДЕАЛЬНИЙ ЗБІГ - Регіон + Сегмент + Стиль + Мета
+    debug_log(f"🎯 СЦЕНАРІЙ 1: Спроба ідеального збігу")
+    
+    # Фільтруємо за категорією
     if category:
         category_filtered = filter_hotels_by_category(program_hotels, category)
-        debug_log(f"Після СТРОГОЇ фільтрації за категорією {category}: {len(category_filtered)} готелів")
+        debug_log(f"Після фільтрації за категорією {category}: {len(category_filtered)} готелів")
     else:
         category_filtered = program_hotels
     
-    if category_filtered.empty:
-        debug_log(f"Немає готелів для програми {program_name} в категорії {category}")
-        return pd.DataFrame(), "no_category"
+    if not category_filtered.empty:
+        # Фільтруємо за стилем
+        if english_styles:
+            style_filtered = filter_hotels_by_style(category_filtered, english_styles)
+            debug_log(f"Після фільтрації за стилями: {len(style_filtered)} готелів")
+        else:
+            style_filtered = category_filtered
+        
+        if not style_filtered.empty:
+            # Фільтруємо за метою
+            if english_purposes:
+                purpose_filtered = filter_hotels_by_purpose(style_filtered, english_purposes)
+                debug_log(f"Після фільтрації за метами: {len(purpose_filtered)} готелів")
+            else:
+                purpose_filtered = style_filtered
+            
+            if not purpose_filtered.empty:
+                # ✅ ІДЕАЛЬНИЙ ЗБІГ ЗНАЙДЕНО!
+                purpose_filtered = convert_rating_column_to_numeric(purpose_filtered)
+                top_1_hotel = select_best_hotel_by_rating(purpose_filtered, 1)
+                
+                if not top_1_hotel.empty:
+                    debug_log(f"✅ СЦЕНАРІЙ 1 УСПІШНИЙ: Ідеальний збіг знайдено!")
+                    debug_log(f"Обрано готель: {top_1_hotel.iloc[0].get('hotel_name')} з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+                    return top_1_hotel, "perfect_match"
     
-    # 4. Фільтруємо за стилем (тільки обрані стилі)
-    if english_styles:
-        style_filtered = filter_hotels_by_style(category_filtered, english_styles)
-        debug_log(f"Після фільтрації за стилями {english_styles}: {len(style_filtered)} готелів")
-    else:
-        style_filtered = category_filtered
+    # СЦЕНАРІЙ 2: FALLBACK 1 - Регіон + Сегмент + Мета (якщо стиль = 0)
+    debug_log(f"🔄 СЦЕНАРІЙ 2: Fallback - пошук БЕЗ фільтру за стилем")
     
-    if style_filtered.empty:
-        debug_log(f"Немає готелів для програми {program_name} з обраними стилями")
-        return pd.DataFrame(), "no_style"
+    if english_purposes:  # Тільки якщо є мети
+        purpose_only_filtered = find_hotel_with_purpose_only(program_hotels, category, english_purposes)
+        
+        if not purpose_only_filtered.empty:
+            purpose_only_filtered = convert_rating_column_to_numeric(purpose_only_filtered)
+            top_1_hotel = select_best_hotel_by_rating(purpose_only_filtered, 1)
+            
+            if not top_1_hotel.empty:
+                debug_log(f"✅ СЦЕНАРІЙ 2 УСПІШНИЙ: Збіг без стилю знайдено!")
+                debug_log(f"Обрано готель: {top_1_hotel.iloc[0].get('hotel_name')} з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+                return top_1_hotel, "purpose_only_match"
     
-    # 5. Фільтруємо за метою (тільки обрані мети)
-    if english_purposes:
-        purpose_filtered = filter_hotels_by_purpose(style_filtered, english_purposes)
-        debug_log(f"Після фільтрації за метами {english_purposes}: {len(purpose_filtered)} готелів")
-    else:
-        purpose_filtered = style_filtered
+    # СЦЕНАРІЙ 3: FALLBACK 2 - Регіон + Сегмент + Стиль (якщо мета = 0)
+    debug_log(f"🔄 СЦЕНАРІЙ 3: Fallback - пошук БЕЗ фільтру за метою")
     
-    if purpose_filtered.empty:
-        debug_log(f"Немає готелів для програми {program_name} з обраними метами")
-        return pd.DataFrame(), "no_purpose"
+    if english_styles:  # Тільки якщо є стилі
+        style_only_filtered = find_hotel_with_style_only(program_hotels, category, english_styles)
+        
+        if not style_only_filtered.empty:
+            style_only_filtered = convert_rating_column_to_numeric(style_only_filtered)
+            top_1_hotel = select_best_hotel_by_rating(style_only_filtered, 1)
+            
+            if not top_1_hotel.empty:
+                debug_log(f"✅ СЦЕНАРІЙ 3 УСПІШНИЙ: Збіг без мети знайдено!")
+                debug_log(f"Обрано готель: {top_1_hotel.iloc[0].get('hotel_name')} з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+                return top_1_hotel, "style_only_match"
     
-    # 6. КОНВЕРТУЄМО рейтинг в числовий формат
-    purpose_filtered = convert_rating_column_to_numeric(purpose_filtered)
+    # СЦЕНАРІЙ 4: FALLBACK 3 - Регіон + Сегмент (БЕЗ стилю і мети)
+    debug_log(f"🔄 СЦЕНАРІЙ 4: Fallback - тільки регіон + сегмент + програма")
     
-    # 7. НОВА ЛОГІКА: Сортуємо за зваженим рейтингом і беремо топ-1
-    top_1_hotel = select_best_hotel_by_rating(purpose_filtered, 1)
+    basic_filtered = find_hotel_basic_filter(program_hotels, category)
     
-    if not top_1_hotel.empty:
-        debug_log(f"Обрано топ-1 готель: {top_1_hotel.iloc[0].get('hotel_name')} "
-                 f"з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
-        return top_1_hotel, "strict_match"
-    else:
-        debug_log(f"Не знайдено готелів для програми {program_name} після всіх фільтрів")
-        return pd.DataFrame(), "no_match"
+    if not basic_filtered.empty:
+        basic_filtered = convert_rating_column_to_numeric(basic_filtered)
+        top_1_hotel = select_best_hotel_by_rating(basic_filtered, 1)
+        
+        if not top_1_hotel.empty:
+            debug_log(f"✅ СЦЕНАРІЙ 4 УСПІШНИЙ: Базовий збіг знайдено!")
+            debug_log(f"Обрано готель: {top_1_hotel.iloc[0].get('hotel_name')} з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+            return top_1_hotel, "basic_match"
+    
+    # СЦЕНАРІЙ 5: FALLBACK 4 - Регіон + Програма (крайній випадок)
+    debug_log(f"🔄 СЦЕНАРІЙ 5: Крайній fallback - тільки регіон + програма")
+    
+    minimal_filtered = find_hotel_minimal_filter(filtered_by_region, program_name)
+    
+    if not minimal_filtered.empty:
+        minimal_filtered = convert_rating_column_to_numeric(minimal_filtered)
+        top_1_hotel = select_best_hotel_by_rating(minimal_filtered, 1)
+        
+        if not top_1_hotel.empty:
+            debug_log(f"✅ СЦЕНАРІЙ 5 УСПІШНИЙ: Мінімальний збіг знайдено!")
+            debug_log(f"Обрано готель: {top_1_hotel.iloc[0].get('hotel_name')} з рейтингом {top_1_hotel.iloc[0].get('Weighted rating of each unique hotel', 0):.2f}")
+            return top_1_hotel, "minimal_match"
+    
+    # КРАЙНІЙ ВИПАДОК: Нічого не знайдено
+    debug_log(f"❌ ВСІ СЦЕНАРІЇ НЕВДАЛІ: Не знайдено жодного готелю для програми {program_name}")
+    return pd.DataFrame(), "no_match"
+
+# ===============================
+# ФУНКЦІЇ ФОРМАТУВАННЯ (БЕЗ ЗМІН)
+# ===============================
 
 def format_hotel_examples_for_integration(top_hotels, program_name, lang='uk'):
     """
@@ -2162,7 +2335,7 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
         try:
             program_name = top_programs.iloc[i]['loyalty_program']
             
-            # Знаходимо топ-1 готель для цієї програми
+            # ОНОВЛЕНО: Використовуємо нову функцію з fallback-логікою
             top_hotels, selection_type = find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data)
             
             # Використовуємо різні функції форматування залежно від режиму
@@ -2184,7 +2357,7 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
     return result
 
 # ===============================
-# ЧАСТИНА 9.5: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
+# ЧАСТИНА 9.3: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
 async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk'):
