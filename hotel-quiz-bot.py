@@ -2416,32 +2416,32 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
         result += f"⭐{program_row['program_rating']:.2f} – average rating of hotels in the program\n"
         result += f"(based on Google Maps reviews):\n\n"
     
-    # РЕГІОН - ОНОВЛЕНА СЕКЦІЯ З БРЕНДАМИ
+    # РЕГІОН - ВИПРАВЛЕНА СЕКЦІЯ З БРЕНДАМИ
     if lang == 'uk':
         region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
         result += f"📍 Регіон: {region_str}\n"
         result += f" • {program_row['region_hotels']} готелів:\n"
         
-        # ДОДАЄМО: Перелік брендів у регіоні
+        # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
         brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
         if brands_in_region:
             for brand in brands_in_region:
-                result += f"   * {brand}\n"
+                result += f"   • {brand}\n"
         else:
-            result += "   * Бренди не знайдено\n"
+            result += "   • Бренди не знайдено\n"
         result += "\n"
     else:
         region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
         result += f"📍 Region: {region_str}\n"
         result += f" • {program_row['region_hotels']} hotels:\n"
         
-        # ДОДАЄМО: Перелік брендів у регіоні
+        # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
         brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
         if brands_in_region:
             for brand in brands_in_region:
-                result += f"   * {brand}\n"
+                result += f"   • {brand}\n"
         else:
-            result += "   * No brands found\n"
+            result += "   • No brands found\n"
         result += "\n"
     
     # КАТЕГОРІЯ
@@ -2697,10 +2697,20 @@ def get_brands_in_region_for_program(program_name, regions=None, countries=None,
     # Отримуємо унікальні бренди та сортуємо їх
     if 'Hotel Brand' in program_hotels.columns:
         unique_brands = program_hotels['Hotel Brand'].dropna().unique().tolist()
-        # Сортуємо бренди для красивого відображення
-        unique_brands.sort()
-        debug_log(f"Знайдено {len(unique_brands)} унікальних брендів для програми {program_name} в регіонах {english_regions}")
-        return unique_brands
+        
+        # ВИПРАВЛЕНО: Очищуємо від зайвих символів та сортуємо
+        cleaned_brands = []
+        for brand in unique_brands:
+            # Очищуємо від зайвих пробілів та символів
+            cleaned_brand = str(brand).strip()
+            if cleaned_brand and cleaned_brand not in cleaned_brands:
+                cleaned_brands.append(cleaned_brand)
+        
+        # Сортуємо бренди в алфавітному порядку
+        cleaned_brands.sort()
+        
+        debug_log(f"Знайдено {len(cleaned_brands)} унікальних брендів для програми {program_name} в регіонах {english_regions}")
+        return cleaned_brands
     
     return []
 
@@ -3484,32 +3494,32 @@ def format_simple_results(user_data, scores_df, lang='uk'):
             results += f"⭐{row['program_rating']:.2f} – average rating of hotels in the program\n"
             results += f"(based on Google Maps reviews):\n\n"
         
-        # РЕГІОН - ОНОВЛЕНА СЕКЦІЯ З БРЕНДАМИ
+        # РЕГІОН - ВИПРАВЛЕНА СЕКЦІЯ З БРЕНДАМИ
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон: {region_str}\n"
             results += f" • {row['region_hotels']} готелів:\n"
             
-            # ДОДАЄМО: Перелік брендів у регіоні
+            # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
             brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
             if brands_in_region:
                 for brand in brands_in_region:
-                    results += f"   * {brand}\n"
+                    results += f"   • {brand}\n"
             else:
-                results += "   * Бренди не знайдено\n"
+                results += "   • Бренди не знайдено\n"
             results += "\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region: {region_str}\n"
             results += f" • {row['region_hotels']} hotels:\n"
             
-            # ДОДАЄМО: Перелік брендів у регіоні
+            # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
             brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
             if brands_in_region:
                 for brand in brands_in_region:
-                    results += f"   * {brand}\n"
+                    results += f"   • {brand}\n"
             else:
-                results += "   * No brands found\n"
+                results += "   • No brands found\n"
             results += "\n"
         
         # КАТЕГОРІЯ - НОВИЙ КОМПАКТНИЙ ФОРМАТ
@@ -3684,32 +3694,32 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
             results += f"Average rating of hotels in the program\n"
             results += f"(based on Google Maps reviews): {row['program_rating']:.2f}⭐\n\n"
         
-        # РЕГІОН - ОНОВЛЕНА СЕКЦІЯ З БРЕНДАМИ
+        # РЕГІОН - ВИПРАВЛЕНА СЕКЦІЯ З БРЕНДАМИ
         if lang == 'uk':
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Регіон: {region_str}\n"
             results += f" • {row['region_hotels']} готелів:\n"
             
-            # ДОДАЄМО: Перелік брендів у регіоні
+            # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
             brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
             if brands_in_region:
                 for brand in brands_in_region:
-                    results += f"   * {brand}\n"
+                    results += f"   • {brand}\n"
             else:
-                results += "   * Бренди не знайдено\n"
+                results += "   • Бренди не знайдено\n"
             results += "\n"
         else:
             region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
             results += f"📍 Region: {region_str}\n"
             results += f" • {row['region_hotels']} hotels:\n"
             
-            # ДОДАЄМО: Перелік брендів у регіоні
+            # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
             brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
             if brands_in_region:
                 for brand in brands_in_region:
-                    results += f"   * {brand}\n"
+                    results += f"   • {brand}\n"
             else:
-                results += "   * No brands found\n"
+                results += "   • No brands found\n"
             results += "\n"
         
         # СЕГМЕНТ
