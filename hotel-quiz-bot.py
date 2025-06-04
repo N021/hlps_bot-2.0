@@ -17,7 +17,7 @@ from urllib.parse import quote
 import openai
 
 # ===============================
-# ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ
+# ЧАСТИНА 2: КОНФІГУРАЦІЯ ТА ГЛОБАЛЬНІ ЗМІННІ (ВИПРАВЛЕНА)
 # ===============================
 
 # Налаштування порту
@@ -68,22 +68,202 @@ MAX_PHOTOS_PER_HOTEL = 3  # Максимум 3 фото на готель
 PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 PLACES_PHOTOS_URL = "https://maps.googleapis.com/maps/api/place/photo"
 
-# ДОДАНО: OpenAI налаштування
+# ВИПРАВЛЕНО: OpenAI налаштування з покращеними параметрами
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 ENABLE_OPENAI = OPENAI_API_KEY != ""
+
+# ДОДАНО: Нові константи для OpenAI налаштувань
+OPENAI_MAX_TOKENS_SIMPLE = 250     # Для простих запитів (2-3 параметри)
+OPENAI_MAX_TOKENS_COMPLEX = 400    # Для складних запитів (4+ параметрів)
+OPENAI_TEMPERATURE_CREATIVE = 0.9  # Висока творчість для коротких описів
+OPENAI_TEMPERATURE_BALANCED = 0.7  # Збалансована творчість для детальних описів
+OPENAI_TIMEOUT = 20                # Збільшений таймаут до 20 секунд
+OPENAI_MAX_WORDS = 90              # Максимум слів у згенерованому тексті
+OPENAI_MIN_WORDS = 15              # Мінімум слів у згенерованому тексті
 
 # Ініціалізуємо OpenAI клієнт, якщо ключ доступний
 if ENABLE_OPENAI:
     openai.api_key = OPENAI_API_KEY
 
 # ===============================
-# ДОДАНО: OpenAI Integration для генерації описів готелів
+# ВИПРАВЛЕНО: OpenAI Integration для генерації описів готелів
 # ===============================
+
+def create_adaptive_prompt(hotel_name: str, hotel_brand: str, selected_styles: list, 
+                          selected_purposes: list, lang: str = 'uk') -> tuple:
+    """
+    Створює адаптивний промт залежно від складності запиту
+    
+    Returns:
+        tuple: (prompt_text, max_tokens, temperature)
+    """
+    styles_text = ', '.join(selected_styles)
+    purposes_text = ', '.join(selected_purposes)
+    total_params = len(selected_styles) + len(selected_purposes)
+    
+    # Визначаємо складність та налаштування
+    if total_params <= 3:
+        max_tokens = OPENAI_MAX_TOKENS_SIMPLE
+        temperature = OPENAI_TEMPERATURE_CREATIVE
+        complexity = "simple"
+    else:
+        max_tokens = OPENAI_MAX_TOKENS_COMPLEX
+        temperature = OPENAI_TEMPERATURE_BALANCED
+        complexity = "complex"
+    
+    if lang == 'uk':
+        if complexity == "simple":
+            prompt = f"""
+Створи короткий персоналізований опис готелю бренду {hotel_brand} українською мовою.
+
+Обрані стилі: {styles_text}
+Обрані цілі: {purposes_text}
+
+Вимоги:
+1. Опис 2-3 речення (60-80 слів)
+2. Покажи, як бренд відповідає вибраним критеріям
+3. Будь конкретним про особливості {hotel_brand}
+4. Не згадуй назву готелю, тільки бренд
+5. Пиши природно та переконливо
+
+Формат: [Як бренд відповідає стилям]. [Чому підходить для цілей]. [Унікальна перевага].
+"""
+        else:
+            prompt = f"""
+Створи детальний персоналізований опис готелю "{hotel_name}" бренду {hotel_brand} українською мовою.
+
+Обрані стилі: {styles_text}
+Обрані цілі подорожі: {purposes_text}
+
+Вимоги:
+1. Опис 2-3 речення (70-90 слів)
+2. Детально покажи відповідність кожному критерію
+3. Використовуй достовірну інформацію про {hotel_brand}
+4. Підкресли унікальні особливості бренду
+5. Не згадуй назву готелю в описі
+6. Пиши захоплююче та персоналізовано
+
+Структура: [Відповідність стилям]. [Підходящість для цілей]. [Ключові переваги бренду].
+"""
+    else:
+        if complexity == "simple":
+            prompt = f"""
+Create a short personalized description of {hotel_brand} brand hotel in English.
+
+Selected styles: {styles_text}
+Selected purposes: {purposes_text}
+
+Requirements:
+1. Description 2-3 sentences (60-80 words)
+2. Show how the brand matches selected criteria
+3. Be specific about {hotel_brand} features
+4. Don't mention hotel name, only brand
+5. Write naturally and convincingly
+
+Format: [How brand matches styles]. [Why it suits purposes]. [Unique advantage].
+"""
+        else:
+            prompt = f"""
+Create a detailed personalized description of hotel "{hotel_name}" from {hotel_brand} brand in English.
+
+Selected styles: {styles_text}
+Selected travel purposes: {purposes_text}
+
+Requirements:
+1. Description 2-3 sentences (70-90 words)
+2. Detail how it matches each criterion
+3. Use accurate information about {hotel_brand}
+4. Highlight unique brand features
+5. Don't mention hotel name in description
+6. Write engagingly and personally
+
+Structure: [Style match]. [Purpose suitability]. [Key brand advantages].
+"""
+    
+    return prompt, max_tokens, temperature
+
+def process_ai_generated_text(text: str, hotel_brand: str, styles: list, purposes: list, lang: str) -> str:
+    """
+    Обробляє та покращує згенерований AI текст
+    """
+    # Очищаємо текст від зайвих символів
+    text = ' '.join(text.split())
+    text = text.strip('"\'«»""''')
+    
+    # Переконуємося, що текст закінчується крапкою
+    if not text.endswith('.'):
+        text += '.'
+    
+    # Перевіряємо довжину
+    words = text.split()
+    word_count = len(words)
+    
+    # Якщо занадто довго - обрізаємо розумно
+    if word_count > OPENAI_MAX_WORDS:
+        # Шукаємо останню повну крапку в межах ліміту
+        truncated_words = words[:OPENAI_MAX_WORDS-5]  # Залишаємо запас
+        truncated_text = ' '.join(truncated_words)
+        
+        # Шукаємо останню крапку
+        last_period = truncated_text.rfind('.')
+        if last_period > len(truncated_text) * 0.7:  # Якщо крапка не занадто рано
+            text = truncated_text[:last_period + 1]
+        else:
+            text = truncated_text + '.'
+        
+        debug_log(f"Обрізано текст з {word_count} до {len(text.split())} слів")
+    
+    # Якщо занадто коротко - додаємо деталі
+    elif word_count < OPENAI_MIN_WORDS:
+        if lang == 'uk':
+            text += f" Бренд {hotel_brand} забезпечує високу якість сервісу та комфорт."
+        else:
+            text += f" {hotel_brand} brand ensures high service quality and comfort."
+        
+        debug_log(f"Розширено короткий текст з {word_count} слів")
+    
+    return text
+
+def generate_smart_fallback(hotel_brand: str, styles: list, purposes: list, lang: str) -> str:
+    """
+    Генерує розумний fallback опис без OpenAI
+    """
+    if lang == 'uk':
+        # Аналізуємо стилі
+        style_keywords = []
+        if any("розкішний" in s.lower() for s in styles):
+            style_keywords.append("розкішного")
+        elif any("бутік" in s.lower() for s in styles):
+            style_keywords.append("унікального")
+        elif any("сучасний" in s.lower() for s in styles):
+            style_keywords.append("сучасного")
+        else:
+            style_keywords.append("комфортного")
+        
+        # Аналізуємо цілі
+        purpose_keywords = []
+        if any("бізнес" in p.lower() for p in purposes):
+            purpose_keywords.append("ділових поїздок")
+        elif any("сімейний" in p.lower() for p in purposes):
+            purpose_keywords.append("сімейного відпочинку")
+        else:
+            purpose_keywords.append("відпочинку")
+        
+        style_desc = style_keywords[0] if style_keywords else "якісного"
+        purpose_desc = purpose_keywords[0] if purpose_keywords else "комфортного перебування"
+        
+        return f"Готелі бренду {hotel_brand} відомі своїм {style_desc} сервісом та ідеально підходять для {purpose_desc}. Цей вибір гарантує незабутнє перебування з усіма необхідними зручностями та високим рівнем обслуговування."
+    else:
+        # Аналіз для англійської
+        style_desc = "luxury" if any("luxury" in s.lower() for s in styles) else "comfortable"
+        purpose_desc = "business travel" if any("business" in p.lower() for p in purposes) else "leisure stays"
+        
+        return f"{hotel_brand} hotels are renowned for their {style_desc} service and perfectly suit {purpose_desc}. This choice guarantees an unforgettable stay with all necessary amenities and exceptional service quality."
 
 async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
                                    selected_purposes: list, lang: str = 'uk') -> str:
     """
-    Генерує персоналізований опис готелю через OpenAI API
+    ВИПРАВЛЕНА функція генерації персоналізованого опису готелю через OpenAI API
     
     Args:
         hotel_name: назва готелю
@@ -93,112 +273,55 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
         lang: мова для опису
     
     Returns:
-        str: згенерований опис готелю (2 речення)
+        str: згенерований опис готелю (2-3 речення, 60-90 слів)
     """
     if not ENABLE_OPENAI:
-        # Fallback: базовий опис без OpenAI
-        if lang == 'uk':
-            return f"Цей готель чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
-        else:
-            return f"This hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
     
     try:
-        # Формуємо промт для OpenAI
-        styles_text = ', '.join(selected_styles)
-        purposes_text = ', '.join(selected_purposes)
+        # Створюємо адаптивний промт
+        prompt, max_tokens, temperature = create_adaptive_prompt(
+            hotel_name, hotel_brand, selected_styles, selected_purposes, lang
+        )
         
-        if lang == 'uk':
-            prompt = f"""
-Створи персоналізований опис готелю "{hotel_name}" бренду {hotel_brand} українською мовою.
-
-Обрані користувачем стилі: {styles_text}
-Обрані користувачем цілі подорожі: {purposes_text}
-
-Вимоги:
-1. Опис має бути точно 2 речення
-2. Опис має показати, як цей готель/бренд відповідає обраним стилям та цілям подорожі
-3. Використовуй тільки правдиву інформацію про бренд {hotel_brand}
-4. Будь конкретним щодо особливостей цього бренду
-5. Не використовуй загальні фрази, а покажи унікальність бренду
-6. Не згадуй назву готелю в описі, тільки особливості бренду
-
-Приклад формату:
-[Перше речення про те, як бренд відповідає обраним стилям]. [Друге речення про те, як бренд підходить для обраних цілей подорожі].
-"""
-        else:
-            prompt = f"""
-Create a personalized description of hotel "{hotel_name}" from {hotel_brand} brand in English.
-
-User selected styles: {styles_text}
-User selected travel purposes: {purposes_text}
-
-Requirements:
-1. Description must be exactly 2 sentences
-2. Description should show how this hotel/brand matches the selected styles and travel purposes
-3. Use only truthful information about {hotel_brand} brand
-4. Be specific about this brand's features
-5. Don't use generic phrases, show the brand's uniqueness
-6. Don't mention the hotel name in description, only brand features
-
-Example format:
-[First sentence about how the brand matches selected styles]. [Second sentence about how the brand suits selected travel purposes].
-"""
+        debug_log(f"Генерація опису для {hotel_name}: max_tokens={max_tokens}, temperature={temperature}")
         
-        # Викликаємо OpenAI API (оновлена версія для новішого API)
+        # Викликаємо OpenAI API з покращеними налаштуваннями
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a hotel industry expert who creates accurate, personalized descriptions of hotel brands based on their real characteristics."},
+                {"role": "system", "content": f"You are a professional travel writer creating engaging hotel descriptions in {'Ukrainian' if lang == 'uk' else 'English'}. Write naturally, be specific about brand features, and match user preferences precisely. Avoid generic phrases."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150,
-            temperature=0.7,
-            timeout=10
+            max_tokens=max_tokens,          # АДАПТИВНИЙ ліміт
+            temperature=temperature,        # АДАПТИВНА творчість
+            top_p=0.9,                     # Кращий вибір слів
+            frequency_penalty=0.4,         # Проти повторів
+            presence_penalty=0.3,          # Для оригінальності
+            timeout=OPENAI_TIMEOUT         # Збільшений таймаут
         )
         
         generated_text = response.choices[0].message.content.strip()
         
-        # Валідація: перевіряємо, що це дійсно 2 речення
-        sentences = generated_text.split('.')
-        sentences = [s.strip() for s in sentences if s.strip()]
+        # Покращена обробка результату
+        result = process_ai_generated_text(
+            generated_text, hotel_brand, selected_styles, selected_purposes, lang
+        )
         
-        if len(sentences) >= 2:
-            # Беремо перші 2 речення
-            result = f"{sentences[0]}. {sentences[1]}."
-        else:
-            # Якщо менше 2 речень, додаємо fallback
-            result = generated_text
-            if lang == 'uk':
-                result += " Ідеальний вибір для вашої подорожі."
-            else:
-                result += " Perfect choice for your trip."
-        
-        debug_log(f"OpenAI generated description for {hotel_name}: {result}")
+        debug_log(f"OpenAI згенерував опис для {hotel_name} ({len(result.split())} слів): {result}")
         return result
         
     except Exception as e:
-        logger.error(f"Помилка генерації опису через OpenAI: {e}")
-        
-        # Fallback: базовий опис
-        if lang == 'uk':
-            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
-        else:
-            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+        logger.error(f"Помилка генерації опису через OpenAI для {hotel_name}: {e}")
+        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
 
+# ЗАЛИШАЄТЬСЯ БЕЗ ЗМІН
 def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
     """
     Форматує підпис до фото готелю з AI-описом
-    
-    Args:
-        hotel_info: словник з інформацією про готель
-        ai_description: згенерований OpenAI опис
-        lang: мова
-    
-    Returns:
-        str: відформатований підпис
     """
     hotel_name = hotel_info.get('name', 'N/A')
     hotel_brand = hotel_info.get('brand', 'N/A')
@@ -218,24 +341,15 @@ def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: s
     
     return caption
 
-# ДОДАНО: Функція для логування дебагу (якщо потрібно)
+# ЗАЛИШАЮТЬСЯ БЕЗ ЗМІН (всі інші функції debug_log, validate_score_calculation тощо)
 def debug_log(message):
     """Логування для дебагу розрахунків"""
     if DEBUG_SCORING:
         logger.info(f"[DEBUG] {message}")
 
-# ВИПРАВЛЕНО: Функція для валідації розрахунків
 def validate_score_calculation(calculated_total, detailed_breakdown, program_name="Unknown"):
     """
     Перевіряє, чи сума детальних балів дорівнює загальному балу
-    
-    Args:
-        calculated_total: загальний розрахований бал
-        detailed_breakdown: словник з детальними балами {'region': X, 'category': Y, ...}
-        program_name: назва програми для логування
-    
-    Returns:
-        bool: True якщо розрахунки правильні
     """
     if not VALIDATE_CALCULATIONS:
         return True
@@ -254,29 +368,15 @@ def validate_score_calculation(calculated_total, detailed_breakdown, program_nam
     debug_log(f"Validation OK for {program_name}: {calculated_total:.2f} = {detailed_breakdown}")
     return True
 
-# ДОДАНО: Функція для отримання рейтингу програми лояльності
 def get_program_rating(program_name):
     """
     Повертає середній рейтинг програми лояльності
-    
-    Args:
-        program_name: назва програми лояльності
-    
-    Returns:
-        float: середній рейтинг (або 4.0 за замовчуванням)
     """
     return LOYALTY_PROGRAM_RATINGS.get(program_name, 4.0)
 
-# ДОДАНО: Функція для розрахунку рейтинг-коефіцієнта
 def calculate_rating_coefficient(program_rating):
     """
     Розраховує коефіцієнт на основі рейтингу програми
-    
-    Args:
-        program_rating: рейтинг програми (1-5)
-    
-    Returns:
-        float: коефіцієнт (рейтинг/5.0)
     """
     return program_rating / 5.0
 
