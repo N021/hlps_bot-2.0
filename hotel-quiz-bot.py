@@ -260,63 +260,120 @@ def generate_smart_fallback(hotel_brand: str, styles: list, purposes: list, lang
         
         return f"{hotel_brand} hotels are renowned for their {style_desc} service and perfectly suit {purpose_desc}. This choice guarantees an unforgettable stay with all necessary amenities and exceptional service quality."
 
+# ===============================
+# ПРОСТИЙ ПІДХІД: Один розумний промт
+# ===============================
+
+# ЗАМІНИТИ тільки функцію generate_hotel_description НА ЦЮ:
+
 async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
                                    selected_purposes: list, lang: str = 'uk') -> str:
     """
-    ВИПРАВЛЕНА функція генерації персоналізованого опису готелю через OpenAI API
-    
-    Args:
-        hotel_name: назва готелю
-        hotel_brand: бренд готелю
-        selected_styles: обрані користувачем стилі
-        selected_purposes: обрані користувачем цілі подорожі
-        lang: мова для опису
-    
-    Returns:
-        str: згенерований опис готелю (2-3 речення, 60-90 слів)
+    Генерує персоналізований опис готелю через один розумний промт
     """
     if not ENABLE_OPENAI:
-        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
+        if lang == 'uk':
+            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
+        else:
+            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
     
     try:
-        # Створюємо адаптивний промт
-        prompt, max_tokens, temperature = create_adaptive_prompt(
-            hotel_name, hotel_brand, selected_styles, selected_purposes, lang
-        )
+        styles_text = ', '.join(selected_styles)
+        purposes_text = ', '.join(selected_purposes)
         
-        debug_log(f"Генерація опису для {hotel_name}: max_tokens={max_tokens}, temperature={temperature}")
+        if lang == 'uk':
+            prompt = f"""
+Створи персоналізований опис готелю бренду {hotel_brand}.
+
+Користувач обрав:
+Стилі: {styles_text}
+Цілі подорожі: {purposes_text}
+
+Твоє завдання:
+1. Спочатку подумай про КОНКРЕТНІ характеристики бренду {hotel_brand}, що відповідають цим стилям та цілям
+2. Потім створи природний опис навколо цих конкретних характеристик
+
+Вимоги до опису:
+- 2-3 речення (70-90 слів)
+- Використовуй КОНКРЕТНІ факти про {hotel_brand} (послуги, зручності, особливості)
+- Пиши природно, як тревел-блогер, що особисто там був
+- НЕ використовуй загальні фрази типу "ідеальний вибір", "неперевершений сервіс"
+- Покажи, чому саме цей бренд підходить для обраних стилів та цілей
+- Пиши так, ніби рекомендуєш другу готель
+
+Приклад підходу: замість "розкішний сервіс" напиши "welcome drink при заселенні", замість "унікальна атмосфера" напиши "художні інсталяції в лобі".
+
+Створи живий, переконливий опис з конкретними деталями.
+"""
+        else:
+            prompt = f"""
+Create a personalized description of {hotel_brand} hotel.
+
+User selected:
+Styles: {styles_text}
+Travel purposes: {purposes_text}
+
+Your task:
+1. First think about SPECIFIC characteristics of {hotel_brand} brand that match these styles and purposes
+2. Then create natural description around these specific characteristics
+
+Description requirements:
+- 2-3 sentences (70-90 words)
+- Use SPECIFIC facts about {hotel_brand} (services, amenities, features)
+- Write naturally, like travel blogger who was there personally
+- DON'T use generic phrases like "perfect choice", "unparalleled service"
+- Show why this specific brand suits selected styles and purposes
+- Write as if recommending hotel to a friend
+
+Approach example: instead of "luxury service" write "welcome drink upon arrival", instead of "unique atmosphere" write "art installations in lobby".
+
+Create vivid, convincing description with concrete details.
+"""
         
-        # Викликаємо OpenAI API з покращеними налаштуваннями
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are a professional travel writer creating engaging hotel descriptions in {'Ukrainian' if lang == 'uk' else 'English'}. Write naturally, be specific about brand features, and match user preferences precisely. Avoid generic phrases."},
+                {"role": "system", "content": f"You are an experienced travel writer who creates authentic hotel descriptions in {'Ukrainian' if lang == 'uk' else 'English'}. You focus on specific brand characteristics rather than generic praise. You write naturally and conversationally."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=max_tokens,          # АДАПТИВНИЙ ліміт
-            temperature=temperature,        # АДАПТИВНА творчість
-            top_p=0.9,                     # Кращий вибір слів
-            frequency_penalty=0.4,         # Проти повторів
-            presence_penalty=0.3,          # Для оригінальності
-            timeout=OPENAI_TIMEOUT         # Збільшений таймаут
+            max_tokens=350,        # Збільшено для кращого результату
+            temperature=0.8,       # Висока творчість
+            top_p=0.9,
+            frequency_penalty=0.6, # Проти повторів
+            presence_penalty=0.4,
+            timeout=20
         )
         
         generated_text = response.choices[0].message.content.strip()
         
-        # Покращена обробка результату
-        result = process_ai_generated_text(
-            generated_text, hotel_brand, selected_styles, selected_purposes, lang
-        )
+        # Простий cleanup
+        generated_text = ' '.join(generated_text.split())
+        generated_text = generated_text.strip('"\'«»""''')
         
-        debug_log(f"OpenAI згенерував опис для {hotel_name} ({len(result.split())} слів): {result}")
-        return result
+        if not generated_text.endswith('.'):
+            generated_text += '.'
+        
+        # Перевіряємо довжину
+        words = generated_text.split()
+        if len(words) > 100:
+            generated_text = ' '.join(words[:95]) + '.'
+        
+        debug_log(f"Згенеровано опис для {hotel_name}: {generated_text}")
+        return generated_text
         
     except Exception as e:
-        logger.error(f"Помилка генерації опису через OpenAI для {hotel_name}: {e}")
-        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
+        logger.error(f"Помилка генерації опису для {hotel_name}: {e}")
+        
+        if lang == 'uk':
+            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
+        else:
+            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+
+# ВСЕ! Більше нічого не треба змінювати.
+# Ніяких нових імпортів, ніяких додаткових функцій.
 
 # ЗАЛИШАЄТЬСЯ БЕЗ ЗМІН
 def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
