@@ -56,6 +56,17 @@ LOYALTY_PROGRAM_RATINGS = {
     "Wyndham Rewards": 3.17
 }
 
+# ДОДАНО: Посилання на реєстрацію в програмах лояльності
+LOYALTY_PROGRAM_REGISTRATION_LINKS = {
+    "Marriott Bonvoy": "https://www.marriott.com/loyalty/join/joinPromotion.mi?promotion=FT25",
+    "Hilton Honors": "https://www.hilton.com/en/hilton-honors/join/?ocode=JHTNW",
+    "IHG One Rewards": "https://www.ihg.com/rewardsclub/us/en/enrollment/join?cm_sp=WEB-_-6C-_-ONEREWARDS-HOME-_-LYMOD1-_-US-EN-_-LOY-_-JOIN-_-FS",
+    "Wyndham Rewards": "https://www.wyndhamhotels.com/wyndham-rewards",
+    "ALL - Accor Live Limitless": "https://all.accor.com/loyalty-program/reasonstojoin/index.en.shtml",
+    "Choice Privileges": "https://www.choicehotels.com/content/choicehotels/apac/au/en/choice-privileges",
+    "World of Hyatt": "https://world.hyatt.com/content/gp/en/program-overview.html"
+}
+
 # ДОДАНО: Глобальна змінна для зберігання останніх результатів користувача (для команди /more)
 user_last_results = {}
 
@@ -290,13 +301,13 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
 Цілі подорожі: {purposes_text}
 
 Вимоги до опису:
-1. Звертання тільки на "Ви", з повагою, але униках офіційних звернень на кшталт "шановний клієнте".
+1. Ввічлива комунікація. Відношення до користувача на "ви".
 2. 2-3 речення (70-90 слів)
 3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
 4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
 5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
 6. Конкретні приклади замість загальних фраз
-7. Правильне слово "гість", а не "гость"
+
 
 Приклади конкретності:
 - Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
@@ -2029,7 +2040,7 @@ async def send_hotels_for_program(context, chat_id, top_hotels, program_name, la
     
     # Відправляємо заголовок
     if lang == 'uk':
-        header_text = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {program_name}:"
+        header_text = f"🏆 Приклад готелю в сегменті {category}, що входить до програми {program_name}:"
     else:
         header_text = f"🏆 An example of a hotel in the {category} segment that is part of the {program_name} program:"
     
@@ -2512,9 +2523,9 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
 # ЧАСТИНА 9.3: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
-async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, lang='uk'):
+async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, program_name, lang='uk'):
     """
-    ОНОВЛЕНА функція відправлення готелю з AI-описом
+    ОНОВЛЕНА функція відправлення готелю з AI-описом та посиланням на реєстрацію
     
     Args:
         context: Telegram bot context
@@ -2522,6 +2533,7 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         hotel_info: словник з інформацією про готель
         user_styles: обрані користувачем стилі
         user_purposes: обрані користувачем цілі
+        program_name: назва програми лояльності
         lang: мова
     """
     try:
@@ -2544,7 +2556,6 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
             photos_data = await get_hotel_photos_and_link(place_id, GOOGLE_MAPS_API_KEY, MAX_PHOTOS_PER_HOTEL)
             
             photos = photos_data.get('photos', [])
-            maps_link = photos_data.get('maps_link', '')
             error = photos_data.get('error')
             
             if error:
@@ -2570,12 +2581,13 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
                     # Відправляємо медіагрупу
                     await context.bot.send_media_group(chat_id=chat_id, media=media_group)
                     
-                    # Додаємо посилання на Google Maps окремим повідомленням
-                    if maps_link:
+                    # ЗАМІНЕНО: Додаємо посилання на реєстрацію замість Google Maps
+                    registration_link = LOYALTY_PROGRAM_REGISTRATION_LINKS.get(program_name)
+                    if registration_link:
                         if lang == 'uk':
-                            link_text = f"📍 [Переглянути на Google Maps]({maps_link})"
+                            link_text = f"🎯 [Зареєструватися в програмі лояльності {program_name}]({registration_link})"
                         else:
-                            link_text = f"📍 [View on Google Maps]({maps_link})"
+                            link_text = f"🎯 [Register for {program_name} loyalty program]({registration_link})"
                         
                         await context.bot.send_message(
                             chat_id=chat_id, 
@@ -2593,13 +2605,13 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         # Fallback: текстове повідомлення з AI-описом
         fallback_text = caption
         
-        # Додаємо посилання на Google Maps, якщо доступне
-        if place_id:
-            maps_link = f"https://maps.google.com/?place_id={place_id}"
+        # ЗАМІНЕНО: Додаємо посилання на реєстрацію замість Google Maps
+        registration_link = LOYALTY_PROGRAM_REGISTRATION_LINKS.get(program_name)
+        if registration_link:
             if lang == 'uk':
-                fallback_text += f"\n\n📍 [Переглянути на Google Maps]({maps_link})"
+                fallback_text += f"\n\n🎯 [Зареєструватися в програмі лояльності {program_name}]({registration_link})"
             else:
-                fallback_text += f"\n\n📍 [View on Google Maps]({maps_link})"
+                fallback_text += f"\n\n🎯 [Register for {program_name} loyalty program]({registration_link})"
         
         await context.bot.send_message(
             chat_id=chat_id, 
@@ -2614,17 +2626,17 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         logger.error(f"Помилка при відправленні готелю з AI-описом {hotel_info.get('name', 'Unknown')}: {e}")
         return False
 
-async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, lang='uk'):
+async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang='uk'):
     """
-    ОНОВЛЕНА функція відправлення готелів з AI-описами
+    ОНОВЛЕНА функція відправлення готелів з AI-описами та назвою програми
     """
     try:
         for i, (index, hotel) in enumerate(top_hotels.iterrows()):
             hotel_dict = convert_hotel_dataframe_to_dict(hotel)
             
-            # Відправляємо готель з AI-описом
+            # Відправляємо готель з AI-описом та program_name
             await send_hotel_with_ai_description(
-                context, chat_id, hotel_dict, user_styles, user_purposes, lang
+                context, chat_id, hotel_dict, user_styles, user_purposes, program_name, lang
             )
             
             # Пауза між готелями (хоча тепер тільки 1)
@@ -2650,6 +2662,12 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
         for i, (index, row) in enumerate(top_programs.iterrows()):
             program_name = row['loyalty_program']
             
+            # Замінюємо назву програми для відображення
+            if program_name == "IHG One Rewards":
+                display_program_name = "InterContinental Hotels One Rewards"
+            else:
+                display_program_name = program_name
+            
             # 1. Відправляємо звіт про програму
             program_report = format_single_program_report(user_data, row, i, lang)
             await send_long_message_to_chat(context, chat_id, program_report)
@@ -2659,9 +2677,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             
             # 2. Відправляємо заголовок готелів
             if lang == 'uk':
-                hotels_header = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {program_name}:"
+                hotels_header = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {display_program_name}:"
             else:
-                hotels_header = f"🏆 An example of a hotel in the {category} segment that is part of the {program_name} program:"
+                hotels_header = f"🏆 Example hotel in {category} segment, part of {display_program_name} program:"
             
             await context.bot.send_message(chat_id=chat_id, text=hotels_header)
             
@@ -2672,8 +2690,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             top_hotels, selection_type = find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
+                # ОНОВЛЕНО: передаємо program_name для посилань на реєстрацію
                 await send_individual_hotels_with_ai_descriptions(
-                    context, chat_id, top_hotels, user_styles, user_purposes, lang
+                    context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang
                 )
             else:
                 if lang == 'uk':
