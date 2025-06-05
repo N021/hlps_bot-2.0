@@ -987,14 +987,16 @@ async def region_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
         # Надсилаємо нове повідомлення з підтвердженням
         if lang == 'uk':
+            regions_list = '\n'.join(f"- {region};" for region in selected_regions)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні регіони: {', '.join(selected_regions)}."
+                text=f"Дякую! Ви обрали наступні регіони:\n{regions_list}"
             )
         else:
+            regions_list = '\n'.join(f"- {region};" for region in selected_regions)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following regions: {', '.join(selected_regions)}."
+                text=f"Thank you! You have chosen the following regions:\n{regions_list}"
             )
         
         await asyncio.sleep(2.0)
@@ -1088,16 +1090,16 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=None
     )
 
-    # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
+   # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
     if lang == 'uk':
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Дякую! Ви обрали категорію: {category}."
+            text=f"Дякую! Ви обрали категорію:\n- {category};"
         )
     else:
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Thank you! You have chosen the category: {category}."
+            text=f"Thank you! You have chosen the category:\n- {category};"
         )
 
     await asyncio.sleep(2.0)
@@ -1346,14 +1348,16 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
         # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
         if lang == 'uk':
+            styles_list = '\n'.join(f"- {style};" for style in selected_styles)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні стилі: {', '.join(selected_styles)}."
+                text=f"Дякую! Ви обрали наступні стилі:\n{styles_list}"
             )
         else:
+            styles_list = '\n'.join(f"- {style};" for style in selected_styles)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following styles: {', '.join(selected_styles)}."
+                text=f"Thank you! You have chosen the following styles:\n{styles_list}"
             )
         
         # Очищуємо ID повідомлення зі стилем
@@ -1585,15 +1589,17 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # Надсилаємо НОВЕ повідомлення з підтвердженням вибору
         if lang == 'uk':
+            purposes_list = '\n'.join(f"- {purpose};" for purpose in selected_purposes)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні пункти: {', '.join(selected_purposes)}.\n"
+                text=f"Дякую! Ви обрали наступні цілі:\n{purposes_list}\n\n"
                 "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
             )
         else:
+            purposes_list = '\n'.join(f"- {purpose};" for purpose in selected_purposes)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Thank you! You have chosen the following purposes: {', '.join(selected_purposes)}.\n"
+                text=f"Thank you! You have chosen the following purposes:\n{purposes_list}\n\n"
                 "Please wait while I analyze your answers and select the best loyalty programs for you."
             )
         
@@ -1601,8 +1607,8 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if 'purpose_message_id' in user_data_global[user_id]:
             del user_data_global[user_id]['purpose_message_id']
         
-        # ДОДАЄМО ЗАТРИМКУ 3.5 СЕКУНДИ
-        await asyncio.sleep(3.5)
+        # ДОДАЄМО ЗАТРИМКУ 3.0 СЕКУНДИ
+        await asyncio.sleep(3.0)
         
         
         # ОНОВЛЕНО: Розрахунок і відображення результатів з рейтингами + збереження для /more
