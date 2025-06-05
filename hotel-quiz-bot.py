@@ -296,6 +296,7 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
 4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
 5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
 6. Конкретні приклади замість загальних фраз
+7. Правильне слово "гість", а не "гость"
 
 Приклади конкретності:
 - Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
@@ -1586,7 +1587,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if lang == 'uk':
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні мети: {', '.join(selected_purposes)}.\n"
+                text=f"Дякую! Ви обрали наступні пункти: {', '.join(selected_purposes)}.\n"
                 "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
             )
         else:
@@ -1603,19 +1604,6 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # ДОДАЄМО ЗАТРИМКУ 3.5 СЕКУНДИ
         await asyncio.sleep(3.5)
         
-        # Надсилаємо повідомлення про завершення аналізу з новим текстом
-        if lang == 'uk':
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="🎉 Аналіз завершено!\n\n"
-                "Ось топ-3 програми лояльності готелів які найбільше відповідають вашим потребам"
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="🎉 Analysis completed!\n\n"
-                "Here are the top 3 hotel loyalty programs that best match your needs"
-            )
         
         # ОНОВЛЕНО: Розрахунок і відображення результатів з рейтингами + збереження для /more
         return await calculate_and_show_results_with_ai(update, context)
@@ -2035,9 +2023,9 @@ async def send_hotels_for_program(context, chat_id, top_hotels, program_name, la
     
     # Відправляємо заголовок
     if lang == 'uk':
-        header_text = f"🏆 Ось приклад кращого готелю програми {program_name}:"
+        header_text = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {program_name}:"
     else:
-        header_text = f"🏆 Here is the best hotel example from {program_name} program:"
+        header_text = f"🏆 An example of a hotel in the {category} segment that is part of the {program_name} program:"
     
     await context.bot.send_message(chat_id=chat_id, text=header_text)
     
@@ -2705,16 +2693,19 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     else:
         display_program_name = program
     
-    # Визначаємо емодзі та назву позиції
+    # Визначаємо емодзі та назву позиції + ДОДАЄМО ПОЯСНЕННЯ
     if position == 0:
         emoji = "🥇"
         position_text = "Топ 1" if lang == 'uk' else "Top 1"
+        explanation = "– містить найбільше збігів з вашими критеріями." if lang == 'uk' else "– contains the most matches with your criteria."
     elif position == 1:
         emoji = "🥈"
         position_text = "Топ 2" if lang == 'uk' else "Top 2"
+        explanation = "– друге місце за кількістю збігів з вашими критеріями." if lang == 'uk' else "– second place in matches with your criteria."
     else:
         emoji = "🥉"
         position_text = "Топ 3" if lang == 'uk' else "Top 3"
+        explanation = "– третє місце за кількістю збігів з вашими критеріями." if lang == 'uk' else "– third place in matches with your criteria."
     
     # Отримуємо дані користувача
     regions = user_data.get('regions', []) or []
@@ -2732,22 +2723,22 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     # Фільтруємо дані за регіоном
     filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
     
+    # ВИПРАВЛЕНО: додаємо пояснення з нового рядка
     if lang == 'uk':
-        result = f"{emoji} {position_text} – {display_program_name}\n\n"
+        result = f"{emoji} {position_text} – {display_program_name}\n{explanation}\n\n"
         result += f"⭐{program_row['program_rating']:.2f} – середній рейтинг готелів, що входять до програми\n"
         result += f"(на основі відгуків з Google Maps):\n\n"
     else:
-        result = f"{emoji} {position_text} – {display_program_name}\n\n"
+        result = f"{emoji} {position_text} – {display_program_name}\n{explanation}\n\n"
         result += f"⭐{program_row['program_rating']:.2f} – average rating of hotels in the program\n"
         result += f"(based on Google Maps reviews):\n\n"
     
-    # РЕГІОН - ВИПРАВЛЕНА СЕКЦІЯ З БРЕНДАМИ
+    # РЕГІОН - ВИПРАВЛЕНО: змінюємо текст
     if lang == 'uk':
         region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
         result += f"📍 Регіон: {region_str}\n"
-        result += f" • {program_row['region_hotels']} готелів:\n"
+        result += f" • {program_row['region_hotels']} готелів, до яких входять такі бренди:\n"  # ЗМІНЕНО
         
-        # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
         brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
         if brands_in_region:
             for brand in brands_in_region:
@@ -2758,9 +2749,8 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     else:
         region_str = ', '.join(regions) if regions else ', '.join(countries) if countries else 'N/A'
         result += f"📍 Region: {region_str}\n"
-        result += f" • {program_row['region_hotels']} hotels:\n"
+        result += f" • {program_row['region_hotels']} hotels, which include such brands:\n"  # ЗМІНЕНО
         
-        # ВИПРАВЛЕНО: Перелік брендів у регіоні з правильним форматуванням
         brands_in_region = get_brands_in_region_for_program(program, regions, countries, hotel_data)
         if brands_in_region:
             for brand in brands_in_region:
@@ -2769,7 +2759,7 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
             result += "   • No brands found\n"
         result += "\n"
     
-    # КАТЕГОРІЯ
+    # КАТЕГОРІЯ - ВИПРАВЛЕНО: новий формат
     if category:
         # Отримуємо дані для основної категорії
         main_category_hotels = filter_hotels_by_category(filtered_by_region, category)
@@ -2786,24 +2776,25 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
             adjacent_total += adj_count
             adjacent_details.append(adj_cat)
         
+        # ВИПРАВЛЕНО: новий формат з тире
         if lang == 'uk':
             result += f"🏨 Сегмент:\n"
-            result += f"Обраний – {category} – {main_count} готелів\n"
+            result += f"– {main_count} готелів {category} (сегмент обраний вами)\n"  # ЗМІНЕНО
             if adjacent_details:
-                adj_cats_str = ' і '.join(adjacent_details)
-                result += f"Cуміжні – {adj_cats_str} – {adjacent_total} готелів\n\n"
+                adj_cats_str = ', '.join(adjacent_details)  # ЗМІНЕНО: кома замість "і"
+                result += f"– {adjacent_total} готелів {adj_cats_str} (суміжні до обраного)\n\n"  # ЗМІНЕНО
             else:
                 result += "\n"
         else:
             result += f"🏨 Segment:\n"
-            result += f"Selected – {category} – {main_count} hotels\n"
+            result += f"– {main_count} hotels {category} (segment selected by you)\n"  # ЗМІНЕНО
             if adjacent_details:
-                adj_cats_str = ' and '.join(adjacent_details)
-                result += f"Adjacent – {adj_cats_str} – {adjacent_total} hotels\n\n"
+                adj_cats_str = ', '.join(adjacent_details)  # ЗМІНЕНО: кома замість "and"
+                result += f"– {adjacent_total} hotels {adj_cats_str} (adjacent to selected)\n\n"  # ЗМІНЕНО
             else:
                 result += "\n"
     
-    # СТИЛЬ
+    # СТИЛЬ - залишається без змін
     if styles:
         if lang == 'uk':
             styles_str = '; '.join(styles)
@@ -2846,11 +2837,11 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
             else:
                 result += "\n"
     
-    # МЕТА
+    # МЕТА - ВИПРАВЛЕНО: змінено "Ціль" на "Мета" 
     if purposes:
         if lang == 'uk':
             purposes_str = '; '.join(purposes)
-            result += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
+            result += f"🎯 Мета подорожі:\n{purposes_str}:\n"  # ЗМІНЕНО: "Ціль" -> "Мета"
         else:
             purposes_str = '; '.join(purposes)
             result += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -3929,7 +3920,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
         if purposes:
             if lang == 'uk':
                 purposes_str = '; '.join(purposes)
-                results += f"🎯 Ціль подорожі:\n{purposes_str}:\n"
+                results += f"🎯 Мета подорожі:\n{purposes_str}:\n"
             else:
                 purposes_str = '; '.join(purposes)
                 results += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -4133,7 +4124,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Ціль подорожі:\n\n"
+                results += f"🎯 Мета подорожі:\n\n"
             else:
                 results += f"🎯 Travel purpose:\n\n"
             
