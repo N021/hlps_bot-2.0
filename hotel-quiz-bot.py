@@ -740,28 +740,28 @@ async def show_more_details(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         # 1-ше повідомлення: програми 1-2
         programs_1_2 = all_programs.iloc[0:2]
         if not programs_1_2.empty:
-            detailed_results_1_2 = format_programs_group(user_data, programs_1_2, 0, lang)
+            detailed_results_1_2 = format_detailed_results_with_ratings(user_data, programs_1_2, lang)
             await send_long_message_to_chat(context, update.message.chat_id, detailed_results_1_2)
             await asyncio.sleep(1)
         
         # 2-ге повідомлення: програми 3-4
         programs_3_4 = all_programs.iloc[2:4]
         if not programs_3_4.empty:
-            detailed_results_3_4 = format_programs_group(user_data, programs_3_4, 2, lang)
+            detailed_results_3_4 = format_detailed_results_with_ratings(user_data, programs_3_4, lang)
             await send_long_message_to_chat(context, update.message.chat_id, detailed_results_3_4)
             await asyncio.sleep(1)
         
         # 3-тє повідомлення: програми 5-6
         programs_5_6 = all_programs.iloc[4:6]
         if not programs_5_6.empty:
-            detailed_results_5_6 = format_programs_group(user_data, programs_5_6, 4, lang)
+            detailed_results_5_6 = format_detailed_results_with_ratings(user_data, programs_5_6, lang)
             await send_long_message_to_chat(context, update.message.chat_id, detailed_results_5_6)
             await asyncio.sleep(1)
         
         # 4-те повідомлення: програма 7
         program_7 = all_programs.iloc[6:7]
         if not program_7.empty:
-            detailed_results_7 = format_programs_group(user_data, program_7, 6, lang)
+            detailed_results_7 = format_detailed_results_with_ratings(user_data, program_7, lang)
             await send_long_message_to_chat(context, update.message.chat_id, detailed_results_7)
         
         # Заключне повідомлення
@@ -3699,10 +3699,10 @@ async def calculate_and_show_results_with_ai(update: Update, context: ContextTyp
         
         # Відправляємо заключне повідомлення
         if lang == 'uk':
-            outro_text = ("💡 Щоб отримати більш детальний звіт усіх 7 програм \n – натисніть /more.\n"
+            outro_text = ("💡 Щоб отримати більш детальний звіт \n усіх 7 програм – натисніть /more.\n"
                          "Щоб почати новий пошук — /start.")
         else:
-            outro_text = ("💡 To get a more detailed report of all 7 programs \n – click /more.\n"
+            outro_text = ("💡 To get a more detailed report \n of all 7 programs – click /more.\n"
                          "To start a new search — /start.")
         
         await context.bot.send_message(
