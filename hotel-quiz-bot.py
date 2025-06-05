@@ -2585,9 +2585,9 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
                     registration_link = LOYALTY_PROGRAM_REGISTRATION_LINKS.get(program_name)
                     if registration_link:
                         if lang == 'uk':
-                            link_text = f"🎯 [Зареєструватися в програмі лояльності {program_name}]({registration_link})"
+                            link_text = f"Щоб зареєструватися в програмі лояльності {program_name} – [натисніть тут]({registration_link})."
                         else:
-                            link_text = f"🎯 [Register for {program_name} loyalty program]({registration_link})"
+                            link_text = f"To register for {program_name} loyalty program – [click here]({registration_link})."
                         
                         await context.bot.send_message(
                             chat_id=chat_id, 
@@ -2609,9 +2609,9 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         registration_link = LOYALTY_PROGRAM_REGISTRATION_LINKS.get(program_name)
         if registration_link:
             if lang == 'uk':
-                fallback_text += f"\n\n🎯 [Зареєструватися в програмі лояльності {program_name}]({registration_link})"
+                fallback_text += f"\n\nЩоб зареєструватися в програмі лояльності {program_name} – [натисніть тут]({registration_link})."
             else:
-                fallback_text += f"\n\n🎯 [Register for {program_name} loyalty program]({registration_link})"
+                fallback_text += f"\n\nTo register for {program_name} loyalty program – [click here]({registration_link})."
         
         await context.bot.send_message(
             chat_id=chat_id, 
@@ -2677,7 +2677,7 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             
             # 2. Відправляємо заголовок готелів
             if lang == 'uk':
-                hotels_header = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {display_program_name}:"
+                hotels_header = f"🏆 Приклад готелю в сегменті {category}, що входить до програми {display_program_name}:"
             else:
                 hotels_header = f"🏆 Example hotel in {category} segment, part of {display_program_name} program:"
             
