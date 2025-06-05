@@ -283,51 +283,49 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
         
         if lang == 'uk':
             prompt = f"""
-Створи персоналізований опис готелю бренду {hotel_brand}.
+Ви представник офіційного сервісу з підбору готелів. Створіть персоналізований опис готелю бренду {hotel_brand} для клієнта.
 
-Користувач обрав:
+Клієнт обрав:
 Стилі: {styles_text}
 Цілі подорожі: {purposes_text}
 
-Твоє завдання:
-1. Спочатку подумай про КОНКРЕТНІ характеристики бренду {hotel_brand}, що відповідають цим стилям та цілям
-2. Потім створи природний опис навколо цих конкретних характеристик
-
 Вимоги до опису:
-- 2-3 речення (70-90 слів)
-- Використовуй КОНКРЕТНІ факти про {hotel_brand} (послуги, зручності, особливості)
-- Пиши природно, як тревел-блогер, що особисто там був
-- НЕ використовуй загальні фрази типу "ідеальний вибір", "неперевершений сервіс"
-- Покажи, чому саме цей бренд підходить для обраних стилів та цілей
-- Пиши так, ніби рекомендуєш другу готель
+1. Звертання тільки на "Ви" (офіційний стиль)
+2. 2-3 речення (70-90 слів)
+3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
+4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
+5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
+6. Конкретні приклади замість загальних фраз
 
-Приклад підходу: замість "розкішний сервіс" напиши "welcome drink при заселенні", замість "унікальна атмосфера" напиши "художні інсталяції в лобі".
+Приклади конкретності:
+- Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
+- Замість "сучасний дизайн" → "смарт-телевізори Samsung в номерах, мобільний додаток для керування освітленням"
+- Замість "сімейна атмосфера" → "дитяче меню від шеф-кухаря, дитячі халати та тапочки"
 
-Створи живий, переконливий опис з конкретними деталями.
+Напишіть як експерт, що знає специфіку {hotel_brand} і може пояснити переваги конкретними фактами.
 """
         else:
             prompt = f"""
-Create a personalized description of {hotel_brand} hotel.
+You represent an official hotel selection service. Create a personalized description of {hotel_brand} hotel for a client.
 
-User selected:
+Client selected:
 Styles: {styles_text}
 Travel purposes: {purposes_text}
 
-Your task:
-1. First think about SPECIFIC characteristics of {hotel_brand} brand that match these styles and purposes
-2. Then create natural description around these specific characteristics
-
 Description requirements:
-- 2-3 sentences (70-90 words)
-- Use SPECIFIC facts about {hotel_brand} (services, amenities, features)
-- Write naturally, like travel blogger who was there personally
-- DON'T use generic phrases like "perfect choice", "unparalleled service"
-- Show why this specific brand suits selected styles and purposes
-- Write as if recommending hotel to a friend
+1. Formal "You" address only (official service style)
+2. 2-3 sentences (70-90 words)
+3. Specific facts about {hotel_brand}: services, amenities, features
+4. Explain WHY this brand matches the selected parameters
+5. Avoid clichés: "perfect choice", "unparalleled service"
+6. Concrete examples instead of generic phrases
 
-Approach example: instead of "luxury service" write "welcome drink upon arrival", instead of "unique atmosphere" write "art installations in lobby".
+Examples of specificity:
+- Instead of "luxury service" → "24/7 concierge, welcome drink upon arrival"
+- Instead of "modern design" → "Samsung smart TVs in rooms, mobile app for lighting control"
+- Instead of "family atmosphere" → "chef's children menu, kids' bathrobes and slippers"
 
-Create vivid, convincing description with concrete details.
+Write as an expert who knows {hotel_brand} specifics and can explain advantages with concrete facts.
 """
         
         from openai import OpenAI
@@ -336,14 +334,14 @@ Create vivid, convincing description with concrete details.
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are an experienced travel writer who creates authentic hotel descriptions in {'Ukrainian' if lang == 'uk' else 'English'}. You focus on specific brand characteristics rather than generic praise. You write naturally and conversationally."},
+                {"role": "system", "content": f"You are a professional hotel consultant representing an official hotel selection service. You write formal, fact-based descriptions in {'Ukrainian' if lang == 'uk' else 'English'} using specific brand knowledge instead of generic praise. Always use formal address."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=350,        # Збільшено для кращого результату
-            temperature=0.8,       # Висока творчість
+            max_tokens=400,
+            temperature=0.7,  # Знижено для більш фактичного тону
             top_p=0.9,
-            frequency_penalty=0.6, # Проти повторів
-            presence_penalty=0.4,
+            frequency_penalty=0.7,  # Збільшено проти штампів
+            presence_penalty=0.5,
             timeout=20
         )
         
