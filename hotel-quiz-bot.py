@@ -2652,9 +2652,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             
             # 2. Відправляємо заголовок готелів
             if lang == 'uk':
-                hotels_header = f"🏆 Ось приклад кращого готелю цієї програми:"
+                hotels_header = f"🏆 Приклад готелю в сегменті {category}, що входять до програми {program_name}:"
             else:
-                hotels_header = f"🏆 Here is the best hotel from this program:"
+                hotels_header = f"🏆 An example of a hotel in the {category} segment that is part of the {program_name} program:"
             
             await context.bot.send_message(chat_id=chat_id, text=hotels_header)
             
