@@ -301,12 +301,14 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
 Цілі подорожі: {purposes_text}
 
 Вимоги до опису:
+
 1. Ввічлива комунікація. Відношення до користувача на "ви".
 2. 2-3 речення (70-90 слів)
 3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
 4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
 5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
 6. Конкретні приклади замість загальних фраз
+7. Заборонені звернення будь які звернення до користувача "Шановний клієнте, Готелі Kimpton Hotels & Restaurants відповідають вашим..."
 
 
 Приклади конкретності:
@@ -698,7 +700,7 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # ДОДАНО: Функція для команди /more
 async def show_more_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Показує детальний розбір останніх результатів - ОНОВЛЕНА версія без пояснень"""
+    """Показує детальний розбір останніх результатів по 2 програми в повідомленні"""
     user_id = update.effective_user.id
     
     # Перевіряємо, чи є збережені результати для цього користувача
@@ -724,30 +726,51 @@ async def show_more_details(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     lang = user_data.get('language', 'uk')
     
     try:
-        # Генерируем ПРОСТИЙ детальний звіт
-        detailed_results = format_detailed_results_with_ratings(user_data, scores_df, lang)
-        
-        # Відправляємо детальні результати БЕЗ пояснень системи балів
+        # Відправляємо вступне повідомлення
         if lang == 'uk':
-            intro_text = "🎉 Детальний аналіз завершено!\n\n"
+            intro_text = "🎉 **Детальний аналіз усіх 7 програм лояльності:**"
+        else:
+            intro_text = "🎉 **Detailed analysis of all 7 loyalty programs:**"
+        
+        await update.message.reply_text(intro_text, parse_mode="Markdown")
+        
+        # Групуємо програми по 2 в повідомлення
+        all_programs = scores_df.head(7)
+        
+        # 1-ше повідомлення: програми 1-2
+        programs_1_2 = all_programs.iloc[0:2]
+        if not programs_1_2.empty:
+            detailed_results_1_2 = format_programs_group(user_data, programs_1_2, 0, lang)
+            await send_long_message_to_chat(context, update.message.chat_id, detailed_results_1_2)
+            await asyncio.sleep(1)
+        
+        # 2-ге повідомлення: програми 3-4
+        programs_3_4 = all_programs.iloc[2:4]
+        if not programs_3_4.empty:
+            detailed_results_3_4 = format_programs_group(user_data, programs_3_4, 2, lang)
+            await send_long_message_to_chat(context, update.message.chat_id, detailed_results_3_4)
+            await asyncio.sleep(1)
+        
+        # 3-тє повідомлення: програми 5-6
+        programs_5_6 = all_programs.iloc[4:6]
+        if not programs_5_6.empty:
+            detailed_results_5_6 = format_programs_group(user_data, programs_5_6, 4, lang)
+            await send_long_message_to_chat(context, update.message.chat_id, detailed_results_5_6)
+            await asyncio.sleep(1)
+        
+        # 4-те повідомлення: програма 7
+        program_7 = all_programs.iloc[6:7]
+        if not program_7.empty:
+            detailed_results_7 = format_programs_group(user_data, program_7, 6, lang)
+            await send_long_message_to_chat(context, update.message.chat_id, detailed_results_7)
+        
+        # Заключне повідомлення
+        if lang == 'uk':
             outro_text = "\n\nЩоб почати нове опитування, надішліть команду /start."
         else:
-            intro_text = "🎉 Detailed analysis completed!\n\n"
             outro_text = "\n\nTo start a new survey, send the /start command."
         
-        # Відправляємо простий детальний звіт
-        full_message = intro_text + detailed_results + outro_text
-        await send_long_message_to_chat(context, update.message.chat_id, full_message)
-        
-        # НОВЕ: Додаємо готелі з фото для режиму /more
-        await add_hotels_to_results_with_photos(
-            context, 
-            update.message.chat_id, 
-            user_data, 
-            scores_df, 
-            lang, 
-            admin_mode=False
-        )
+        await update.message.reply_text(outro_text)
         
     except Exception as e:
         logger.error(f"Помилка при показі детальних результатів: {e}")
@@ -3676,16 +3699,15 @@ async def calculate_and_show_results_with_ai(update: Update, context: ContextTyp
         
         # Відправляємо заключне повідомлення
         if lang == 'uk':
-            outro_text = ("💡 **Хочете ще більше деталей?**\n"
-                         "Натисніть /more для розширеного аналізу або /start для нового пошуку")
+            outro_text = ("💡 Щоб отримати більш детальний звіт усіх 7 програм – натисніть /more.\n"
+                         "Щоб почати новий пошук — /start.")
         else:
-            outro_text = ("💡 **Want even more details?**\n"
-                         "Type /more for extended analysis or /start for a new search")
+            outro_text = ("💡 To get a more detailed report of all 7 programs – click /more.\n"
+                         "To start a new search — /start.")
         
         await context.bot.send_message(
             chat_id=update.callback_query.message.chat_id,
-            text=outro_text,
-            parse_mode="Markdown"
+            text=outro_text
         )
 
     except Exception as e:
