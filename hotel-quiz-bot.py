@@ -2639,6 +2639,7 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
         # Отримуємо стилі та цілі користувача для AI
         user_styles = user_data.get('styles', [])
         user_purposes = user_data.get('purposes', [])
+        category = user_data.get('category')
         
         for i, (index, row) in enumerate(top_programs.iterrows()):
             program_name = row['loyalty_program']
