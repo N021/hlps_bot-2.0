@@ -301,7 +301,7 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4-turbo",
             messages=[
                 {
                     "role": "system", 
@@ -3856,8 +3856,8 @@ async def calculate_and_show_results_with_ai(update: Update, context: ContextTyp
         
         # Відправляємо заключне повідомлення
         if lang == 'uk':
-            outro_text = ("💡Детальний звіт для усіх 7 програм – натисніть /more.\n"
-                         "💡 Щоб почати новий пошук — /start.")
+            outro_text = ("💡 Детальний звіт для усіх 7 програм – натисніть /more.\n"
+                         "💡 Щоб почати нове опитування — /start.")
         else:
             outro_text = ("💡 Detailed report of all 7 programs – click /more.\n"
                          "💡 To start a new search — /start.")
