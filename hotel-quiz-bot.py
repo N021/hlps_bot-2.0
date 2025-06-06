@@ -843,10 +843,10 @@ def format_detailed_results_for_group(user_data, group_programs, start_position,
             
             if lang == 'uk':
                 results += f"🏨 Сегмент:\n"
-                results += f" • {main_count} готелів в категорії {category} (обраний сегмент)\n"
+                results += f" • {main_count} готелів в сегменті {category} (обраний сегмент)\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n\n"
+                    results += f" • {adjacent_total} готелів в сегментах {adj_cats_str} (суміжний сегмент до обраного)\n\n"
                 else:
                     results += "\n"
             else:
@@ -888,10 +888,10 @@ def format_detailed_results_for_group(user_data, group_programs, start_position,
                         adjacent_style_details.append(adj_cat)
                 
                 if lang == 'uk':
-                    results += f"  - {main_style_total} готелів в стилі «{style}» в категорії {category}\n"
+                    results += f"  - {main_style_total} готелів в стилі «{style}» в сегменті {category}\n"
                     if adjacent_style_details:
                         adj_cats_str = ' i '.join(adjacent_style_details)
-                        results += f"  - {adjacent_style_total} готелів в стилі «{style}» в суміжних категоріях ({adj_cats_str})\n"
+                        results += f"  - {adjacent_style_total} готелів в стилі «{style}» в суміжних сегментах ({adj_cats_str})\n"
                     # ДОДАНО: абзац після кожного стилю (крім останнього)
                     if j < len(styles) - 1:
                         results += "\n"
@@ -937,7 +937,7 @@ def format_detailed_results_for_group(user_data, group_programs, start_position,
                         adjacent_purpose_details.append(adj_cat)
                 
                 if lang == 'uk':
-                    results += f"  - {main_purpose_total} готелів, що відповідають цілі «{purpose}» в категорії {category}\n"
+                    results += f"  - {main_purpose_total} готелів, що відповідають цілі «{purpose}» в сегменті {category}\n"
                     if adjacent_purpose_details:
                         adj_cats_str = ' i '.join(adjacent_purpose_details)
                         results += f"  - {adjacent_purpose_total} готелів, що відповідають цілі «{purpose}» в суміжних сегментах ({adj_cats_str})\n"
@@ -3125,10 +3125,10 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
                 adjacent_categories_list.append(adj_cat)
         
         if lang == 'uk':
-            result += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
+            result += f"  - {main_style_total} готелів в обраних стилях, в сегменті {category}\n"
             if adjacent_categories_list:
                 adj_cats_str = ' і '.join(adjacent_categories_list)
-                result += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"
+                result += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних сегментах ({adj_cats_str})\n\n"
             else:
                 result += "\n"
         else:
@@ -3155,7 +3155,7 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
             main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
             main_purpose_total = len(main_purpose_filtered[main_purpose_filtered['loyalty_program'] == program])
         
-        # Підрахунок готелів для обраних цілей в суміжних категоріях
+        # Підрахунок готелів для обраних цілей в суміжних сегментах
         adjacent_purpose_total = 0
         adjacent_categories_list = []
         if category:
@@ -3168,10 +3168,10 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
                 adjacent_categories_list.append(adj_cat)
         
         if lang == 'uk':
-            result += f"  - {main_purpose_total} готелів в обраних цілях, в категорії {category}\n"
+            result += f"  - {main_purpose_total} готелів в обраних цілях, в сегменті {category}\n"
             if adjacent_categories_list:
                 adj_cats_str = ' і '.join(adjacent_categories_list)
-                result += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
+                result += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних сегментах ({adj_cats_str})\n"
         else:
             result += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
             if adjacent_categories_list:
@@ -4203,10 +4203,10 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adjacent_categories_list.append(adj_cat)
             
             if lang == 'uk':
-                results += f"  - {main_style_total} готелів в обраних стилях, в категорії {category}\n"
+                results += f"  - {main_style_total} готелів в обраних стилях, в сегменті {category}\n"
                 if adjacent_style_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних категоріях ({adj_cats_str})\n\n"
+                    results += f"  - {adjacent_style_total} готелів в обраних стилях, в суміжних сегментах ({adj_cats_str})\n\n"
                 else:
                     results += "\n"
             else:
@@ -4233,7 +4233,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                 main_purpose_filtered = filter_hotels_by_purpose(main_category_hotels, purposes)
                 main_purpose_total = len(main_purpose_filtered[main_purpose_filtered['loyalty_program'] == program])
             
-            # Підрахунок готелів для обраних цілей в суміжних категоріях
+            # Підрахунок готелів для обраних цілей в суміжних сегментах
             adjacent_purpose_total = 0
             adjacent_categories_list = []
             if category:
@@ -4246,10 +4246,10 @@ def format_simple_results(user_data, scores_df, lang='uk'):
                     adjacent_categories_list.append(adj_cat)
             
             if lang == 'uk':
-                results += f"  - {main_purpose_total} готелів в обраних цілях, в категорії {category}\n"
+                results += f"  - {main_purpose_total} готелів в обраних цілях, в сегменті {category}\n"
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
                     adj_cats_str = ' і '.join(adjacent_categories_list)
-                    results += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних категоріях ({adj_cats_str})\n"
+                    results += f"  - {adjacent_purpose_total} готелів в обраних цілях, в суміжних сегментах ({adj_cats_str})\n"
             else:
                 results += f"  - {main_purpose_total} hotels for selected purposes, in {category} category\n"
                 if adjacent_purpose_total > 0 and adjacent_categories_list:
@@ -4358,10 +4358,10 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
             
             if lang == 'uk':
                 results += f"🏨 Сегмент:\n"
-                results += f" • {main_count} готелів в категорії {category} (обраний сегмент)\n"
+                results += f" • {main_count} готелів в сегменті {category} (обраний сегмент)\n"
                 if adjacent_details:
                     adj_cats_str = ' і '.join(adjacent_details)
-                    results += f" • {adjacent_total} готелів в категоріях {adj_cats_str} (суміжний сегмент до обраного)\n\n"
+                    results += f" • {adjacent_total} готелів в сегментах {adj_cats_str} (суміжний сегмент до обраного)\n\n"
                 else:
                     results += "\n"
             else:
@@ -4403,10 +4403,10 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                         adjacent_style_details.append(adj_cat)
                 
                 if lang == 'uk':
-                    results += f"  - {main_style_total} готелів в стилі «{style}» в категорії {category}\n"
+                    results += f"  - {main_style_total} готелів в стилі «{style}» в сегменті {category}\n"
                     if adjacent_style_details:
                         adj_cats_str = ' i '.join(adjacent_style_details)
-                        results += f"  - {adjacent_style_total} готелів в стилі «{style}» в суміжних категоріях ({adj_cats_str})\n"
+                        results += f"  - {adjacent_style_total} готелів в стилі «{style}» в суміжних сегментах ({adj_cats_str})\n"
                     # ДОДАНО: абзац після кожного стилю (крім останнього)
                     if j < len(styles) - 1:
                         results += "\n"
@@ -4452,7 +4452,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
                         adjacent_purpose_details.append(adj_cat)
                 
                 if lang == 'uk':
-                    results += f"  - {main_purpose_total} готелів, що відповідають цілі «{purpose}» в категорії {category}\n"
+                    results += f"  - {main_purpose_total} готелів, що відповідають цілі «{purpose}» в сегменті {category}\n"
                     if adjacent_purpose_details:
                         adj_cats_str = ' i '.join(adjacent_purpose_details)
                         results += f"  - {adjacent_purpose_total} готелів, що відповідають цілі «{purpose}» в суміжних сегментах ({adj_cats_str})\n"
