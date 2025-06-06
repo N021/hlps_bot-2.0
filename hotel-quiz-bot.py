@@ -100,6 +100,20 @@ if ENABLE_OPENAI:
 # Очищена версія генерації описів готелів
 # ===============================
 
+# Константи для OpenAI
+OPENAI_MAX_TOKENS_SIMPLE = 250
+OPENAI_MAX_TOKENS_COMPLEX = 300
+OPENAI_TEMPERATURE_CREATIVE = 0.8
+OPENAI_TEMPERATURE_BALANCED = 0.7
+
+# Константи для обробки тексту
+OPENAI_MAX_WORDS = 90
+OPENAI_MIN_WORDS = 40
+
+# Константи для логування і валідації (заглушки)
+DEBUG_SCORING = False
+VALIDATE_CALCULATIONS = False
+
 def analyze_request_complexity(selected_styles: list, selected_purposes: list) -> dict:
     """
     Аналізує складність запиту та повертає налаштування для OpenAI
@@ -301,7 +315,7 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system", 
