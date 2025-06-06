@@ -95,6 +95,7 @@ OPENAI_MIN_WORDS = 15              # Мінімум слів у згенеров
 # Ініціалізуємо OpenAI клієнт, якщо ключ доступний
 if ENABLE_OPENAI:
     openai.api_key = OPENAI_API_KEY
+
 # ===============================
 # Очищена версія генерації описів готелів
 # ===============================
@@ -128,51 +129,71 @@ def create_hotel_prompt(hotel_name: str, hotel_brand: str, selected_styles: list
     
     if lang == 'uk':
         return f"""
-Ви представник офіційного сервісу з підбору готелів. Створіть персоналізований опис готелю бренду {hotel_brand} для клієнта.
+ЗАВДАННЯ: Напиши фактичний опис готелю {hotel_brand} українською мовою.
 
-Клієнт обрав:
+ДАНІ КЛІЄНТА:
 Стилі: {styles_text}
-Цілі подорожі: {purposes_text}
+Цілі: {purposes_text}
 
-Вимоги до опису:
-1. Ввічлива комунікація. Відношення до користувача на "ви"
-2. {'2-3 речення (60-80 слів)' if complexity == 'simple' else '2-3 речення (70-90 слів)'}
-3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
-4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
-5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
-6. Конкретні приклади замість загальних фраз
-7. Заборонені будь-які звернення до користувача "Шановний клієнте..."
+ФОРМАТ: 2-3 речення, {'50-70 слів' if complexity == 'simple' else '60-80 слів'}
 
-Приклади конкретності:
-- Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
-- Замість "сучасний дизайн" → "смарт-телевізори Samsung в номерах, мобільний додаток для керування освітленням"
-- Замість "сімейна атмосфера" → "дитяче меню від шеф-кухаря, дитячі халати та тапочки"
+ОБОВ'ЯЗКОВІ ВИМОГИ:
+1. Починай з назви бренду: "Готелі {hotel_brand}..."
+2. Конкретні факти про послуги бренду
+3. Пояснення відповідності обраним критеріям
 
-Напишіть як експерт, що знає специфіку {hotel_brand} і може пояснити переваги конкретними фактами.
+КАТЕГОРИЧНО ЗАБОРОНЕНО:
+❌ Звернення: "Ви", "Вас", "Шановний", "Запрошуємо"
+❌ Штампи: "ідеальний", "неперевершений", "бездоганний", "символ", "нотки"
+❌ Загальні фрази: "високий рівень", "широкий спектр"
+
+ЗРОБИ ЗА ТАКИМ ПРИКЛАДОМ:
+
+ПРАВИЛЬНИЙ ОПИС:
+"Готелі W Hotels втілюють бутікову філософію через авторські інсталяції від сучасних художників у кожному номері та унікальний дизайн від провідних архітекторів світу. Для сімейного відпочинку бренд пропонує WOW Suite з окремою дитячою зоною, спеціальні дитячі welcome-подарунки та меню Whatever/Whenever з дитячими стравами 24/7. Roof-top басейн з панорамним видом та Whatever/Whenever сервіс дозволяють батькам розслабитися, поки діти граються у спеціально обладнаних зонах."
+
+Цей текст було створено за таких вводних даних:
+Стилі: Бутік і унікальний, Сучасний і дизайнерський  
+Цілі: Відпустка/релакс, Сімейний відпочинок
+
+НЕПРИЙНЯТНИЙ ПРИКЛАД:
+"Шановний гість, готелі W Hotels - ідеальний вибір для Вашої подорожі. Ви насолоджуватиметесь бездоганним сервісом та широким спектром послуг."
+
+Пиши тільки опис, без привітань та прощань.
 """
     else:
         return f"""
-You represent an official hotel selection service. Create a personalized description of {hotel_brand} hotel for a client.
+TASK: Write factual description of {hotel_brand} hotel in English.
 
-Client selected:
+CLIENT DATA:
 Styles: {styles_text}
-Travel purposes: {purposes_text}
+Purposes: {purposes_text}
 
-Description requirements:
-1. Formal "You" address only (official service style)
-2. {'2-3 sentences (60-80 words)' if complexity == 'simple' else '2-3 sentences (70-90 words)'}
-3. Specific facts about {hotel_brand}: services, amenities, features
-4. Explain WHY this brand matches the selected parameters
-5. Avoid clichés: "perfect choice", "unparalleled service"
-6. Concrete examples instead of generic phrases
-7. No direct address to client like "Dear client..."
+FORMAT: 2-3 sentences, {'50-70 words' if complexity == 'simple' else '60-80 words'}
 
-Examples of specificity:
-- Instead of "luxury service" → "24/7 concierge, welcome drink upon arrival"
-- Instead of "modern design" → "Samsung smart TVs in rooms, mobile app for lighting control"
-- Instead of "family atmosphere" → "chef's children menu, kids' bathrobes and slippers"
+MANDATORY REQUIREMENTS:
+1. Start with brand name: "{hotel_brand} hotels..."
+2. Specific facts about brand services
+3. Explain match to selected criteria
 
-Write as an expert who knows {hotel_brand} specifics and can explain advantages with concrete facts.
+STRICTLY FORBIDDEN:
+❌ Address: "You", "Dear", "Welcome"
+❌ Clichés: "perfect", "unparalleled", "exceptional", "symbol"
+❌ Generic phrases: "high level", "wide range"
+
+FOLLOW THIS EXAMPLE:
+
+CORRECT DESCRIPTION:
+"W Hotels embody boutique philosophy through original art installations by contemporary artists in each room and unique design by world-leading architects. For family relaxation, the brand offers WOW Suites with separate children's areas, special kids' welcome gifts, and Whatever/Whenever menu with children's dishes 24/7. Rooftop pools with panoramic views and Whatever/Whenever service allow parents to relax while children play in specially equipped zones."
+
+This text was created for these input data:
+Styles: Boutique & unique, Modern & design-focused
+Purposes: Vacation/relaxation, Family travel
+
+UNACCEPTABLE EXAMPLE:
+"Dear guest, W Hotels is the perfect choice for your journey. You will enjoy exceptional service and wide range of services."
+
+Write only description, no greetings or farewells.
 """
 
 def process_generated_text(text: str, hotel_brand: str, complexity: str, lang: str) -> str:
@@ -284,15 +305,15 @@ async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected
             messages=[
                 {
                     "role": "system", 
-                    "content": f"You are a professional hotel consultant representing an official hotel selection service. You write formal, fact-based descriptions in {'Ukrainian' if lang == 'uk' else 'English'} using specific brand knowledge instead of generic praise. Always use formal address."
+                    "content": f"You are a professional hotel consultant. Write fact-based hotel descriptions in {'Ukrainian' if lang == 'uk' else 'English'} using specific brand knowledge. No greetings, no direct address to users, only concrete facts."
                 },
                 {"role": "user", "content": prompt}
             ],
             max_tokens=config['max_tokens'],
             temperature=config['temperature'],
             top_p=0.9,
-            frequency_penalty=0.7,  # Проти штампів
-            presence_penalty=0.5,
+            frequency_penalty=0.9,  # Збільшено проти штампів
+            presence_penalty=0.6,
             timeout=20
         )
         
@@ -373,7 +394,6 @@ def calculate_rating_coefficient(program_rating):
     Розраховує коефіцієнт на основі рейтингу програми
     """
     return program_rating / 5.0
-
 
 # ===============================
 # ЧАСТИНА 2.5: ФУНКЦІЇ ПЕРЕКЛАДУ
