@@ -910,7 +910,7 @@ def format_detailed_results_for_group(user_data, group_programs, start_position,
         # МЕТА - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Мета подорожі:\n\n"
+                results += f"🎯 Мета/ціль подорожі:\n\n"
             else:
                 results += f"🎯 Travel purpose:\n\n"
             
@@ -3061,7 +3061,7 @@ def format_single_program_report(user_data, program_row, position, lang='uk'):
     if purposes:
         if lang == 'uk':
             purposes_str = '; '.join(purposes)
-            result += f"🎯 Мета подорожі:\n{purposes_str}:\n"  # ЗМІНЕНО: "Ціль" -> "Мета"
+            result += f"🎯 Мета/ціль подорожі:\n{purposes_str}:\n"  # ЗМІНЕНО: "Ціль" -> "Мета"
         else:
             purposes_str = '; '.join(purposes)
             result += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -4139,7 +4139,7 @@ def format_simple_results(user_data, scores_df, lang='uk'):
         if purposes:
             if lang == 'uk':
                 purposes_str = '; '.join(purposes)
-                results += f"🎯 Мета подорожі:\n{purposes_str}:\n"
+                results += f"🎯 Мета/ціль подорожі:\n{purposes_str}:\n"
             else:
                 purposes_str = '; '.join(purposes)
                 results += f"🎯 Travel purpose:\n{purposes_str}:\n"
@@ -4343,7 +4343,7 @@ def format_detailed_results_with_ratings(user_data, scores_df, lang='uk'):
         # ЦІЛЬ - ДЕТАЛЬНИЙ РОЗБІР ПО КОЖНІЙ ЦІЛІ
         if purposes:
             if lang == 'uk':
-                results += f"🎯 Мета подорожі:\n\n"
+                results += f"🎯 Мета/ціль подорожі:\n\n"
             else:
                 results += f"🎯 Travel purpose:\n\n"
             
