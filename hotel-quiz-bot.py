@@ -1079,7 +1079,7 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         regions_description = (
             "Питання 1/4:\n"
             "У яких регіонах світу ви плануєте подорожувати?\n"
-            "*(Оберіть один або декілька варіантів)*\n\n"
+            "(Оберіть один або декілька варіантів)\n\n"
             "1. Європа\n"
             "2. Північна Америка\n"
             "3. Азія\n"
@@ -1421,7 +1421,7 @@ async def ask_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         styles_description = (
             "Питання 3/4:\n"
             "Який стиль готелю ви зазвичай обираєте?\n"
-            "*(Оберіть мінімум 2 варіанти)*\n\n"
+            "(Оберіть мінімум 2 варіанти)\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних стилів
@@ -1666,7 +1666,7 @@ async def ask_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         purpose_description = (
             "Питання 4/4:\n"
             "З якою метою ви зазвичай зупиняєтесь у готелі?\n"
-            "*(Оберіть мінімум 2 варіанти)*\n\n"
+            "(Оберіть мінімум 2 варіанти)\n\n"
         )
         
         # Динамічно генеруємо описи тільки для доступних цілей
@@ -2717,6 +2717,66 @@ def add_hotels_to_results(detailed_results, user_data, scores_df, lang='uk', adm
 # ЧАСТИНА 9.3: НОВІ ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ ГОТЕЛІВ З AI-ОПИСАМИ
 # ===============================
 
+def get_actual_criteria_for_program(program_name, user_data, hotel_data):
+    """
+    Перевіряє які критерії фактично мають готелі для програми та повертає тільки ті, де count > 0
+    
+    Args:
+        program_name: назва програми лояльності
+        user_data: дані користувача з відповідями
+        hotel_data: повні дані готелів
+    
+    Returns:
+        tuple: (actual_styles, actual_purposes) - тільки ті критерії, де є готелі
+    """
+    regions = user_data.get('regions', []) or []
+    countries = user_data.get('countries', []) or []
+    category = user_data.get('category')
+    styles = user_data.get('styles', []) or []
+    purposes = user_data.get('purposes', []) or []
+    
+    # Переводимо на англійську для фільтрації
+    english_regions = translate_regions_to_english(regions)
+    english_countries = translate_regions_to_english(countries)
+    english_styles = translate_styles_to_english(styles)
+    english_purposes = translate_purposes_to_english(purposes)
+    
+    # Фільтруємо за регіоном та програмою
+    filtered_by_region = filter_hotels_by_region(hotel_data, english_regions, english_countries)
+    program_hotels = filtered_by_region[filtered_by_region['loyalty_program'] == program_name]
+    
+    # Фільтруємо за категорією
+    if category:
+        category_hotels = filter_hotels_by_category(program_hotels, category)
+    else:
+        category_hotels = program_hotels
+    
+    # Перевіряємо стилі - тільки якщо є готелі в основній категорії
+    actual_styles = []
+    if english_styles and not category_hotels.empty:
+        style_filtered = filter_hotels_by_style(category_hotels, english_styles)
+        style_count = len(style_filtered)
+        if style_count > 0:
+            actual_styles = styles  # Повертаємо оригінальні (українські/англійські)
+            debug_log(f"Program {program_name}: {style_count} hotels match styles in main category")
+        else:
+            debug_log(f"Program {program_name}: 0 hotels match styles in main category - styles excluded from AI")
+    
+    # Перевіряємо цілі - тільки якщо є готелі в основній категорії
+    actual_purposes = []
+    if english_purposes and not category_hotels.empty:
+        purpose_filtered = filter_hotels_by_purpose(category_hotels, english_purposes)
+        purpose_count = len(purpose_filtered)
+        if purpose_count > 0:
+            actual_purposes = purposes  # Повертаємо оригінальні
+            debug_log(f"Program {program_name}: {purpose_count} hotels match purposes in main category")
+        else:
+            debug_log(f"Program {program_name}: 0 hotels match purposes in main category - purposes excluded from AI")
+    
+    debug_log(f"Actual criteria for {program_name}: styles={len(actual_styles)} items, purposes={len(actual_purposes)} items")
+    
+    return actual_styles, actual_purposes
+
 async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styles, user_purposes, program_name, lang='uk'):
     """
     ОНОВЛЕНА функція відправлення готелю з AI-описом та посиланням на реєстрацію
@@ -2725,8 +2785,8 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         context: Telegram bot context
         chat_id: ID чату
         hotel_info: словник з інформацією про готель
-        user_styles: обрані користувачем стилі
-        user_purposes: обрані користувачем цілі
+        user_styles: обрані користувачем стилі (вже відфільтровані за наявністю готелів)
+        user_purposes: обрані користувачем цілі (вже відфільтровані за наявністю готелів)
         program_name: назва програми лояльності
         lang: мова
     """
@@ -2736,8 +2796,9 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         place_id = hotel_info.get('place_id', '')
         
         debug_log(f"Генерація AI-опису для готелю: {hotel_name}")
+        debug_log(f"AI критерії: styles={user_styles}, purposes={user_purposes}")
         
-        # Генеруємо AI-опис
+        # Генеруємо AI-опис (тепер user_styles та user_purposes вже відфільтровані)
         ai_description = await generate_hotel_description(
             hotel_name, hotel_brand, user_styles, user_purposes, lang
         )
@@ -2820,17 +2881,38 @@ async def send_hotel_with_ai_description(context, chat_id, hotel_info, user_styl
         logger.error(f"Помилка при відправленні готелю з AI-описом {hotel_info.get('name', 'Unknown')}: {e}")
         return False
 
-async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang='uk'):
+async def send_individual_hotels_with_ai_descriptions(context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang='uk', user_data=None):
     """
     ОНОВЛЕНА функція відправлення готелів з AI-описами та назвою програми
+    
+    Args:
+        context: Telegram bot context
+        chat_id: ID чату
+        top_hotels: DataFrame з готелями
+        user_styles: оригінальні стилі користувача (будуть відфільтровані)
+        user_purposes: оригінальні цілі користувача (будуть відфільтровані)
+        program_name: назва програми лояльності
+        lang: мова
+        user_data: дані користувача для перевірки фактичних критеріїв
     """
     try:
+        # ✅ ДОДАНО: Отримуємо фактичні критерії для цієї програми
+        if user_data is None:
+            # Fallback: якщо user_data не передано, спробуємо отримати з глобальної змінної
+            user_id = list(user_data_global.keys())[0] if user_data_global else None
+            user_data = user_data_global.get(user_id, {}) if user_id else {}
+        
+        actual_styles, actual_purposes = get_actual_criteria_for_program(program_name, user_data, hotel_data)
+        
+        debug_log(f"Program {program_name}: Original criteria - styles={len(user_styles)}, purposes={len(user_purposes)}")
+        debug_log(f"Program {program_name}: Actual criteria - styles={len(actual_styles)}, purposes={len(actual_purposes)}")
+        
         for i, (index, hotel) in enumerate(top_hotels.iterrows()):
             hotel_dict = convert_hotel_dataframe_to_dict(hotel)
             
-            # Відправляємо готель з AI-описом та program_name
+            # ✅ ЗМІНЕНО: Передаємо фактичні критерії замість оригінальних
             await send_hotel_with_ai_description(
-                context, chat_id, hotel_dict, user_styles, user_purposes, program_name, lang
+                context, chat_id, hotel_dict, actual_styles, actual_purposes, program_name, lang
             )
             
             # Пауза між готелями (хоча тепер тільки 1)
@@ -2848,7 +2930,7 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
         # Беремо топ-3 програми
         top_programs = scores_df.head(3)
         
-        # Отримуємо стилі та цілі користувача для AI
+        # Отримуємо стилі та цілі користувача для AI (оригінальні)
         user_styles = user_data.get('styles', [])
         user_purposes = user_data.get('purposes', [])
         category = user_data.get('category')
@@ -2884,9 +2966,9 @@ async def send_programs_with_ai_integrated_hotels(context, chat_id, user_data, s
             top_hotels, selection_type = find_top_1_hotel_for_program_strict(program_name, user_data, hotel_data)
             
             if not top_hotels.empty:
-                # ОНОВЛЕНО: передаємо program_name для посилань на реєстрацію
+                # ✅ ОНОВЛЕНО: передаємо user_data для правильної фільтрації критеріїв
                 await send_individual_hotels_with_ai_descriptions(
-                    context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang
+                    context, chat_id, top_hotels, user_styles, user_purposes, program_name, lang, user_data
                 )
             else:
                 if lang == 'uk':
