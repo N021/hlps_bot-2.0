@@ -95,105 +95,87 @@ OPENAI_MIN_WORDS = 15              # Мінімум слів у згенеров
 # Ініціалізуємо OpenAI клієнт, якщо ключ доступний
 if ENABLE_OPENAI:
     openai.api_key = OPENAI_API_KEY
-
 # ===============================
-# ВИПРАВЛЕНО: OpenAI Integration для генерації описів готелів
+# Очищена версія генерації описів готелів
 # ===============================
 
-def create_adaptive_prompt(hotel_name: str, hotel_brand: str, selected_styles: list, 
-                          selected_purposes: list, lang: str = 'uk') -> tuple:
+def analyze_request_complexity(selected_styles: list, selected_purposes: list) -> dict:
     """
-    Створює адаптивний промт залежно від складності запиту
+    Аналізує складність запиту та повертає налаштування для OpenAI
+    """
+    total_params = len(selected_styles) + len(selected_purposes)
     
-    Returns:
-        tuple: (prompt_text, max_tokens, temperature)
+    if total_params <= 3:
+        return {
+            'complexity': 'simple',
+            'max_tokens': OPENAI_MAX_TOKENS_SIMPLE,
+            'temperature': OPENAI_TEMPERATURE_CREATIVE
+        }
+    else:
+        return {
+            'complexity': 'complex', 
+            'max_tokens': OPENAI_MAX_TOKENS_COMPLEX,
+            'temperature': OPENAI_TEMPERATURE_BALANCED
+        }
+
+def create_hotel_prompt(hotel_name: str, hotel_brand: str, selected_styles: list, 
+                       selected_purposes: list, complexity: str, lang: str = 'uk') -> str:
+    """
+    Створює промт для генерації опису готелю
     """
     styles_text = ', '.join(selected_styles)
     purposes_text = ', '.join(selected_purposes)
-    total_params = len(selected_styles) + len(selected_purposes)
-    
-    # Визначаємо складність та налаштування
-    if total_params <= 3:
-        max_tokens = OPENAI_MAX_TOKENS_SIMPLE
-        temperature = OPENAI_TEMPERATURE_CREATIVE
-        complexity = "simple"
-    else:
-        max_tokens = OPENAI_MAX_TOKENS_COMPLEX
-        temperature = OPENAI_TEMPERATURE_BALANCED
-        complexity = "complex"
     
     if lang == 'uk':
-        if complexity == "simple":
-            prompt = f"""
-Створи короткий персоналізований опис готелю бренду {hotel_brand} українською мовою.
+        return f"""
+Ви представник офіційного сервісу з підбору готелів. Створіть персоналізований опис готелю бренду {hotel_brand} для клієнта.
 
-Обрані стилі: {styles_text}
-Обрані цілі: {purposes_text}
+Клієнт обрав:
+Стилі: {styles_text}
+Цілі подорожі: {purposes_text}
 
-Вимоги:
-1. Опис 2-3 речення (60-80 слів)
-2. Покажи, як бренд відповідає вибраним критеріям
-3. Будь конкретним про особливості {hotel_brand}
-4. Не згадуй назву готелю, тільки бренд
-5. Пиши природно та переконливо
+Вимоги до опису:
+1. Ввічлива комунікація. Відношення до користувача на "ви"
+2. {'2-3 речення (60-80 слів)' if complexity == 'simple' else '2-3 речення (70-90 слів)'}
+3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
+4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
+5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
+6. Конкретні приклади замість загальних фраз
+7. Заборонені будь-які звернення до користувача "Шановний клієнте..."
 
-Формат: [Як бренд відповідає стилям]. [Чому підходить для цілей]. [Унікальна перевага].
-"""
-        else:
-            prompt = f"""
-Створи детальний персоналізований опис готелю "{hotel_name}" бренду {hotel_brand} українською мовою.
+Приклади конкретності:
+- Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
+- Замість "сучасний дизайн" → "смарт-телевізори Samsung в номерах, мобільний додаток для керування освітленням"
+- Замість "сімейна атмосфера" → "дитяче меню від шеф-кухаря, дитячі халати та тапочки"
 
-Обрані стилі: {styles_text}
-Обрані цілі подорожі: {purposes_text}
-
-Вимоги:
-1. Опис 2-3 речення (70-90 слів)
-2. Детально покажи відповідність кожному критерію
-3. Використовуй достовірну інформацію про {hotel_brand}
-4. Підкресли унікальні особливості бренду
-5. Не згадуй назву готелю в описі
-6. Пиши захоплююче та персоналізовано
-
-Структура: [Відповідність стилям]. [Підходящість для цілей]. [Ключові переваги бренду].
+Напишіть як експерт, що знає специфіку {hotel_brand} і може пояснити переваги конкретними фактами.
 """
     else:
-        if complexity == "simple":
-            prompt = f"""
-Create a short personalized description of {hotel_brand} brand hotel in English.
+        return f"""
+You represent an official hotel selection service. Create a personalized description of {hotel_brand} hotel for a client.
 
-Selected styles: {styles_text}
-Selected purposes: {purposes_text}
+Client selected:
+Styles: {styles_text}
+Travel purposes: {purposes_text}
 
-Requirements:
-1. Description 2-3 sentences (60-80 words)
-2. Show how the brand matches selected criteria
-3. Be specific about {hotel_brand} features
-4. Don't mention hotel name, only brand
-5. Write naturally and convincingly
+Description requirements:
+1. Formal "You" address only (official service style)
+2. {'2-3 sentences (60-80 words)' if complexity == 'simple' else '2-3 sentences (70-90 words)'}
+3. Specific facts about {hotel_brand}: services, amenities, features
+4. Explain WHY this brand matches the selected parameters
+5. Avoid clichés: "perfect choice", "unparalleled service"
+6. Concrete examples instead of generic phrases
+7. No direct address to client like "Dear client..."
 
-Format: [How brand matches styles]. [Why it suits purposes]. [Unique advantage].
+Examples of specificity:
+- Instead of "luxury service" → "24/7 concierge, welcome drink upon arrival"
+- Instead of "modern design" → "Samsung smart TVs in rooms, mobile app for lighting control"
+- Instead of "family atmosphere" → "chef's children menu, kids' bathrobes and slippers"
+
+Write as an expert who knows {hotel_brand} specifics and can explain advantages with concrete facts.
 """
-        else:
-            prompt = f"""
-Create a detailed personalized description of hotel "{hotel_name}" from {hotel_brand} brand in English.
 
-Selected styles: {styles_text}
-Selected travel purposes: {purposes_text}
-
-Requirements:
-1. Description 2-3 sentences (70-90 words)
-2. Detail how it matches each criterion
-3. Use accurate information about {hotel_brand}
-4. Highlight unique brand features
-5. Don't mention hotel name in description
-6. Write engagingly and personally
-
-Structure: [Style match]. [Purpose suitability]. [Key brand advantages].
-"""
-    
-    return prompt, max_tokens, temperature
-
-def process_ai_generated_text(text: str, hotel_brand: str, styles: list, purposes: list, lang: str) -> str:
+def process_generated_text(text: str, hotel_brand: str, complexity: str, lang: str) -> str:
     """
     Обробляє та покращує згенерований AI текст
     """
@@ -205,14 +187,17 @@ def process_ai_generated_text(text: str, hotel_brand: str, styles: list, purpose
     if not text.endswith('.'):
         text += '.'
     
-    # Перевіряємо довжину
+    # Визначаємо ліміти слів залежно від складності
+    max_words = OPENAI_MAX_WORDS if complexity == 'complex' else OPENAI_MAX_WORDS - 10
+    min_words = OPENAI_MIN_WORDS
+    
     words = text.split()
     word_count = len(words)
     
     # Якщо занадто довго - обрізаємо розумно
-    if word_count > OPENAI_MAX_WORDS:
+    if word_count > max_words:
         # Шукаємо останню повну крапку в межах ліміту
-        truncated_words = words[:OPENAI_MAX_WORDS-5]  # Залишаємо запас
+        truncated_words = words[:max_words-5]  # Залишаємо запас
         truncated_text = ' '.join(truncated_words)
         
         # Шукаємо останню крапку
@@ -225,7 +210,7 @@ def process_ai_generated_text(text: str, hotel_brand: str, styles: list, purpose
         debug_log(f"Обрізано текст з {word_count} до {len(text.split())} слів")
     
     # Якщо занадто коротко - додаємо деталі
-    elif word_count < OPENAI_MIN_WORDS:
+    elif word_count < min_words:
         if lang == 'uk':
             text += f" Бренд {hotel_brand} забезпечує високу якість сервісу та комфорт."
         else:
@@ -271,124 +256,61 @@ def generate_smart_fallback(hotel_brand: str, styles: list, purposes: list, lang
         
         return f"{hotel_brand} hotels are renowned for their {style_desc} service and perfectly suit {purpose_desc}. This choice guarantees an unforgettable stay with all necessary amenities and exceptional service quality."
 
-# ===============================
-# ПРОСТИЙ ПІДХІД: Один розумний промт
-# ===============================
-
-# ЗАМІНИТИ тільки функцію generate_hotel_description НА ЦЮ:
-
 async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
                                    selected_purposes: list, lang: str = 'uk') -> str:
     """
-    Генерує персоналізований опис готелю через один розумний промт
+    Генерує персоналізований опис готелю
     """
+    # Якщо OpenAI вимкнено - повертаємо fallback
     if not ENABLE_OPENAI:
-        if lang == 'uk':
-            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
-        else:
-            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
+        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
     
     try:
-        styles_text = ', '.join(selected_styles)
-        purposes_text = ', '.join(selected_purposes)
+        # Аналізуємо складність запиту
+        config = analyze_request_complexity(selected_styles, selected_purposes)
         
-        if lang == 'uk':
-            prompt = f"""
-Ви представник офіційного сервісу з підбору готелів. Створіть персоналізований опис готелю бренду {hotel_brand} для клієнта.
-
-Клієнт обрав:
-Стилі: {styles_text}
-Цілі подорожі: {purposes_text}
-
-Вимоги до опису:
-
-1. Ввічлива комунікація. Відношення до користувача на "ви".
-2. 2-3 речення (70-90 слів)
-3. Конкретні факти про {hotel_brand}: послуги, зручності, особливості
-4. Пояснити, ЧОМУ саме цей бренд підходить під обрані параметри
-5. Уникати штампів: "ідеальний вибір", "неперевершений сервіс"
-6. Конкретні приклади замість загальних фраз
-7. Заборонені звернення будь які звернення до користувача "Шановний клієнте, Готелі Kimpton Hotels & Restaurants відповідають вашим..."
-
-
-Приклади конкретності:
-- Замість "розкішний сервіс" → "консьєрж працює 24/7, welcome drink при заселенні"
-- Замість "сучасний дизайн" → "смарт-телевізори Samsung в номерах, мобільний додаток для керування освітленням"
-- Замість "сімейна атмосфера" → "дитяче меню від шеф-кухаря, дитячі халати та тапочки"
-
-Приклад хорошої відповіді:
-"Готелі Kimpton Hotels & Restaurants ідеально відповідають Вашим вимогам до бутікової унікальності завдяки авторському дизайну від місцевих художників та лімітованим колекціям арт-об'єктів у кожному номері. Для сімейного відпочинку бренд пропонує безкоштовні ліжечка для дітей, спеціальне дитяче меню та pet-friendly політику без додаткової плати. Програма hosted evening wine hour щовечора створює затишну атмосферу для спілкування між гостями.
-
-Напишіть як експерт, що знає специфіку {hotel_brand} і може пояснити переваги конкретними фактами.
-"""
-        else:
-            prompt = f"""
-You represent an official hotel selection service. Create a personalized description of {hotel_brand} hotel for a client.
-
-Client selected:
-Styles: {styles_text}
-Travel purposes: {purposes_text}
-
-Description requirements:
-1. Formal "You" address only (official service style)
-2. 2-3 sentences (70-90 words)
-3. Specific facts about {hotel_brand}: services, amenities, features
-4. Explain WHY this brand matches the selected parameters
-5. Avoid clichés: "perfect choice", "unparalleled service"
-6. Concrete examples instead of generic phrases
-
-Examples of specificity:
-- Instead of "luxury service" → "24/7 concierge, welcome drink upon arrival"
-- Instead of "modern design" → "Samsung smart TVs in rooms, mobile app for lighting control"
-- Instead of "family atmosphere" → "chef's children menu, kids' bathrobes and slippers"
-
-Write as an expert who knows {hotel_brand} specifics and can explain advantages with concrete facts.
-"""
+        # Створюємо промт
+        prompt = create_hotel_prompt(
+            hotel_name, hotel_brand, selected_styles, 
+            selected_purposes, config['complexity'], lang
+        )
         
+        # Викликаємо OpenAI
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are a professional hotel consultant representing an official hotel selection service. You write formal, fact-based descriptions in {'Ukrainian' if lang == 'uk' else 'English'} using specific brand knowledge instead of generic praise. Always use formal address."},
+                {
+                    "role": "system", 
+                    "content": f"You are a professional hotel consultant representing an official hotel selection service. You write formal, fact-based descriptions in {'Ukrainian' if lang == 'uk' else 'English'} using specific brand knowledge instead of generic praise. Always use formal address."
+                },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,
-            temperature=0.7,  # Знижено для більш фактичного тону
+            max_tokens=config['max_tokens'],
+            temperature=config['temperature'],
             top_p=0.9,
-            frequency_penalty=0.7,  # Збільшено проти штампів
+            frequency_penalty=0.7,  # Проти штампів
             presence_penalty=0.5,
             timeout=20
         )
         
         generated_text = response.choices[0].message.content.strip()
         
-        # Простий cleanup
-        generated_text = ' '.join(generated_text.split())
-        generated_text = generated_text.strip('"\'«»""''')
+        # Обробляємо згенерований текст
+        final_text = process_generated_text(
+            generated_text, hotel_brand, config['complexity'], lang
+        )
         
-        if not generated_text.endswith('.'):
-            generated_text += '.'
-        
-        # Перевіряємо довжину
-        words = generated_text.split()
-        if len(words) > 100:
-            generated_text = ' '.join(words[:95]) + '.'
-        
-        debug_log(f"Згенеровано опис для {hotel_name}: {generated_text}")
-        return generated_text
+        debug_log(f"Згенеровано опис для {hotel_name}: {final_text}")
+        return final_text
         
     except Exception as e:
         logger.error(f"Помилка генерації опису для {hotel_name}: {e}")
         
-        if lang == 'uk':
-            return f"Цей готель бренду {hotel_brand} чудово підходить для ваших потреб. Відмінний вибір для комфортного перебування."
-        else:
-            return f"This {hotel_brand} hotel perfectly suits your needs. An excellent choice for a comfortable stay."
-
-# ВСЕ! Більше нічого не треба змінювати.
-# Ніяких нових імпортів, ніяких додаткових функцій.
+        # Fallback при помилці
+        return generate_smart_fallback(hotel_brand, selected_styles, selected_purposes, lang)
 
 # ЗАЛИШАЄТЬСЯ БЕЗ ЗМІН
 def format_hotel_caption_with_ai_description(hotel_info: dict, ai_description: str, lang: str = 'uk') -> str:
@@ -1294,7 +1216,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             chat_id=chat_id,
             text=(
                 "Питання 2/4:\n"
-                "Яку категорію готелів ви зазвичай обираєте?\n\n"
+                "Готелі якого сегменту ви зазвичай обираєте?\n\n"
                 "1. Luxury (преміум-клас)\n"
                 "2. Comfort (середній клас)\n"
                 "3. Standard (економ-клас)\n"
@@ -1312,7 +1234,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             chat_id=chat_id,
             text=(
                 "Question 2/4:\n"
-                "Which hotel category do you usually choose?\n\n"
+                "Which hotel segment do you usually choose?\n\n"
                 "1. Luxury (premium class)\n"
                 "2. Comfort (middle class)\n"
                 "3. Standard (economy class)\n"
@@ -1343,12 +1265,12 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if lang == 'uk':
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Дякую! Ви обрали категорію:\n- {category};"
+            text=f"Дякую! Ви обрали сегмент:\n- {category};"
         )
     else:
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Thank you! You have chosen the category:\n- {category};"
+            text=f"Thank you! You have chosen the segment:\n- {category};"
         )
 
     await asyncio.sleep(2.0)
@@ -1841,7 +1763,7 @@ async def purpose_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             purposes_list = '\n'.join(f"- {purpose};" for purpose in selected_purposes)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Дякую! Ви обрали наступні цілі:\n{purposes_list}\n\n"
+                text=f"Дякую! Ви обрали наступні пункти:\n{purposes_list}\n\n"
                 "Зачекайте, будь ласка, поки я проаналізую ваші відповіді та підберу найкращі програми лояльності для вас."
             )
         else:
@@ -3914,10 +3836,10 @@ async def calculate_and_show_results_with_ai(update: Update, context: ContextTyp
         
         # Відправляємо заключне повідомлення
         if lang == 'uk':
-            outro_text = ("💡 Щоб отримати більш детальний звіт \n усіх 7 програм – натисніть /more.\n"
+            outro_text = ("💡Детальний звіт для усіх 7 програм – натисніть /more.\n"
                          "💡 Щоб почати новий пошук — /start.")
         else:
-            outro_text = ("💡 To get a more detailed report \n of all 7 programs – click /more.\n"
+            outro_text = ("💡 Detailed report of all 7 programs – click /more.\n"
                          "💡 To start a new search — /start.")
         
         await context.bot.send_message(
