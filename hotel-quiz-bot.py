@@ -293,7 +293,7 @@ def generate_smart_fallback(hotel_brand: str, styles: list, purposes: list, lang
         return f"{hotel_brand} hotels are renowned for their {style_desc} service and perfectly suit {purpose_desc}. This choice guarantees an unforgettable stay with all necessary amenities and exceptional service quality."
 
 async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
-                                   selected_purposes: list, lang: str = 'uk') -> str:
+                                   selected_purposes: list, lang: str = 'en') -> str:
     """
     Генерує персоналізований опис готелю
     """
@@ -502,481 +502,6 @@ def translate_purposes_to_english(purposes):
     return translated
 
 
-# Додати після існуючих констант у ЧАСТИНІ 2
-
-# ===============================
-# ДОДАНО: КОНСТАНТИ ДЛЯ ІМІТАЦІЇ ПЛАТНОГО ДОСТУПУ
-# ===============================
-
-# Емодзі та символи для красивого оформлення
-PAYMENT_EMOJIS = {
-    'premium': '⭐',
-    'money': '💰', 
-    'check': '✅',
-    'lock': '🔒',
-    'unlock': '🔓',
-    'card': '💳',
-    'sparkles': '✨',
-    'rocket': '🚀',
-    'crown': '👑'
-}
-
-# Ціна доступу
-PREMIUM_PRICE = "$5"
-PREMIUM_PRICE_UAH = "180₴"
-
-# Час "обробки" платежу (в секундах)
-PAYMENT_PROCESSING_TIME = 3
-
-# ===============================
-# НОВІ ФУНКЦІЇ ДЛЯ ПЛАТНОГО ДОСТУПУ
-# ===============================
-
-def check_user_premium_status(user_id):
-    """
-    Перевіряє чи користувач має преміум доступ
-    В реальному боті тут була б перевірка бази даних
-    """
-    # Для демонстрації: всі користувачі НЕ мають преміум доступу спочатку
-    return user_data_global.get(user_id, {}).get('has_premium', False)
-
-def grant_premium_access(user_id):
-    """Надає преміум доступ користувачу"""
-    if user_id not in user_data_global:
-        user_data_global[user_id] = {}
-    user_data_global[user_id]['has_premium'] = True
-    user_data_global[user_id]['premium_granted_at'] = pd.Timestamp.now()
-    logger.info(f"Надано преміум доступ користувачу {user_id}")
-
-async def show_premium_paywall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Показує красиве повідомлення про необхідність оплати
-    """
-    user_id = update.effective_user.id
-    lang = user_data_global.get(user_id, {}).get('language', 'uk')
-    
-    if lang == 'uk':
-        premium_text = f"""
-{PAYMENT_EMOJIS['crown']} **HotelBot Premium** {PAYMENT_EMOJIS['crown']}
-
-{PAYMENT_EMOJIS['sparkles']} **Персоналізований підбір готелів з ШІ**
-• Унікальні описи готелів на базі ваших уподобань
-• Топ-3 найкращі програми лояльності для вас
-• Фото готелів та посилання на Google Maps
-• Детальний аналіз по всіх 7 програмах лояльності
-
-{PAYMENT_EMOJIS['rocket']} **Що ви отримаєте:**
-• Персоналізовані рекомендації готелів
-• AI-генеровані описи під ваш стиль подорожей  
-• Прямі посилання на реєстрацію в програмах
-• Рейтинг готелів на основі Google Maps
-• Детальна аналітика по регіонах та сегментах
-
-{PAYMENT_EMOJIS['money']} **Вартість:** {PREMIUM_PRICE_UAH} ({PREMIUM_PRICE})
-{PAYMENT_EMOJIS['check']} Одноразовий платіж • Миттєвий доступ
-
-_Отримайте персоналізовані рекомендації готелів вже зараз!_
-"""
-    else:
-        premium_text = f"""
-{PAYMENT_EMOJIS['crown']} **HotelBot Premium** {PAYMENT_EMOJIS['crown']}
-
-{PAYMENT_EMOJIS['sparkles']} **AI-Powered Personalized Hotel Recommendations**
-• Unique hotel descriptions based on your preferences
-• Top 3 best loyalty programs for you
-• Hotel photos and Google Maps links
-• Detailed analysis of all 7 loyalty programs
-
-{PAYMENT_EMOJIS['rocket']} **What you'll get:**
-• Personalized hotel recommendations
-• AI-generated descriptions for your travel style
-• Direct links to loyalty program registration
-• Hotel ratings based on Google Maps
-• Detailed analytics by regions and segments
-
-{PAYMENT_EMOJIS['money']} **Price:** {PREMIUM_PRICE}
-{PAYMENT_EMOJIS['check']} One-time payment • Instant access
-
-_Get personalized hotel recommendations right now!_
-"""
-    
-    # Створюємо красиву кнопку для "оплати"
-    keyboard = []
-    
-    if lang == 'uk':
-        pay_button = InlineKeyboardButton(
-            f"{PAYMENT_EMOJIS['card']} Оплатити {PREMIUM_PRICE_UAH}",
-            callback_data="simulate_payment"
-        )
-        
-        keyboard.append([pay_button])
-        
-        # Додаємо кнопку "Більше інформації" для реалістичності
-        info_button = InlineKeyboardButton(
-            "ℹ️ Детальніше про Premium",
-            callback_data="premium_info"
-        )
-        keyboard.append([info_button])
-        
-    else:
-        pay_button = InlineKeyboardButton(
-            f"{PAYMENT_EMOJIS['card']} Pay {PREMIUM_PRICE}",
-            callback_data="simulate_payment"
-        )
-        
-        keyboard.append([pay_button])
-        
-        # Додаємо кнопку "More information" для реалістичності  
-        info_button = InlineKeyboardButton(
-            "ℹ️ More about Premium",
-            callback_data="premium_info"
-        )
-        keyboard.append([info_button])
-    
-    try:
-        await context.bot.send_message(
-            chat_id=update.message.chat_id,
-            text=premium_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        # Fallback без Markdown
-        await context.bot.send_message(
-            chat_id=update.message.chat_id,
-            text=premium_text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    
-    return ConversationHandler.END
-
-async def handle_payment_simulation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обробляє імітацію платежу
-    """
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    lang = user_data_global.get(user_id, {}).get('language', 'uk')
-    
-    if query.data == "simulate_payment":
-        # Показуємо процес "обробки платежу"
-        if lang == 'uk':
-            processing_text = f"""
-{PAYMENT_EMOJIS['card']} **Обробка платежу...**
-
-{PAYMENT_EMOJIS['lock']} Перевіряємо платіжні дані
-{PAYMENT_EMOJIS['money']} Сума: {PREMIUM_PRICE_UAH}
-
-_Зачекайте, будь ласка..._
-"""
-        else:
-            processing_text = f"""
-{PAYMENT_EMOJIS['card']} **Processing payment...**
-
-{PAYMENT_EMOJIS['lock']} Verifying payment details
-{PAYMENT_EMOJIS['money']} Amount: {PREMIUM_PRICE}
-
-_Please wait..._
-"""
-        
-        await query.edit_message_text(
-            text=processing_text,
-            parse_mode="Markdown"
-        )
-        
-        # Імітація часу обробки
-        await asyncio.sleep(PAYMENT_PROCESSING_TIME)
-        
-        # Надаємо доступ
-        grant_premium_access(user_id)
-        
-        # Показуємо успішне повідомлення
-        if lang == 'uk':
-            success_text = f"""
-{PAYMENT_EMOJIS['check']} **Платіж успішно оброблено!**
-
-{PAYMENT_EMOJIS['unlock']} **HotelBot Premium активовано**
-{PAYMENT_EMOJIS['sparkles']} Тепер ви маєте доступ до всіх преміум функцій!
-
-{PAYMENT_EMOJIS['rocket']} Розпочніть пошук ідеальних готелів:
-Натисніть /start щоб почати персоналізований підбір
-"""
-        else:
-            success_text = f"""
-{PAYMENT_EMOJIS['check']} **Payment processed successfully!**
-
-{PAYMENT_EMOJIS['unlock']} **HotelBot Premium activated**
-{PAYMENT_EMOJIS['sparkles']} You now have access to all premium features!
-
-{PAYMENT_EMOJIS['rocket']} Start finding perfect hotels:
-Click /start to begin personalized recommendations
-"""
-        
-        # Кнопка для початку роботи
-        start_keyboard = []
-        if lang == 'uk':
-            start_button = InlineKeyboardButton(
-                f"{PAYMENT_EMOJIS['rocket']} Почати підбір готелів",
-                callback_data="start_premium_flow"
-            )
-        else:
-            start_button = InlineKeyboardButton(
-                f"{PAYMENT_EMOJIS['rocket']} Start Hotel Search",
-                callback_data="start_premium_flow"
-            )
-        
-        start_keyboard.append([start_button])
-        
-        await query.edit_message_text(
-            text=success_text,
-            reply_markup=InlineKeyboardMarkup(start_keyboard),
-            parse_mode="Markdown"
-        )
-        
-    elif query.data == "premium_info":
-        # Показуємо додаткову інформацію про Premium
-        if lang == 'uk':
-            info_text = f"""
-{PAYMENT_EMOJIS['crown']} **Детальніше про HotelBot Premium**
-
-{PAYMENT_EMOJIS['sparkles']} **Унікальні можливості:**
-
-**🤖 AI-описи готелів**
-Штучний інтелект створює персоналізовані описи готелів на основі ваших уподобань щодо стилю подорожей та мети поїздки.
-
-**📊 Розумна аналітика** 
-Детальний аналіз усіх 7 найбільших програм лояльності готелів з урахуванням рейтингів з Google Maps.
-
-**🎯 Персоналізація**
-Рекомендації враховують ваші регіони подорожей, стиль готелів, цілі поїздок та сегмент (Luxury/Comfort/Standard).
-
-**📱 Зручність**
-Прямі посилання на реєстрацію в програмах лояльності, фото готелів та карти.
-
-**💎 Преміум підтримка**
-Постійні оновлення бази готелів та покращення алгоритмів підбору.
-
-{PAYMENT_EMOJIS['money']} **Вартість: {PREMIUM_PRICE_UAH} - одноразово**
-{PAYMENT_EMOJIS['check']} Без підписки • Назавжди ваш
-"""
-        else:
-            info_text = f"""
-{PAYMENT_EMOJIS['crown']} **More about HotelBot Premium**
-
-{PAYMENT_EMOJIS['sparkles']} **Unique Features:**
-
-**🤖 AI Hotel Descriptions**
-Artificial intelligence creates personalized hotel descriptions based on your preferences for travel style and trip purpose.
-
-**📊 Smart Analytics**
-Detailed analysis of all 7 major hotel loyalty programs with Google Maps ratings integration.
-
-**🎯 Personalization**
-Recommendations consider your travel regions, hotel styles, trip purposes and segments (Luxury/Comfort/Standard).
-
-**📱 Convenience**
-Direct links to loyalty program registration, hotel photos and maps.
-
-**💎 Premium Support**
-Regular hotel database updates and recommendation algorithm improvements.
-
-{PAYMENT_EMOJIS['money']} **Price: {PREMIUM_PRICE} - one time**
-{PAYMENT_EMOJIS['check']} No subscription • Yours forever
-"""
-        
-        # Кнопка повернення до оплати
-        back_keyboard = []
-        if lang == 'uk':
-            back_button = InlineKeyboardButton(
-                f"← Повернутися до оплати",
-                callback_data="back_to_payment"
-            )
-        else:
-            back_button = InlineKeyboardButton(
-                f"← Back to Payment",
-                callback_data="back_to_payment"
-            )
-        
-        back_keyboard.append([back_button])
-        
-        await query.edit_message_text(
-            text=info_text,
-            reply_markup=InlineKeyboardMarkup(back_keyboard),
-            parse_mode="Markdown"
-        )
-        
-    elif query.data == "back_to_payment":
-        # Повертаємося до екрану оплати
-        # Відтворюємо оригінальне повідомлення з paywall
-        # (можна викликати show_premium_paywall, але простіше відтворити контент)
-        
-        if lang == 'uk':
-            premium_text = f"""
-{PAYMENT_EMOJIS['crown']} **HotelBot Premium** {PAYMENT_EMOJIS['crown']}
-
-{PAYMENT_EMOJIS['sparkles']} **Персоналізований підбір готелів з ШІ**
-• Унікальні описи готелів на базі ваших уподобань
-• Топ-3 найкращі програми лояльності для вас
-• Фото готелів та посилання на Google Maps
-• Детальний аналіз по всіх 7 програмах лояльності
-
-{PAYMENT_EMOJIS['rocket']} **Що ви отримаєте:**
-• Персоналізовані рекомендації готелів
-• AI-генеровані описи під ваш стиль подорожей  
-• Прямі посилання на реєстрацію в програмах
-• Рейтинг готелів на основі Google Maps
-• Детальна аналітика по регіонах та сегментах
-
-{PAYMENT_EMOJIS['money']} **Вартість:** {PREMIUM_PRICE_UAH} ({PREMIUM_PRICE})
-{PAYMENT_EMOJIS['check']} Одноразовий платіж • Миттєвий доступ
-
-_Отримайте персоналізовані рекомендації готелів вже зараз!_
-"""
-        else:
-            premium_text = f"""
-{PAYMENT_EMOJIS['crown']} **HotelBot Premium** {PAYMENT_EMOJIS['crown']}
-
-{PAYMENT_EMOJIS['sparkles']} **AI-Powered Personalized Hotel Recommendations**
-• Unique hotel descriptions based on your preferences
-• Top 3 best loyalty programs for you
-• Hotel photos and Google Maps links
-• Detailed analysis of all 7 loyalty programs
-
-{PAYMENT_EMOJIS['rocket']} **What you'll get:**
-• Personalized hotel recommendations
-• AI-generated descriptions for your travel style
-• Direct links to loyalty program registration
-• Hotel ratings based on Google Maps
-• Detailed analytics by regions and segments
-
-{PAYMENT_EMOJIS['money']} **Price:** {PREMIUM_PRICE}
-{PAYMENT_EMOJIS['check']} One-time payment • Instant access
-
-_Get personalized hotel recommendations right now!_
-"""
-        
-        # Відтворюємо кнопки
-        keyboard = []
-        
-        if lang == 'uk':
-            pay_button = InlineKeyboardButton(
-                f"{PAYMENT_EMOJIS['card']} Оплатити {PREMIUM_PRICE_UAH}",
-                callback_data="simulate_payment"
-            )
-            info_button = InlineKeyboardButton(
-                "ℹ️ Детальніше про Premium",
-                callback_data="premium_info"
-            )
-        else:
-            pay_button = InlineKeyboardButton(
-                f"{PAYMENT_EMOJIS['card']} Pay {PREMIUM_PRICE}",
-                callback_data="simulate_payment"
-            )
-            info_button = InlineKeyboardButton(
-                "ℹ️ More about Premium",
-                callback_data="premium_info"
-            )
-        
-        keyboard.append([pay_button])
-        keyboard.append([info_button])
-        
-        await query.edit_message_text(
-            text=premium_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-        
-    elif query.data == "start_premium_flow":
-        # Користувач натиснув кнопку "Почати підбір" після оплати
-        # Перенаправляємо на функцію start
-        await query.edit_message_text(
-            text=query.message.text,  # Зберігаємо попереднє повідомлення
-            reply_markup=None  # Прибираємо кнопки
-        )
-        
-        # Симулюємо виклик /start
-        fake_update = type('FakeUpdate', (), {
-            'effective_user': query.from_user,
-            'message': type('FakeMessage', (), {
-                'chat_id': query.message.chat_id,
-                'from_user': query.from_user
-            })()
-        })()
-        
-        # Викликаємо функцію start
-        return await start(fake_update, context)
-
-# ===============================
-# МОДИФІКАЦІЯ ФУНКЦІЇ START
-# ===============================
-
-async def start_with_premium_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    ОНОВЛЕНА функція старту з перевіркою преміум статусу
-    """
-    user_id = update.effective_user.id
-    
-    # Завжди очищати дані користувача при використанні команди /start
-    if user_id in user_data_global:
-        # Зберігаємо преміум статус при очищенні
-        has_premium = user_data_global[user_id].get('has_premium', False)
-        premium_granted_at = user_data_global[user_id].get('premium_granted_at', None)
-        del user_data_global[user_id]
-        
-        # Відновлюємо преміум дані
-        user_data_global[user_id] = {
-            'language': 'uk',
-            'has_premium': has_premium,
-            'premium_granted_at': premium_granted_at
-        }
-    else:
-        # Ініціалізація нових даних з українською мовою за замовчуванням
-        user_data_global[user_id] = {'language': 'uk', 'has_premium': False}
-    
-    # Перевіряємо преміум статус
-    if not check_user_premium_status(user_id):
-        logger.info(f"User {user_id} doesn't have premium access. Showing paywall.")
-        return await show_premium_paywall(update, context)
-    
-    # Якщо користувач має преміум доступ - продовжуємо зі звичайним флоу
-    logger.info(f"User {user_id} has premium access. Starting regular flow.")
-    
-    # Одразу переходимо до першого питання про регіони  
-    return await ask_region(update, context)
-
-# ===============================
-# ОНОВЛЕННЯ MAIN ФУНКЦІЇ ДЛЯ ДОДАВАННЯ ОБРОБНИКІВ
-# ===============================
-
-def add_payment_handlers_to_main():
-    """
-    Код для додавання до main() функції:
-    """
-    code_to_add = '''
-    # ДОДАНО: Обробники для імітації платежів
-    application.add_handler(CallbackQueryHandler(handle_payment_simulation, pattern="^(simulate_payment|premium_info|back_to_payment|start_premium_flow)$"))
-    
-    # ЗМІНЕНО: Замінюємо звичайний start на start_with_premium_check
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start_with_premium_check)],  # ЗМІНЕНО ТУТ
-        states={
-            WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
-            CATEGORY: [CallbackQueryHandler(category_choice)],
-            WAITING_STYLE_SUBMIT: [CallbackQueryHandler(style_choice)],
-            WAITING_PURPOSE_SUBMIT: [CallbackQueryHandler(purpose_choice)]
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start_with_premium_check)  # І ТУТ ТЕОЖ ЗМІНЕНО
-        ]
-    )
-    '''
-    
-    return code_to_add
-
-
 
 # ===============================
 # ЧАСТИНА 3: ФУНКЦІЇ АНАЛІЗУ CSV ТА ЗАВАНТАЖЕННЯ ДАНИХ
@@ -1086,7 +611,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         del user_data_global[user_id]
     
     # Ініціалізація нових даних з українською мовою за замовчуванням
-    user_data_global[user_id] = {'language': 'uk'}
+    user_data_global[user_id] = {'language': 'en'}
     
     # Логування початку нової розмови
     logger.info(f"User {user_id} started a new conversation. Data cleared.")
@@ -1792,7 +1317,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ЧАСТИНА 7: ОБРОБНИКИ СТИЛЮ
 # ===============================
 
-def get_styles_for_category(category, lang='uk'):
+def get_styles_for_category(category, lang='en'):
     """
     Повертає список стилів, які відповідають обраній категорії готелю
     """
@@ -2071,7 +1596,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 import asyncio  # Додаємо імпорт для затримки
 
-def get_purposes_for_category(category, lang='uk'):
+def get_purposes_for_category(category, lang='en'):
     """
     Повертає список цілей подорожі, які відповідають обраній категорії готелю
     """
@@ -5049,10 +4574,6 @@ def format_admin_scoring_report(user_data, scores_df):
 # ФУНКЦІЯ MAIN ТА ЗАПУСК БОТА
 # ===============================
 
-# ===============================
-# ЗМІНИ В ФУНКЦІЇ MAIN() - ЗАМІНИТИ ІСНУЮЧИЙ КОД
-# ===============================
-
 def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None):
     """Головна функція запуску бота з підтримкою webhook"""
     # Завантаження даних
@@ -5086,19 +4607,9 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     # Побудова застосунку
     application = app.build()
     
-    # ===============================
-    # ОНОВЛЕНО: Налаштування обробників з підтримкою платного доступу
-    # ===============================
-    
-    # ДОДАНО: Обробник для кнопок платежу (ДОДАТИ ПЕРЕД conv_handler)
-    application.add_handler(CallbackQueryHandler(
-        handle_payment_simulation, 
-        pattern="^(simulate_payment|premium_info|back_to_payment|start_premium_flow)$"
-    ))
-    
-    # ОНОВЛЕНО: Основний обробник розмови з новою функцією start
+    # ОНОВЛЕНО: Налаштування обробників з додаванням команди /more
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start_with_premium_check)],  # ЗМІНЕНО: start -> start_with_premium_check
+        entry_points=[CommandHandler("start", start)],
         states={
             WAITING_REGION_SUBMIT: [CallbackQueryHandler(region_choice)],
             CATEGORY: [CallbackQueryHandler(category_choice)],
@@ -5107,7 +4618,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("start", start_with_premium_check)  # ЗМІНЕНО: start -> start_with_premium_check
+            CommandHandler("start", start)  # Додаємо /start як fallback
         ]
     )
     
@@ -5122,11 +4633,10 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
     
     # ДОДАНО: Логування доступних команд
     logger.info("Зареєстровані команди бота:")
-    logger.info("  /start - початок опитування (з перевіркою Premium)")
+    logger.info("  /start - початок опитування")
     logger.info("  /cancel - скасування розмови")
     logger.info("  /more - детальний розбір останніх результатів")
     logger.info("  /21 - адміністративний розбір нарахування балів")
-    logger.info("НОВЕ: Додано підтримку Premium підписки з імітацією платежу")
     
     # ВИПРАВЛЕНО: Отримуємо порт з змінних середовища
     port = int(os.environ.get("PORT", "10000"))
@@ -5156,11 +4666,7 @@ def main(token, csv_path, webhook_url=None, webhook_port=None, webhook_path=None
         logger.info("WEBHOOK_URL не вказано. Запуск бота в режимі polling...")
         application.run_polling(allowed_updates=Update.ALL_TYPES)
     
-    logger.info("Бот успішно запущено з підтримкою Premium підписки та рейтингових розрахунків")
-
-# ===============================
-# ТАКОЖ ОНОВИТИ ЛОГУВАННЯ В КІНЦІ ФАЙЛУ
-# ===============================
+    logger.info("Бот успішно запущено з підтримкою рейтингових розрахунків")
 
 if __name__ == "__main__":
     # Використовуємо змінні середовища або значення за замовчуванням
@@ -5183,9 +4689,9 @@ if __name__ == "__main__":
     if TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
         logger.warning("Токен бота не налаштовано! Встановіть змінну середовища TELEGRAM_BOT_TOKEN або змініть значення в коді.")
     
-    # ОНОВЛЕНО: Логування версії бота
+    # ДОДАНО: Логування версії бота
     logger.info("="*60)
-    logger.info("🤖 HOTEL LOYALTY PROGRAM BOT v3.0 (WITH PREMIUM SUBSCRIPTION)")  # ЗМІНЕНО версію
+    logger.info("🤖 HOTEL LOYALTY PROGRAM BOT v2.0 (WITH RATINGS)")
     logger.info("="*60)
     
     # ВИПРАВЛЕНО: Додаткове логування для діагностики
@@ -5195,17 +4701,11 @@ if __name__ == "__main__":
     logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
     logger.info(f"PORT: {os.environ.get('PORT', '10000')}")
     
-    # ДОДАНО: Логування налаштувань рейтингів та Premium
+    # ДОДАНО: Логування налаштувань рейтингів
     logger.info(f"Loyalty program ratings loaded: {len(LOYALTY_PROGRAM_RATINGS)} programs")
     logger.info("Available ratings:")
     for program, rating in LOYALTY_PROGRAM_RATINGS.items():
         logger.info(f"  {program}: {rating}★")
-    
-    # НОВЕ: Логування Premium налаштувань
-    logger.info("Premium subscription settings:")
-    logger.info(f"  Price: {PREMIUM_PRICE} ({PREMIUM_PRICE_UAH})")
-    logger.info(f"  Payment processing time: {PAYMENT_PROCESSING_TIME}s")
-    logger.info("  Premium features: AI descriptions, personalized recommendations, photos")
     
     # Запускаємо бота з підтримкою webhook або polling
     main(TOKEN, CSV_PATH, WEBHOOK_URL, 10000, WEBHOOK_PATH)
