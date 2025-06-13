@@ -1103,7 +1103,7 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         regions_description = (
             "Question 1/4:\n"
             "In which regions of the world are you planning to travel?\n"
-            "*(Select one or multiple options)*\n\n"
+            "(Select one or multiple options)\n\n"
             "1. Europe\n"
             "2. North America\n"
             "3. Asia\n"
