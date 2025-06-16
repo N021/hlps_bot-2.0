@@ -3954,7 +3954,7 @@ async def calculate_and_show_results_with_ai(update: Update, context: ContextTyp
         # Відправляємо заключне повідомлення
         if lang == 'uk':
             outro_text = ("💡 Детальний звіт для усіх 7 програм – натисніть /more.\n"
-                         "💡 Щоб почати нове опитування — /start.")
+                         "💡 Щоб почати нове опитування — \n/start.")
         else:
             outro_text = ("💡 Detailed report of all 7 programs – click /more.\n"
                          "💡 To start a new search — /start.")
