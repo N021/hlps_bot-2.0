@@ -293,7 +293,7 @@ def generate_smart_fallback(hotel_brand: str, styles: list, purposes: list, lang
         return f"{hotel_brand} hotels are renowned for their {style_desc} service and perfectly suit {purpose_desc}. This choice guarantees an unforgettable stay with all necessary amenities and exceptional service quality."
 
 async def generate_hotel_description(hotel_name: str, hotel_brand: str, selected_styles: list, 
-                                   selected_purposes: list, lang: str = 'en') -> str:
+                                   selected_purposes: list, lang: str = 'uk') -> str:
     """
     Генерує персоналізований опис готелю
     """
@@ -611,7 +611,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         del user_data_global[user_id]
     
     # Ініціалізація нових даних з українською мовою за замовчуванням
-    user_data_global[user_id] = {'language': 'en'}
+    user_data_global[user_id] = {'language': 'uk'}
     
     # Логування початку нової розмови
     logger.info(f"User {user_id} started a new conversation. Data cleared.")
@@ -1103,7 +1103,7 @@ async def ask_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         regions_description = (
             "Question 1/4:\n"
             "In which regions of the world are you planning to travel?\n"
-            "(Select one or multiple options)\n\n"
+            "*(Select one or multiple options)*\n\n"
             "1. Europe\n"
             "2. North America\n"
             "3. Asia\n"
@@ -1317,7 +1317,7 @@ async def category_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ЧАСТИНА 7: ОБРОБНИКИ СТИЛЮ
 # ===============================
 
-def get_styles_for_category(category, lang='en'):
+def get_styles_for_category(category, lang='uk'):
     """
     Повертає список стилів, які відповідають обраній категорії готелю
     """
@@ -1596,7 +1596,7 @@ async def style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 import asyncio  # Додаємо імпорт для затримки
 
-def get_purposes_for_category(category, lang='en'):
+def get_purposes_for_category(category, lang='uk'):
     """
     Повертає список цілей подорожі, які відповідають обраній категорії готелю
     """
